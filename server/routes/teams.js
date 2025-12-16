@@ -151,4 +151,61 @@ router.post('/:id/logo', authenticate, upload.single('logo'), async (req, res) =
   }
 });
 
+router.post('/:id/members', authenticate, async (req, res) => {
+  try {
+    if (!hasTeamAccess(req.user, req.params.id, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const { email, role } = req.body;
+
+    let user = await prisma.user.findUnique({ where: { email } });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'ユーザーが見つかりません' });
+    }
+
+    const existing = await prisma.userTeam.findFirst({
+      where: { userId: user.id, teamId: req.params.id }
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: 'このユーザーは既にチームメンバーです' });
+    }
+
+    const userTeam = await prisma.userTeam.create({
+      data: {
+        userId: user.id,
+        teamId: req.params.id,
+        role: role
+      },
+      include: { user: true }
+    });
+
+    res.json(userTeam);
+  } catch (error) {
+    console.error('Add member error:', error);
+    res.status(500).json({ error: 'メンバーの追加に失敗しました' });
+  }
+});
+
+router.delete('/:id/members/:userId', authenticate, async (req, res) => {
+  try {
+    if (!hasTeamAccess(req.user, req.params.id, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    await prisma.userTeam.deleteMany({
+      where: {
+        userId: req.params.userId,
+        teamId: req.params.id
+      }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'メンバーの削除に失敗しました' });
+  }
+});
+
 module.exports = router;
