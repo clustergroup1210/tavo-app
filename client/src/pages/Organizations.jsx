@@ -16,10 +16,19 @@ export default function Organizations() {
   const fetchOrganizations = async () => {
     try {
       const res = await fetch('/api/organizations', { credentials: 'include' });
+      if (!res.ok) {
+        setOrganizations([]);
+        return;
+      }
       const data = await res.json();
+      if (!Array.isArray(data)) {
+        setOrganizations([]);
+        return;
+      }
       setOrganizations(data);
     } catch (error) {
       console.error('Failed to fetch organizations:', error);
+      setOrganizations([]);
     } finally {
       setLoading(false);
     }

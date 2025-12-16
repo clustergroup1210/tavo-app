@@ -33,13 +33,17 @@ model Organization {
 model Team {
   id             String   @id @default(uuid())
   organizationId String
+  parentId       String?
   name           String
   logoUrl        String?
   description    String?
+  sortOrder      Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   organization   Organization @relation(fields: [organizationId], references: [id])
+  parent         Team?        @relation("TeamHierarchy", fields: [parentId], references: [id])
+  children       Team[]       @relation("TeamHierarchy")
   users          UserTeam[]
   players        Player[]
   evaluationItems EvaluationItem[]

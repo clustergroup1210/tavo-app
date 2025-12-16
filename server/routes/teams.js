@@ -23,13 +23,35 @@ router.get('/', authenticate, async (req, res) => {
     let teams;
     if (isOperator) {
       teams = await prisma.team.findMany({
-        include: { organization: true, _count: { select: { players: true, users: true } } }
+        where: { parentId: null },
+        include: { 
+          organization: true, 
+          _count: { select: { players: true, users: true } },
+          children: {
+            include: {
+              _count: { select: { players: true, users: true } }
+            },
+            orderBy: { sortOrder: 'asc' }
+          }
+        },
+        orderBy: { sortOrder: 'asc' }
       });
     } else {
       const teamIds = req.user.teams?.map(t => t.teamId) || [];
       teams = await prisma.team.findMany({
-        where: { id: { in: teamIds } },
-        include: { organization: true, _count: { select: { players: true, users: true } } }
+        where: { id: { in: teamIds }, parentId: null },
+        include: { 
+          organization: true, 
+          _count: { select: { players: true, users: true } },
+          children: {
+            where: { id: { in: teamIds } },
+            include: {
+              _count: { select: { players: true, users: true } }
+            },
+            orderBy: { sortOrder: 'asc' }
+          }
+        },
+        orderBy: { sortOrder: 'asc' }
       });
     }
 
@@ -46,6 +68,11 @@ router.get('/:id', authenticate, async (req, res) => {
       where: { id: req.params.id },
       include: {
         organization: true,
+        parent: true,
+        children: {
+          include: { _count: { select: { players: true } } },
+          orderBy: { sortOrder: 'asc' }
+        },
         players: true,
         users: { include: { user: true } },
         evaluationItems: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } }
@@ -64,10 +91,16 @@ router.get('/:id', authenticate, async (req, res) => {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { name, organizationId, description } = req.body;
+    const { name, organizationId, description, parentId } = req.body;
+
+    let orgId = organizationId;
+    if (parentId && !organizationId) {
+      const parent = await prisma.team.findUnique({ where: { id: parentId } });
+      if (parent) orgId = parent.organizationId;
+    }
 
     const team = await prisma.team.create({
-      data: { name, organizationId, description }
+      data: { name, organizationId: orgId, description, parentId }
     });
 
     await prisma.userTeam.create({

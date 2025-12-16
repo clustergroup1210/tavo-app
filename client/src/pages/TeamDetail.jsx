@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Building2, Upload, Save } from 'lucide-react';
+import { Building2, Upload, Save, Users, Plus } from 'lucide-react';
 
 export default function TeamDetail() {
   const { id } = useParams();
@@ -173,6 +173,40 @@ export default function TeamDetail() {
           </div>
         </div>
       </div>
+
+      {team.children?.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">サブチーム</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {team.children.map((subTeam) => (
+              <Link
+                key={subTeam.id}
+                to={`/teams/${subTeam.id}`}
+                className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-gray-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900">{subTeam.name}</p>
+                  <p className="text-sm text-gray-500 flex items-center gap-1">
+                    <Users className="w-3 h-3" />
+                    {subTeam._count?.players || 0}名
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {team.parent && (
+        <div className="bg-blue-50 rounded-xl p-4">
+          <p className="text-sm text-blue-700">
+            親チーム: <Link to={`/teams/${team.parent.id}`} className="font-medium underline">{team.parent.name}</Link>
+          </p>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">チームメンバー</h3>

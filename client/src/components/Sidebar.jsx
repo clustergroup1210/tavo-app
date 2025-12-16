@@ -38,7 +38,6 @@ export default function Sidebar() {
       return {
         main: [
           { path: '/dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
-          { path: '/organizations', label: 'クラブ一覧', icon: Building2 },
           { path: '/teams', label: 'チーム一覧', icon: Building2 },
           { path: '/players', label: '選手一覧', icon: Users },
           { path: '/evaluations/entry', label: '評価データ', icon: ClipboardList },
