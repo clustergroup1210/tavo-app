@@ -7,6 +7,7 @@ async function main() {
   console.log('Seeding database...');
 
   const hashedPassword = await bcrypt.hash('password123', 10);
+  const adminPassword = await bcrypt.hash('admin123', 10);
 
   const org = await prisma.organization.upsert({
     where: { id: 'org-1' },
@@ -19,10 +20,10 @@ async function main() {
 
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
-    update: {},
+    update: { password: adminPassword },
     create: {
       email: 'admin@example.com',
-      password: hashedPassword,
+      password: adminPassword,
       name: '管理者 太郎',
     },
   });
@@ -181,7 +182,7 @@ async function main() {
 
   console.log('Seed completed!');
   console.log('Test accounts:');
-  console.log('  Admin: admin@example.com / password123');
+  console.log('  Admin: admin@example.com / admin123');
   console.log('  Coach: coach@example.com / password123');
   console.log('  Player: player@example.com / password123');
 }

@@ -115,7 +115,7 @@ After running the seed script, the following accounts are available:
 
 | Role | Email | Password |
 |------|-------|----------|
-| Operator Admin | admin@example.com | password123 |
+| Operator Admin | admin@example.com | admin123 |
 | Head Coach | coach@example.com | password123 |
 | Player | player@example.com | password123 |
 
