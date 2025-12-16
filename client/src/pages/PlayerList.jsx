@@ -6,13 +6,15 @@ import { UserCircle, Plus } from 'lucide-react';
 export default function PlayerList() {
   const { currentTeam, isCoach } = useAuth();
   const [players, setPlayers] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: '' });
+  const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: '', teamId: '' });
 
   useEffect(() => {
     if (currentTeam) {
       fetchPlayers();
+      fetchCategories();
     }
   }, [currentTeam]);
 
@@ -28,6 +30,24 @@ export default function PlayerList() {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch(`/api/teams/${currentTeam.id}`, { credentials: 'include' });
+      const team = await res.json();
+      const cats = [];
+      if (team.children && team.children.length > 0) {
+        team.children.forEach(child => {
+          cats.push({ id: child.id, name: child.name });
+        });
+      }
+      cats.unshift({ id: currentTeam.id, name: currentTeam.name + '（トップ）' });
+      setCategories(cats);
+      setNewPlayer(prev => ({ ...prev, teamId: currentTeam.id }));
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
+    }
+  };
+
   const handleCreatePlayer = async (e) => {
     e.preventDefault();
     try {
@@ -35,10 +55,15 @@ export default function PlayerList() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ ...newPlayer, teamId: currentTeam.id }),
+        body: JSON.stringify({ 
+          name: newPlayer.name,
+          number: newPlayer.number,
+          position: newPlayer.position,
+          teamId: newPlayer.teamId || currentTeam.id 
+        }),
       });
       if (res.ok) {
-        setNewPlayer({ name: '', number: '', position: '' });
+        setNewPlayer({ name: '', number: '', position: '', teamId: currentTeam.id });
         setShowCreateModal(false);
         fetchPlayers();
       }
@@ -155,6 +180,19 @@ export default function PlayerList() {
                   <option value="DF">DF</option>
                   <option value="MF">MF</option>
                   <option value="FW">FW</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">所属カテゴリー</label>
+                <select
+                  value={newPlayer.teamId}
+                  onChange={(e) => setNewPlayer({ ...newPlayer, teamId: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  required
+                >
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
                 </select>
               </div>
               <div className="flex justify-end gap-3">

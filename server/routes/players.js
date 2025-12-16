@@ -20,7 +20,15 @@ router.get('/', authenticate, async (req, res) => {
     
     const where = {};
     if (teamId) {
-      where.teamId = teamId;
+      const team = await prisma.team.findUnique({
+        where: { id: teamId },
+        include: { children: { select: { id: true } } }
+      });
+      const teamIds = [teamId];
+      if (team?.children) {
+        team.children.forEach(child => teamIds.push(child.id));
+      }
+      where.teamId = { in: teamIds };
     } else {
       const isOperator = req.user.organizations?.some(o => 
         ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
