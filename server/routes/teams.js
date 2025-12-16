@@ -99,6 +99,21 @@ router.post('/', authenticate, async (req, res) => {
       if (parent) orgId = parent.organizationId;
     }
 
+    if (!orgId) {
+      const userOrg = req.user.organizations?.[0];
+      if (userOrg) {
+        orgId = userOrg.organizationId;
+      } else {
+        let defaultOrg = await prisma.organization.findFirst();
+        if (!defaultOrg) {
+          defaultOrg = await prisma.organization.create({
+            data: { name: 'Default Organization' }
+          });
+        }
+        orgId = defaultOrg.id;
+      }
+    }
+
     const team = await prisma.team.create({
       data: { name, organizationId: orgId, description, parentId }
     });
