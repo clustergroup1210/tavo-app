@@ -168,7 +168,7 @@ export default function TeamList() {
                     className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-primary-600 hover:bg-primary-50 rounded-lg"
                   >
                     <Plus className="w-4 h-4" />
-                    サブチーム追加
+                    カテゴリー追加
                   </button>
                 )}
               </div>
@@ -204,12 +204,12 @@ export default function TeamList() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              {parentTeamId ? 'サブチーム作成' : '新規チーム作成'}
+              {parentTeamId ? 'カテゴリー作成' : '新規チーム作成'}
             </h2>
             <form onSubmit={handleCreateTeam}>
               <input
                 type="text"
-                placeholder={parentTeamId ? 'サブチーム名（例: Aチーム）' : 'チーム名'}
+                placeholder={parentTeamId ? 'カテゴリー名（例: Aチーム）' : 'チーム名'}
                 value={newTeamName}
                 onChange={(e) => setNewTeamName(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4"
