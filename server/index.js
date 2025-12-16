@@ -1,0 +1,44 @@
+const express = require('express');
+const cors = require('cors');
+const cookieParser = require('cookie-parser');
+const path = require('path');
+require('dotenv').config();
+
+const authRoutes = require('./routes/auth');
+const teamRoutes = require('./routes/teams');
+const playerRoutes = require('./routes/players');
+const evaluationRoutes = require('./routes/evaluations');
+const userRoutes = require('./routes/users');
+const invitationRoutes = require('./routes/invitations');
+const appealRoutes = require('./routes/appeals');
+const videoRoutes = require('./routes/videos');
+const organizationRoutes = require('./routes/organizations');
+
+const app = express();
+
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json());
+app.use(cookieParser());
+app.use('/uploads/logos', express.static(path.join(__dirname, '../uploads')));
+
+app.use('/api/auth', authRoutes);
+app.use('/api/teams', teamRoutes);
+app.use('/api/players', playerRoutes);
+app.use('/api/evaluations', evaluationRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/invitations', invitationRoutes);
+app.use('/api/appeals', appealRoutes);
+app.use('/api/videos', videoRoutes);
+app.use('/api/organizations', organizationRoutes);
+
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../client/dist')));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+  });
+}
+
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+});

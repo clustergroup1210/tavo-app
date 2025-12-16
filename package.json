@@ -1,15 +1,40 @@
 {
-  "name": "nodejs",
+  "name": "player-development-system",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Player development support system",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "node server/index.js",
+    "client": "vite",
+    "build": "vite build",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/node": "^22.13.11"
+    "@prisma/client": "^6.2.1",
+    "@types/node": "^22.13.11",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "bcryptjs": "^3.0.2",
+    "clsx": "^2.1.1",
+    "concurrently": "^9.2.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.474.0",
+    "multer": "^1.4.5-lts.1",
+    "postcss": "^8.5.1",
+    "prisma": "^6.2.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.1",
+    "tailwindcss": "^3.4.17",
+    "uuid": "^11.0.5",
+    "vite": "^6.0.7"
   }
 }
