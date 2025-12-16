@@ -16,19 +16,23 @@ const upload = multer({ storage });
 
 router.get('/', authenticate, async (req, res) => {
   try {
-    const { teamId } = req.query;
+    const { teamId, includeChildren } = req.query;
     
     const where = {};
     if (teamId) {
-      const team = await prisma.team.findUnique({
-        where: { id: teamId },
-        include: { children: { select: { id: true } } }
-      });
-      const teamIds = [teamId];
-      if (team?.children) {
-        team.children.forEach(child => teamIds.push(child.id));
+      if (includeChildren === 'true') {
+        const team = await prisma.team.findUnique({
+          where: { id: teamId },
+          include: { children: { select: { id: true } } }
+        });
+        const teamIds = [teamId];
+        if (team?.children) {
+          team.children.forEach(child => teamIds.push(child.id));
+        }
+        where.teamId = { in: teamIds };
+      } else {
+        where.teamId = teamId;
       }
-      where.teamId = { in: teamIds };
     } else {
       const isOperator = req.user.organizations?.some(o => 
         ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)

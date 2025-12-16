@@ -1,28 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { UserCircle, Plus } from 'lucide-react';
+import { UserCircle, Plus, ChevronUp, ChevronDown, Filter, X } from 'lucide-react';
 
 export default function PlayerList() {
   const { currentTeam, isCoach } = useAuth();
   const [players, setPlayers] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [allTeams, setAllTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: '', teamId: '' });
 
+  const [sortField, setSortField] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
+  const [filterTeam, setFilterTeam] = useState('');
+  const [filterPosition, setFilterPosition] = useState('');
+
   useEffect(() => {
     if (currentTeam) {
       fetchPlayers();
-      fetchCategories();
+      fetchTeams();
     }
   }, [currentTeam]);
 
   const fetchPlayers = async () => {
     try {
-      const res = await fetch(`/api/players?teamId=${currentTeam.id}`, { credentials: 'include' });
+      const res = await fetch(`/api/players?teamId=${currentTeam.id}&includeChildren=true`, { credentials: 'include' });
       const data = await res.json();
-      setPlayers(data);
+      setPlayers(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch players:', error);
     } finally {
@@ -30,21 +35,20 @@ export default function PlayerList() {
     }
   };
 
-  const fetchCategories = async () => {
+  const fetchTeams = async () => {
     try {
       const res = await fetch(`/api/teams/${currentTeam.id}`, { credentials: 'include' });
       const team = await res.json();
-      const cats = [];
+      const cats = [{ id: currentTeam.id, name: currentTeam.name + '（トップ）' }];
       if (team.children && team.children.length > 0) {
         team.children.forEach(child => {
           cats.push({ id: child.id, name: child.name });
         });
       }
-      cats.unshift({ id: currentTeam.id, name: currentTeam.name + '（トップ）' });
-      setCategories(cats);
+      setAllTeams(cats);
       setNewPlayer(prev => ({ ...prev, teamId: currentTeam.id }));
     } catch (error) {
-      console.error('Failed to fetch categories:', error);
+      console.error('Failed to fetch teams:', error);
     }
   };
 
@@ -72,6 +76,57 @@ export default function PlayerList() {
     }
   };
 
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field) => {
+    if (sortField !== field) return null;
+    return sortDirection === 'asc' ? 
+      <ChevronUp className="w-4 h-4 inline ml-1" /> : 
+      <ChevronDown className="w-4 h-4 inline ml-1" />;
+  };
+
+  const sortedAndFilteredPlayers = () => {
+    let result = [...players];
+
+    if (filterTeam) {
+      result = result.filter(p => p.teamId === filterTeam);
+    }
+
+    if (filterPosition) {
+      result = result.filter(p => p.position === filterPosition);
+    }
+
+    result.sort((a, b) => {
+      let aVal = a[sortField] || '';
+      let bVal = b[sortField] || '';
+      
+      if (sortField === 'number') {
+        aVal = parseInt(aVal) || 999;
+        bVal = parseInt(bVal) || 999;
+      }
+      
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  };
+
+  const clearFilters = () => {
+    setFilterTeam('');
+    setFilterPosition('');
+  };
+
+  const hasActiveFilters = filterTeam || filterPosition;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -79,6 +134,8 @@ export default function PlayerList() {
       </div>
     );
   }
+
+  const displayPlayers = sortedAndFilteredPlayers();
 
   return (
     <div className="space-y-6">
@@ -98,26 +155,85 @@ export default function PlayerList() {
         )}
       </div>
 
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-gray-500" />
+            <span className="text-sm font-medium text-gray-700">フィルター:</span>
+          </div>
+          
+          <div>
+            <select
+              value={filterTeam}
+              onChange={(e) => setFilterTeam(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+            >
+              <option value="">全カテゴリー</option>
+              {allTeams.map((team) => (
+                <option key={team.id} value={team.id}>{team.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <select
+              value={filterPosition}
+              onChange={(e) => setFilterPosition(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+            >
+              <option value="">全ポジション</option>
+              <option value="GK">GK</option>
+              <option value="DF">DF</option>
+              <option value="MF">MF</option>
+              <option value="FW">FW</option>
+            </select>
+          </div>
+
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 px-2 py-1 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+            >
+              <X className="w-4 h-4" />
+              クリア
+            </button>
+          )}
+
+          <div className="ml-auto text-sm text-gray-500">
+            {displayPlayers.length}件表示
+          </div>
+        </div>
+      </div>
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                選手
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('name')}
+              >
+                選手 {getSortIcon('name')}
+              </th>
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('number')}
+              >
+                背番号 {getSortIcon('number')}
+              </th>
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('position')}
+              >
+                ポジション {getSortIcon('position')}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                背番号
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                ポジション
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                チーム
+                カテゴリー
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {players.map((player) => (
+            {displayPlayers.map((player) => (
               <tr key={player.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <Link to={`/players/${player.id}`} className="flex items-center gap-3">
@@ -140,6 +256,13 @@ export default function PlayerList() {
                 </td>
               </tr>
             ))}
+            {displayPlayers.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                  {hasActiveFilters ? '条件に一致する選手がいません' : '選手が登録されていません'}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -147,7 +270,12 @@ export default function PlayerList() {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">選手登録</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">選手登録</h2>
+              <button onClick={() => setShowCreateModal(false)} className="p-1 hover:bg-gray-100 rounded">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
             <form onSubmit={handleCreatePlayer} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">名前</label>
@@ -190,8 +318,8 @@ export default function PlayerList() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   required
                 >
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  {allTeams.map((team) => (
+                    <option key={team.id} value={team.id}>{team.name}</option>
                   ))}
                 </select>
               </div>
