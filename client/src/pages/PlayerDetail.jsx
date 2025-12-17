@@ -5,7 +5,7 @@ import { UserCircle, Upload, Link2, TrendingUp, Video, ClipboardList, Edit2, Sav
 
 export default function PlayerDetail() {
   const { id } = useParams();
-  const { user, isCoach } = useAuth();
+  const { user, isCoach, isOperator } = useAuth();
   const [player, setPlayer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -162,7 +162,7 @@ export default function PlayerDetail() {
   }
 
   const isSelf = player.userId === user?.id;
-  const isCoachOrAdmin = isCoach(player.teamId);
+  const isCoachOrAdmin = isCoach(player.teamId) || isOperator();
   const canEdit = isSelf || isCoachOrAdmin;
 
   const tabs = [
@@ -358,12 +358,12 @@ export default function PlayerDetail() {
                   {player.team?.parent ? player.team.parent.name : player.team?.name}
                 </span>
               </div>
-              {player.team?.parent && (
-                <div>
-                  <span className="text-gray-500">カテゴリー:</span>
-                  <span className="ml-2 text-gray-900">{player.team.name}</span>
-                </div>
-              )}
+              <div>
+                <span className="text-gray-500">カテゴリー:</span>
+                <span className="ml-2 text-gray-900">
+                  {player.team?.parent ? player.team.name : '-'}
+                </span>
+              </div>
             </div>
           )}
         </div>

@@ -127,18 +127,23 @@ router.put('/:id', authenticate, async (req, res) => {
 
     const isSelf = player.userId === req.user.id;
     const isCoachOrAdmin = hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
+    const isOperator = req.user.organizations?.some(o => 
+      ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+    );
     
-    if (!isSelf && !isCoachOrAdmin) {
+    if (!isSelf && !isCoachOrAdmin && !isOperator) {
       return res.status(403).json({ error: 'Access denied' });
     }
+    
+    const canChangeTeam = isCoachOrAdmin || isOperator;
 
     const updateData = {};
     if (name !== undefined) updateData.name = name;
     if (number !== undefined) updateData.number = number;
     if (position !== undefined) updateData.position = position;
     if (birthDate !== undefined) updateData.birthDate = birthDate ? new Date(birthDate) : null;
-    if (teamId !== undefined && isCoachOrAdmin) {
-      const canAccessDestination = hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
+    if (teamId !== undefined && canChangeTeam) {
+      const canAccessDestination = isOperator || hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
       if (!canAccessDestination) {
         return res.status(403).json({ error: 'Access denied to destination team' });
       }
