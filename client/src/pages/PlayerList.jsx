@@ -4,28 +4,71 @@ import { useAuth } from '../contexts/AuthContext';
 import { UserCircle, Plus, ChevronUp, ChevronDown, Filter, X } from 'lucide-react';
 
 export default function PlayerList() {
-  const { currentTeam, isCoach } = useAuth();
+  const { currentTeam, isCoach, isOperator } = useAuth();
   const [players, setPlayers] = useState([]);
-  const [allTeams, setAllTeams] = useState([]);
+  const [parentTeams, setParentTeams] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: '', teamId: '' });
 
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
-  const [filterTeam, setFilterTeam] = useState('');
+  const [filterParentTeam, setFilterParentTeam] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
   const [filterPosition, setFilterPosition] = useState('');
 
   useEffect(() => {
-    if (currentTeam) {
-      fetchPlayers();
-      fetchTeams();
-    }
+    fetchAllTeams();
   }, [currentTeam]);
+
+  useEffect(() => {
+    if (currentTeam || isOperator()) {
+      fetchPlayers();
+    }
+  }, [currentTeam, filterParentTeam]);
+  
+  const getDefaultTeamId = () => {
+    return filterCategory || filterParentTeam || currentTeam?.id || (categories.length > 0 ? categories[0].id : '');
+  };
+
+  useEffect(() => {
+    if (categories.length > 0 && !newPlayer.teamId) {
+      setNewPlayer(prev => ({ ...prev, teamId: getDefaultTeamId() }));
+    }
+  }, [categories]);
+
+  useEffect(() => {
+    const newTeamId = getDefaultTeamId();
+    if (newTeamId) {
+      setNewPlayer(prev => ({ ...prev, teamId: newTeamId }));
+    }
+  }, [filterCategory, filterParentTeam, currentTeam]);
+  
+  const openCreateModal = () => {
+    setNewPlayer({ name: '', number: '', position: '', teamId: getDefaultTeamId() });
+    setShowCreateModal(true);
+  };
 
   const fetchPlayers = async () => {
     try {
-      const res = await fetch(`/api/players?teamId=${currentTeam.id}&includeChildren=true`, { credentials: 'include' });
+      let url = '/api/players';
+      const params = new URLSearchParams();
+      
+      if (isOperator() && filterParentTeam) {
+        params.append('teamId', filterParentTeam);
+        params.append('includeChildren', 'true');
+      } else if (isOperator() && !filterParentTeam) {
+      } else if (currentTeam) {
+        params.append('teamId', currentTeam.id);
+        params.append('includeChildren', 'true');
+      }
+      
+      if (params.toString()) {
+        url += '?' + params.toString();
+      }
+      
+      const res = await fetch(url, { credentials: 'include' });
       const data = await res.json();
       setPlayers(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -35,25 +78,65 @@ export default function PlayerList() {
     }
   };
 
-  const fetchTeams = async () => {
+  const fetchAllTeams = async () => {
     try {
-      const res = await fetch(`/api/teams/${currentTeam.id}`, { credentials: 'include' });
-      const team = await res.json();
-      const cats = [{ id: currentTeam.id, name: currentTeam.name + '（トップ）' }];
-      if (team.children && team.children.length > 0) {
-        team.children.forEach(child => {
-          cats.push({ id: child.id, name: child.name });
-        });
+      const cats = [];
+      
+      if (isOperator()) {
+        const res = await fetch('/api/teams', { credentials: 'include' });
+        const teams = await res.json();
+        setParentTeams(Array.isArray(teams) ? teams : []);
+        
+        if (Array.isArray(teams)) {
+          teams.forEach(team => {
+            cats.push({ id: team.id, name: team.name, parentId: null });
+            if (team.children) {
+              team.children.forEach(child => {
+                cats.push({ id: child.id, name: child.name, parentId: team.id, parentName: team.name });
+              });
+            }
+          });
+        }
+      } else if (currentTeam) {
+        const teamRes = await fetch(`/api/teams/${currentTeam.id}`, { credentials: 'include' });
+        const teamData = await teamRes.json();
+        if (teamData) {
+          if (teamData.parent) {
+            const parentRes = await fetch(`/api/teams/${teamData.parent.id}`, { credentials: 'include' });
+            const parentData = await parentRes.json();
+            if (parentData) {
+              cats.push({ id: parentData.id, name: parentData.name, parentId: null });
+              if (parentData.children) {
+                parentData.children.forEach(child => {
+                  cats.push({ id: child.id, name: child.name, parentId: parentData.id, parentName: parentData.name });
+                });
+              }
+            }
+          } else {
+            cats.push({ id: teamData.id, name: teamData.name, parentId: null });
+            if (teamData.children) {
+              teamData.children.forEach(child => {
+                cats.push({ id: child.id, name: child.name, parentId: teamData.id, parentName: teamData.name });
+              });
+            }
+          }
+        }
       }
-      setAllTeams(cats);
-      setNewPlayer(prev => ({ ...prev, teamId: currentTeam.id }));
+      
+      setCategories(cats);
     } catch (error) {
       console.error('Failed to fetch teams:', error);
+      setLoading(false);
     }
   };
 
   const handleCreatePlayer = async (e) => {
     e.preventDefault();
+    const targetTeamId = newPlayer.teamId || filterCategory || currentTeam?.id || (categories.length > 0 ? categories[0].id : '');
+    if (!targetTeamId) {
+      console.error('No team selected');
+      return;
+    }
     try {
       const res = await fetch('/api/players', {
         method: 'POST',
@@ -63,11 +146,12 @@ export default function PlayerList() {
           name: newPlayer.name,
           number: newPlayer.number,
           position: newPlayer.position,
-          teamId: newPlayer.teamId || currentTeam.id 
+          teamId: targetTeamId
         }),
       });
       if (res.ok) {
-        setNewPlayer({ name: '', number: '', position: '', teamId: currentTeam.id });
+        const defaultTeamId = filterCategory || currentTeam?.id || (categories.length > 0 ? categories[0].id : '');
+        setNewPlayer({ name: '', number: '', position: '', teamId: defaultTeamId });
         setShowCreateModal(false);
         fetchPlayers();
       }
@@ -95,8 +179,8 @@ export default function PlayerList() {
   const sortedAndFilteredPlayers = () => {
     let result = [...players];
 
-    if (filterTeam) {
-      result = result.filter(p => p.teamId === filterTeam);
+    if (filterCategory) {
+      result = result.filter(p => p.teamId === filterCategory);
     }
 
     if (filterPosition) {
@@ -121,11 +205,16 @@ export default function PlayerList() {
   };
 
   const clearFilters = () => {
-    setFilterTeam('');
+    setFilterParentTeam('');
+    setFilterCategory('');
     setFilterPosition('');
   };
 
-  const hasActiveFilters = filterTeam || filterPosition;
+  const hasActiveFilters = filterParentTeam || filterCategory || filterPosition;
+  
+  const filteredCategories = filterParentTeam 
+    ? categories.filter(c => c.parentId === filterParentTeam || c.id === filterParentTeam)
+    : categories;
 
   if (loading) {
     return (
@@ -144,9 +233,9 @@ export default function PlayerList() {
           <h1 className="text-2xl font-bold text-gray-900">選手一覧</h1>
           <p className="mt-1 text-sm text-gray-500">{players.length}名の選手</p>
         </div>
-        {currentTeam && isCoach(currentTeam.id) && (
+        {(isOperator() || (currentTeam && isCoach(currentTeam.id))) && (
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={openCreateModal}
             className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
           >
             <Plus className="w-4 h-4" />
@@ -162,15 +251,35 @@ export default function PlayerList() {
             <span className="text-sm font-medium text-gray-700">フィルター:</span>
           </div>
           
+          {isOperator() && (
+            <div>
+              <select
+                value={filterParentTeam}
+                onChange={(e) => {
+                  setFilterParentTeam(e.target.value);
+                  setFilterCategory('');
+                }}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
+              >
+                <option value="">全チーム</option>
+                {parentTeams.map((team) => (
+                  <option key={team.id} value={team.id}>{team.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div>
             <select
-              value={filterTeam}
-              onChange={(e) => setFilterTeam(e.target.value)}
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
               className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
             >
               <option value="">全カテゴリー</option>
-              {allTeams.map((team) => (
-                <option key={team.id} value={team.id}>{team.name}</option>
+              {filteredCategories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.parentName ? `${cat.parentName} / ${cat.name}` : cat.name}
+                </option>
               ))}
             </select>
           </div>
@@ -318,8 +427,10 @@ export default function PlayerList() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   required
                 >
-                  {allTeams.map((team) => (
-                    <option key={team.id} value={team.id}>{team.name}</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.parentName ? `${cat.parentName} / ${cat.name}` : cat.name}
+                    </option>
                   ))}
                 </select>
               </div>

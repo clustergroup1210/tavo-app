@@ -57,7 +57,7 @@ export default function TeamDetail() {
 
   const fetchPlayers = async () => {
     try {
-      const res = await fetch(`/api/players?teamId=${id}`, { credentials: 'include' });
+      const res = await fetch(`/api/players?teamId=${id}&includeChildren=true`, { credentials: 'include' });
       const data = await res.json();
       setPlayers(Array.isArray(data) ? data : []);
     } catch (error) {
