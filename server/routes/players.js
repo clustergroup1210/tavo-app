@@ -65,7 +65,7 @@ router.get('/:id', authenticate, async (req, res) => {
     const player = await prisma.player.findUnique({
       where: { id: req.params.id },
       include: {
-        team: true,
+        team: { include: { parent: true } },
         user: { select: { id: true, email: true, name: true } },
         parents: { include: { user: { select: { id: true, email: true, name: true } } } },
         evaluations: {
@@ -118,7 +118,7 @@ router.post('/', authenticate, async (req, res) => {
 
 router.put('/:id', authenticate, async (req, res) => {
   try {
-    const { name, number, position, birthDate } = req.body;
+    const { name, number, position, birthDate, teamId } = req.body;
 
     const player = await prisma.player.findUnique({ where: { id: req.params.id } });
     if (!player) {
@@ -137,14 +137,26 @@ router.put('/:id', authenticate, async (req, res) => {
     if (number !== undefined) updateData.number = number;
     if (position !== undefined) updateData.position = position;
     if (birthDate !== undefined) updateData.birthDate = birthDate ? new Date(birthDate) : null;
+    if (teamId !== undefined && isCoachOrAdmin) {
+      const canAccessDestination = hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
+      if (!canAccessDestination) {
+        return res.status(403).json({ error: 'Access denied to destination team' });
+      }
+      updateData.teamId = teamId;
+      await prisma.playerTeamHistory.create({
+        data: { playerId: req.params.id, teamId, joinedAt: new Date() }
+      });
+    }
 
     const updated = await prisma.player.update({
       where: { id: req.params.id },
-      data: updateData
+      data: updateData,
+      include: { team: { include: { parent: true } } }
     });
 
     res.json(updated);
   } catch (error) {
+    console.error('Update player error:', error);
     res.status(500).json({ error: 'Failed to update player' });
   }
 });

@@ -11,13 +11,25 @@ export default function PlayerDetail() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [evaluationSummary, setEvaluationSummary] = useState([]);
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', number: '', position: '' });
+  const [editForm, setEditForm] = useState({ name: '', number: '', position: '', teamId: '' });
   const [saving, setSaving] = useState(false);
+  const [teams, setTeams] = useState([]);
 
   useEffect(() => {
     fetchPlayer();
     fetchEvaluationSummary();
+    fetchTeams();
   }, [id]);
+
+  const fetchTeams = async () => {
+    try {
+      const res = await fetch('/api/teams', { credentials: 'include' });
+      const data = await res.json();
+      setTeams(data);
+    } catch (error) {
+      console.error('Failed to fetch teams:', error);
+    }
+  };
 
   const fetchPlayer = async () => {
     try {
@@ -80,24 +92,47 @@ export default function PlayerDetail() {
     setEditForm({
       name: player.name || '',
       number: player.number || '',
-      position: player.position || ''
+      position: player.position || '',
+      teamId: player.teamId || ''
     });
     setEditing(true);
   };
 
   const cancelEditing = () => {
     setEditing(false);
-    setEditForm({ name: '', number: '', position: '' });
+    setEditForm({ name: '', number: '', position: '', teamId: '' });
+  };
+
+  const getParentTeams = () => {
+    return teams.filter(t => !t.parentId);
+  };
+
+  const getChildTeams = (parentId) => {
+    return teams.filter(t => t.parentId === parentId);
+  };
+
+  const getCurrentParentId = () => {
+    const currentTeam = teams.find(t => t.id === editForm.teamId);
+    if (!currentTeam) return '';
+    return currentTeam.parentId || currentTeam.id;
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
+      const payload = {
+        name: editForm.name,
+        number: editForm.number,
+        position: editForm.position
+      };
+      if (isCoachOrAdmin && editForm.teamId && editForm.teamId !== player.teamId) {
+        payload.teamId = editForm.teamId;
+      }
       const res = await fetch(`/api/players/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(editForm),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         await fetchPlayer();
@@ -127,7 +162,8 @@ export default function PlayerDetail() {
   }
 
   const isSelf = player.userId === user?.id;
-  const canEdit = isSelf || isCoach(player.teamId);
+  const isCoachOrAdmin = isCoach(player.teamId);
+  const canEdit = isSelf || isCoachOrAdmin;
 
   const tabs = [
     { id: 'dashboard', label: 'ダッシュボード', icon: UserCircle },
@@ -248,6 +284,42 @@ export default function PlayerDetail() {
                   <option value="FW">FW</option>
                 </select>
               </div>
+              {isCoachOrAdmin && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">チーム</label>
+                    <select
+                      value={getCurrentParentId()}
+                      onChange={(e) => {
+                        const parentId = e.target.value;
+                        const children = getChildTeams(parentId);
+                        setEditForm({ ...editForm, teamId: children.length > 0 ? '' : parentId });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="">選択してください</option>
+                      {getParentTeams().map((team) => (
+                        <option key={team.id} value={team.id}>{team.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {getCurrentParentId() && getChildTeams(getCurrentParentId()).length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">カテゴリー</label>
+                      <select
+                        value={editForm.teamId}
+                        onChange={(e) => setEditForm({ ...editForm, teamId: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      >
+                        <option value="">選択してください</option>
+                        {getChildTeams(getCurrentParentId()).map((team) => (
+                          <option key={team.id} value={team.id}>{team.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={handleSave}
@@ -282,8 +354,16 @@ export default function PlayerDetail() {
               </div>
               <div>
                 <span className="text-gray-500">チーム:</span>
-                <span className="ml-2 text-gray-900">{player.team?.name}</span>
+                <span className="ml-2 text-gray-900">
+                  {player.team?.parent ? player.team.parent.name : player.team?.name}
+                </span>
               </div>
+              {player.team?.parent && (
+                <div>
+                  <span className="text-gray-500">カテゴリー:</span>
+                  <span className="ml-2 text-gray-900">{player.team.name}</span>
+                </div>
+              )}
             </div>
           )}
         </div>
