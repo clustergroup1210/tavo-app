@@ -395,7 +395,9 @@ export default function TeamDetail() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{player.number || '-'}</td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{player.position || '-'}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{player.team?.name || '-'}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {player.team?.parentId ? player.team.name : '-'}
+                    </td>
                   </tr>
                 ))}
               </tbody>

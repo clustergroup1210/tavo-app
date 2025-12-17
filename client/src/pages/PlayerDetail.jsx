@@ -25,7 +25,16 @@ export default function PlayerDetail() {
     try {
       const res = await fetch('/api/teams', { credentials: 'include' });
       const data = await res.json();
-      setTeams(data);
+      const flatTeams = [];
+      data.forEach(team => {
+        flatTeams.push({ ...team, children: undefined });
+        if (team.children) {
+          team.children.forEach(child => {
+            flatTeams.push({ ...child, parentId: team.id });
+          });
+        }
+      });
+      setTeams(flatTeams);
     } catch (error) {
       console.error('Failed to fetch teams:', error);
     }

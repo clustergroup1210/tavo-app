@@ -47,7 +47,7 @@ router.get('/', authenticate, async (req, res) => {
     const players = await prisma.player.findMany({
       where,
       include: {
-        team: true,
+        team: { include: { parent: true } },
         user: { select: { id: true, email: true, name: true } },
         evaluations: { take: 5, orderBy: { evaluatedAt: 'desc' } }
       }
