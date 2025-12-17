@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { UserCircle, Upload, Link2, TrendingUp, Video, ClipboardList } from 'lucide-react';
+import { UserCircle, Upload, Link2, TrendingUp, Video, ClipboardList, Edit2, Save, X } from 'lucide-react';
 
 export default function PlayerDetail() {
   const { id } = useParams();
@@ -10,6 +10,9 @@ export default function PlayerDetail() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [evaluationSummary, setEvaluationSummary] = useState([]);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', number: '', position: '' });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchPlayer();
@@ -70,6 +73,44 @@ export default function PlayerDetail() {
       fetchPlayer();
     } catch (error) {
       console.error('Failed to create appeal:', error);
+    }
+  };
+
+  const startEditing = () => {
+    setEditForm({
+      name: player.name || '',
+      number: player.number || '',
+      position: player.position || ''
+    });
+    setEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setEditing(false);
+    setEditForm({ name: '', number: '', position: '' });
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/players/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(editForm),
+      });
+      if (res.ok) {
+        await fetchPlayer();
+        setEditing(false);
+      } else {
+        const data = await res.json();
+        alert(data.error || '更新に失敗しました');
+      }
+    } catch (error) {
+      console.error('Failed to update player:', error);
+      alert('更新に失敗しました');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -160,25 +201,91 @@ export default function PlayerDetail() {
 
       {activeTab === 'dashboard' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">基本情報</h2>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-gray-500">名前:</span>
-              <span className="ml-2 text-gray-900">{player.name}</span>
-            </div>
-            <div>
-              <span className="text-gray-500">背番号:</span>
-              <span className="ml-2 text-gray-900">{player.number || '-'}</span>
-            </div>
-            <div>
-              <span className="text-gray-500">ポジション:</span>
-              <span className="ml-2 text-gray-900">{player.position || '-'}</span>
-            </div>
-            <div>
-              <span className="text-gray-500">チーム:</span>
-              <span className="ml-2 text-gray-900">{player.team?.name}</span>
-            </div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">基本情報</h2>
+            {canEdit && !editing && (
+              <button
+                onClick={startEditing}
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-primary-600 hover:bg-primary-50 rounded-lg"
+              >
+                <Edit2 className="w-4 h-4" />
+                編集
+              </button>
+            )}
           </div>
+          
+          {editing ? (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">名前</label>
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">背番号</label>
+                <input
+                  type="text"
+                  value={editForm.number}
+                  onChange={(e) => setEditForm({ ...editForm, number: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">ポジション</label>
+                <select
+                  value={editForm.position}
+                  onChange={(e) => setEditForm({ ...editForm, position: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">選択してください</option>
+                  <option value="GK">GK</option>
+                  <option value="DF">DF</option>
+                  <option value="MF">MF</option>
+                  <option value="FW">FW</option>
+                </select>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  {saving ? '保存中...' : '保存'}
+                </button>
+                <button
+                  onClick={cancelEditing}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                >
+                  <X className="w-4 h-4" />
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-500">名前:</span>
+                <span className="ml-2 text-gray-900">{player.name}</span>
+              </div>
+              <div>
+                <span className="text-gray-500">背番号:</span>
+                <span className="ml-2 text-gray-900">{player.number || '-'}</span>
+              </div>
+              <div>
+                <span className="text-gray-500">ポジション:</span>
+                <span className="ml-2 text-gray-900">{player.position || '-'}</span>
+              </div>
+              <div>
+                <span className="text-gray-500">チーム:</span>
+                <span className="ml-2 text-gray-900">{player.team?.name}</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

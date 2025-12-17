@@ -125,18 +125,22 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Player not found' });
     }
 
-    if (!hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'])) {
+    const isSelf = player.userId === req.user.id;
+    const isCoachOrAdmin = hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
+    
+    if (!isSelf && !isCoachOrAdmin) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (number !== undefined) updateData.number = number;
+    if (position !== undefined) updateData.position = position;
+    if (birthDate !== undefined) updateData.birthDate = birthDate ? new Date(birthDate) : null;
+
     const updated = await prisma.player.update({
       where: { id: req.params.id },
-      data: {
-        name,
-        number,
-        position,
-        birthDate: birthDate ? new Date(birthDate) : null
-      }
+      data: updateData
     });
 
     res.json(updated);
