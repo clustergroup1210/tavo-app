@@ -119,7 +119,43 @@ After running the seed script, the following accounts are available:
 | Head Coach | coach@example.com | password123 |
 | Player | player@example.com | password123 |
 
+## System Administration
+
+### Operator Dashboard (/admin)
+Operators (OPERATOR_ADMIN, OPERATOR_MANAGER, OPERATOR_STAFF) are redirected to /admin upon login.
+
+**Features:**
+- System-wide statistics (total teams, players, users)
+- Team list with search, showing: team name, representative, player count, category count, creation date
+- "管理画面を開く" button to view team details
+- "チームとしてログイン" button for team impersonation
+
+### Team Impersonation
+Operators can impersonate any team:
+1. Click "管理画面を開く" on team list
+2. View team overview (players, categories, staff)
+3. Click "チームとしてログイン" to access team dashboard
+4. Use "管理画面に戻る" link in sidebar to return to admin
+
+### Admin Navigation
+Separate sidebar for operators:
+- ダッシュボード, チーム管理, ユーザー管理
+- 組織管理, マスタ設定, 通知管理, システム設定
+
+### Player Profile Enhancement
+Rich card-based player detail page:
+- Gradient header with photo, number, name (kanji + romaji), position badge
+- Basic info grid: birthdate, height, weight, dominant foot, hometown, school, previous team
+- Tabbed navigation: 評価データ, 動画, コメント/ノート, 上達状況, アピール
+- Coach notes with add/delete functionality
+
 ## Recent Changes
+- System admin dashboard with team impersonation feature
+- Separate admin routing (/admin/*) for operators
+- AdminSidebar and AdminLayout for system management views
+- AdminUserManagement for system-wide user management
+- Player notes feature with hierarchical access control
+- Enhanced player profile with rich card-based UI
 - Initial implementation with full role-based access control
 - clevio-style sidebar UI with organization switching for operators
 - Complete evaluation system with rounds and duplicate prevention
