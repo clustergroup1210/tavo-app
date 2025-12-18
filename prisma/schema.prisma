@@ -65,6 +65,7 @@ model User {
   players       Player[]
   parentPlayers PlayerParent[]
   evaluations   Evaluation[]
+  playerNotes   PlayerNote[]
 }
 
 model UserOrganization {
@@ -120,6 +121,7 @@ model Player {
   appealLinks AppealLink[]
   videos      Video[]
   teamHistory PlayerTeamHistory[]
+  notes       PlayerNote[]
 }
 
 model PlayerParent {
@@ -142,6 +144,18 @@ model PlayerTeamHistory {
   leftAt    DateTime?
 
   player Player @relation(fields: [playerId], references: [id])
+}
+
+model PlayerNote {
+  id        String   @id @default(uuid())
+  playerId  String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  author User   @relation(fields: [authorId], references: [id])
 }
 
 model EvaluationItem {

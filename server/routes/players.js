@@ -173,6 +173,78 @@ router.put('/:id', authenticate, async (req, res) => {
   }
 });
 
+router.get('/:id/notes', authenticate, async (req, res) => {
+  try {
+    const notes = await prisma.playerNote.findMany({
+      where: { playerId: req.params.id },
+      include: { author: { select: { id: true, name: true, avatarUrl: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(notes);
+  } catch (error) {
+    console.error('Get notes error:', error);
+    res.status(500).json({ error: 'Failed to fetch notes' });
+  }
+});
+
+router.post('/:id/notes', authenticate, async (req, res) => {
+  try {
+    const { content } = req.body;
+    const player = await prisma.player.findUnique({ 
+      where: { id: req.params.id },
+      include: { team: { select: { parentId: true } } }
+    });
+    
+    const isCoachOrAdmin = hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']) ||
+      (player.team?.parentId && hasTeamAccess(req.user, player.team.parentId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']));
+    const isOperator = req.user.organizations?.some(o => 
+      ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+    );
+
+    if (!isCoachOrAdmin && !isOperator) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const note = await prisma.playerNote.create({
+      data: {
+        playerId: req.params.id,
+        authorId: req.user.id,
+        content
+      },
+      include: { author: { select: { id: true, name: true, avatarUrl: true } } }
+    });
+
+    res.json(note);
+  } catch (error) {
+    console.error('Create note error:', error);
+    res.status(500).json({ error: 'Failed to create note' });
+  }
+});
+
+router.delete('/:id/notes/:noteId', authenticate, async (req, res) => {
+  try {
+    const note = await prisma.playerNote.findUnique({ where: { id: req.params.noteId } });
+    if (!note) {
+      return res.status(404).json({ error: 'Note not found' });
+    }
+
+    if (note.authorId !== req.user.id) {
+      const isOperator = req.user.organizations?.some(o => 
+        ['OPERATOR_ADMIN', 'OPERATOR_MANAGER'].includes(o.role)
+      );
+      if (!isOperator) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+    }
+
+    await prisma.playerNote.delete({ where: { id: req.params.noteId } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete note error:', error);
+    res.status(500).json({ error: 'Failed to delete note' });
+  }
+});
+
 router.post('/:id/passport', authenticate, upload.single('passport'), async (req, res) => {
   try {
     const player = await prisma.player.findUnique({ where: { id: req.params.id } });
