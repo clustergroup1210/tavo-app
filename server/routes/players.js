@@ -118,7 +118,7 @@ router.post('/', authenticate, async (req, res) => {
 
 router.put('/:id', authenticate, async (req, res) => {
   try {
-    const { name, number, position, birthDate, teamId } = req.body;
+    const { name, nameRomaji, number, position, birthDate, height, weight, dominantFoot, hometown, school, previousTeam, teamId } = req.body;
 
     const player = await prisma.player.findUnique({ where: { id: req.params.id } });
     if (!player) {
@@ -139,9 +139,16 @@ router.put('/:id', authenticate, async (req, res) => {
 
     const updateData = {};
     if (name !== undefined) updateData.name = name;
+    if (nameRomaji !== undefined) updateData.nameRomaji = nameRomaji;
     if (number !== undefined) updateData.number = number;
     if (position !== undefined) updateData.position = position;
     if (birthDate !== undefined) updateData.birthDate = birthDate ? new Date(birthDate) : null;
+    if (height !== undefined) updateData.height = height ? parseInt(height) : null;
+    if (weight !== undefined) updateData.weight = weight ? parseInt(weight) : null;
+    if (dominantFoot !== undefined) updateData.dominantFoot = dominantFoot;
+    if (hometown !== undefined) updateData.hometown = hometown;
+    if (school !== undefined) updateData.school = school;
+    if (previousTeam !== undefined) updateData.previousTeam = previousTeam;
     if (teamId !== undefined && canChangeTeam) {
       const canAccessDestination = isOperator || hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
       if (!canAccessDestination) {
