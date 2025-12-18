@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   LayoutDashboard, Users, UserCircle, ClipboardList, Video, 
   Bell, Settings, Building2, UserCog, ListChecks, Database,
-  Link2, FileText, TrendingUp, LogOut, Megaphone
+  Link2, FileText, TrendingUp, LogOut, Megaphone, ArrowLeft, Shield
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -127,6 +127,15 @@ export default function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 flex flex-col">
       <div className="p-4 border-b border-gray-200">
+        {isOperator() && (
+          <Link
+            to="/admin"
+            className="flex items-center gap-2 px-3 py-2 mb-3 text-sm text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            管理画面に戻る
+          </Link>
+        )}
         <div className="flex items-center gap-3">
           {currentTeam?.logoUrl ? (
             <img
