@@ -222,4 +222,305 @@ router.get('/summary/:playerId', authenticate, async (req, res) => {
   }
 });
 
+router.get('/comparison/:playerId', authenticate, async (req, res) => {
+  try {
+    const { roundId } = req.query;
+    
+    const player = await prisma.player.findUnique({
+      where: { id: req.params.playerId },
+      include: { team: true }
+    });
+    
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
+    const items = await prisma.evaluationItem.findMany({
+      where: { teamId: player.teamId, isActive: true },
+      orderBy: { sortOrder: 'asc' }
+    });
+
+    const evalWhere = { playerId: req.params.playerId };
+    if (roundId) evalWhere.roundId = roundId;
+
+    const evaluations = await prisma.evaluation.findMany({
+      where: evalWhere,
+      include: { item: { include: { parent: { include: { parent: true } } } }, round: true },
+      orderBy: { evaluatedAt: 'desc' }
+    });
+
+    const latestRoundId = roundId || (evaluations.length > 0 ? evaluations[0].roundId : null);
+    const latestEvals = evaluations.filter(e => e.roundId === latestRoundId);
+
+    const coachEvals = {};
+    const selfEvals = {};
+    latestEvals.forEach(e => {
+      if (e.raterType === 'COACH') {
+        if (!coachEvals[e.itemId] || e.evaluatedAt > coachEvals[e.itemId].evaluatedAt) {
+          coachEvals[e.itemId] = e;
+        }
+      } else if (e.raterType === 'SELF') {
+        if (!selfEvals[e.itemId] || e.evaluatedAt > selfEvals[e.itemId].evaluatedAt) {
+          selfEvals[e.itemId] = e;
+        }
+      }
+    });
+
+    const buildHierarchy = (items, parentId = null) => {
+      return items
+        .filter(item => item.parentId === parentId)
+        .map(item => ({
+          ...item,
+          children: buildHierarchy(items, item.id)
+        }));
+    };
+
+    const hierarchy = buildHierarchy(items);
+
+    const flattenWithHierarchy = (items, category = null, subCategory = null) => {
+      const result = [];
+      items.forEach(item => {
+        if (item.children && item.children.length > 0) {
+          item.children.forEach(child => {
+            if (child.children && child.children.length > 0) {
+              child.children.forEach(leaf => {
+                result.push({
+                  itemId: leaf.id,
+                  category: item.name,
+                  subCategory: child.name,
+                  itemName: leaf.name,
+                  coachScore: coachEvals[leaf.id]?.score || null,
+                  selfScore: selfEvals[leaf.id]?.score || null,
+                  gap: coachEvals[leaf.id] && selfEvals[leaf.id] 
+                    ? coachEvals[leaf.id].score - selfEvals[leaf.id].score 
+                    : null
+                });
+              });
+            } else {
+              result.push({
+                itemId: child.id,
+                category: item.name,
+                subCategory: null,
+                itemName: child.name,
+                coachScore: coachEvals[child.id]?.score || null,
+                selfScore: selfEvals[child.id]?.score || null,
+                gap: coachEvals[child.id] && selfEvals[child.id] 
+                  ? coachEvals[child.id].score - selfEvals[child.id].score 
+                  : null
+              });
+            }
+          });
+        } else {
+          result.push({
+            itemId: item.id,
+            category: null,
+            subCategory: null,
+            itemName: item.name,
+            coachScore: coachEvals[item.id]?.score || null,
+            selfScore: selfEvals[item.id]?.score || null,
+            gap: coachEvals[item.id] && selfEvals[item.id] 
+              ? coachEvals[item.id].score - selfEvals[item.id].score 
+              : null
+          });
+        }
+      });
+      return result;
+    };
+
+    const comparison = flattenWithHierarchy(hierarchy);
+
+    res.json({
+      roundId: latestRoundId,
+      comparison,
+      hasData: latestEvals.length > 0
+    });
+  } catch (error) {
+    console.error('Comparison error:', error);
+    res.status(500).json({ error: 'Failed to fetch evaluation comparison' });
+  }
+});
+
+router.get('/progress/:playerId', authenticate, async (req, res) => {
+  try {
+    const player = await prisma.player.findUnique({
+      where: { id: req.params.playerId },
+      include: { team: true }
+    });
+    
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
+    const evaluations = await prisma.evaluation.findMany({
+      where: { playerId: req.params.playerId },
+      include: { 
+        item: { include: { parent: true } }, 
+        round: true 
+      },
+      orderBy: { evaluatedAt: 'asc' }
+    });
+
+    const byRound = {};
+    evaluations.forEach(e => {
+      const roundKey = e.roundId;
+      if (!byRound[roundKey]) {
+        byRound[roundKey] = {
+          roundId: e.roundId,
+          roundName: e.round.name,
+          date: e.round.startDate,
+          coach: { total: 0, count: 0, categories: {} },
+          self: { total: 0, count: 0, categories: {} }
+        };
+      }
+      
+      const targetType = e.raterType === 'COACH' ? 'coach' : 'self';
+      byRound[roundKey][targetType].total += e.score;
+      byRound[roundKey][targetType].count += 1;
+
+      const categoryName = e.item.parent?.name || e.item.name;
+      if (!byRound[roundKey][targetType].categories[categoryName]) {
+        byRound[roundKey][targetType].categories[categoryName] = { total: 0, count: 0 };
+      }
+      byRound[roundKey][targetType].categories[categoryName].total += e.score;
+      byRound[roundKey][targetType].categories[categoryName].count += 1;
+    });
+
+    const progressData = Object.values(byRound)
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .map(r => {
+        const coachAvg = r.coach.count > 0 ? (r.coach.total / r.coach.count).toFixed(1) : null;
+        const selfAvg = r.self.count > 0 ? (r.self.total / r.self.count).toFixed(1) : null;
+        
+        const categoryData = {};
+        const allCategories = new Set([
+          ...Object.keys(r.coach.categories),
+          ...Object.keys(r.self.categories)
+        ]);
+        
+        allCategories.forEach(cat => {
+          const coachCat = r.coach.categories[cat];
+          const selfCat = r.self.categories[cat];
+          categoryData[cat] = {
+            coach: coachCat ? (coachCat.total / coachCat.count).toFixed(1) : null,
+            self: selfCat ? (selfCat.total / selfCat.count).toFixed(1) : null
+          };
+        });
+
+        return {
+          roundName: r.roundName,
+          date: r.date,
+          coachAvg: coachAvg ? parseFloat(coachAvg) : null,
+          selfAvg: selfAvg ? parseFloat(selfAvg) : null,
+          gap: coachAvg && selfAvg ? parseFloat((coachAvg - selfAvg).toFixed(1)) : null,
+          categories: categoryData
+        };
+      });
+
+    const allCategories = [...new Set(
+      progressData.flatMap(d => Object.keys(d.categories))
+    )];
+
+    res.json({
+      progressData,
+      categories: allCategories
+    });
+  } catch (error) {
+    console.error('Progress error:', error);
+    res.status(500).json({ error: 'Failed to fetch progress data' });
+  }
+});
+
+router.get('/heatmap/:playerId', authenticate, async (req, res) => {
+  try {
+    const player = await prisma.player.findUnique({
+      where: { id: req.params.playerId },
+      include: { team: true }
+    });
+    
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
+    const items = await prisma.evaluationItem.findMany({
+      where: { teamId: player.teamId, isActive: true },
+      orderBy: { sortOrder: 'asc' }
+    });
+
+    const evaluations = await prisma.evaluation.findMany({
+      where: { playerId: req.params.playerId },
+      orderBy: { evaluatedAt: 'desc' }
+    });
+
+    const latestByItem = {};
+    evaluations.forEach(e => {
+      if (!latestByItem[e.itemId]) {
+        latestByItem[e.itemId] = e;
+      }
+    });
+
+    const buildHierarchy = (items, parentId = null) => {
+      return items
+        .filter(item => item.parentId === parentId)
+        .map(item => ({
+          ...item,
+          children: buildHierarchy(items, item.id)
+        }));
+    };
+
+    const hierarchy = buildHierarchy(items);
+
+    const flattenForHeatmap = (items, category = null) => {
+      const result = [];
+      items.forEach(item => {
+        if (item.children && item.children.length > 0) {
+          item.children.forEach(child => {
+            if (child.children && child.children.length > 0) {
+              child.children.forEach(leaf => {
+                const eval_ = latestByItem[leaf.id];
+                result.push({
+                  id: leaf.id,
+                  name: leaf.name,
+                  category: item.name,
+                  subCategory: child.name,
+                  score: eval_?.score || 0,
+                  percentage: eval_ ? (eval_.score / 5) * 100 : 0
+                });
+              });
+            } else {
+              const eval_ = latestByItem[child.id];
+              result.push({
+                id: child.id,
+                name: child.name,
+                category: item.name,
+                subCategory: null,
+                score: eval_?.score || 0,
+                percentage: eval_ ? (eval_.score / 5) * 100 : 0
+              });
+            }
+          });
+        }
+      });
+      return result;
+    };
+
+    const heatmapData = flattenForHeatmap(hierarchy);
+
+    const categoryGroups = {};
+    heatmapData.forEach(item => {
+      if (!categoryGroups[item.category]) {
+        categoryGroups[item.category] = [];
+      }
+      categoryGroups[item.category].push(item);
+    });
+
+    res.json({
+      heatmapData,
+      categoryGroups
+    });
+  } catch (error) {
+    console.error('Heatmap error:', error);
+    res.status(500).json({ error: 'Failed to fetch heatmap data' });
+  }
+});
+
 module.exports = router;

@@ -5,6 +5,10 @@ import {
   UserCircle, Upload, Link2, TrendingUp, Video, ClipboardList, Edit2, Save, X,
   Calendar, Ruler, Weight, MapPin, GraduationCap, Users, Footprints, MessageSquare, Send, Trash2
 } from 'lucide-react';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  BarChart, Bar, ReferenceLine
+} from 'recharts';
 
 export default function PlayerDetail() {
   const { id } = useParams();
@@ -13,6 +17,9 @@ export default function PlayerDetail() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('evaluation');
   const [evaluationSummary, setEvaluationSummary] = useState([]);
+  const [evaluationComparison, setEvaluationComparison] = useState({ comparison: [], hasData: false });
+  const [progressData, setProgressData] = useState({ progressData: [], categories: [] });
+  const [heatmapData, setHeatmapData] = useState({ heatmapData: [], categoryGroups: {} });
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
@@ -26,6 +33,9 @@ export default function PlayerDetail() {
     fetchEvaluationSummary();
     fetchTeams();
     fetchNotes();
+    fetchEvaluationComparison();
+    fetchProgressData();
+    fetchHeatmapData();
   }, [id]);
 
   const fetchNotes = async () => {
@@ -35,6 +45,36 @@ export default function PlayerDetail() {
       setNotes(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch notes:', error);
+    }
+  };
+
+  const fetchEvaluationComparison = async () => {
+    try {
+      const res = await fetch(`/api/evaluations/comparison/${id}`, { credentials: 'include' });
+      const data = await res.json();
+      setEvaluationComparison(data);
+    } catch (error) {
+      console.error('Failed to fetch evaluation comparison:', error);
+    }
+  };
+
+  const fetchProgressData = async () => {
+    try {
+      const res = await fetch(`/api/evaluations/progress/${id}`, { credentials: 'include' });
+      const data = await res.json();
+      setProgressData(data);
+    } catch (error) {
+      console.error('Failed to fetch progress data:', error);
+    }
+  };
+
+  const fetchHeatmapData = async () => {
+    try {
+      const res = await fetch(`/api/evaluations/heatmap/${id}`, { credentials: 'include' });
+      const data = await res.json();
+      setHeatmapData(data);
+    } catch (error) {
+      console.error('Failed to fetch heatmap data:', error);
     }
   };
 
@@ -225,6 +265,52 @@ export default function PlayerDetail() {
     return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
   };
 
+  const getScoreColor = (score) => {
+    if (!score) return 'bg-gray-100';
+    const colors = [
+      'bg-blue-100',
+      'bg-blue-200',
+      'bg-blue-300',
+      'bg-blue-400',
+      'bg-blue-500'
+    ];
+    return colors[Math.min(score - 1, 4)];
+  };
+
+  const getScoreTextColor = (score) => {
+    if (!score) return 'text-gray-400';
+    if (score >= 4) return 'text-white';
+    return 'text-gray-800';
+  };
+
+  const getGapBadge = (gap) => {
+    if (gap === null || gap === undefined) return null;
+    if (gap > 0) {
+      return <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">+{gap}</span>;
+    } else if (gap < 0) {
+      return <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700">{gap}</span>;
+    }
+    return <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600">0</span>;
+  };
+
+  const getHeatmapColor = (percentage) => {
+    if (percentage === 0) return 'bg-gray-200';
+    if (percentage <= 20) return 'bg-blue-100';
+    if (percentage <= 40) return 'bg-blue-200';
+    if (percentage <= 60) return 'bg-blue-300';
+    if (percentage <= 80) return 'bg-blue-400';
+    return 'bg-blue-500';
+  };
+
+  const categoryColors = [
+    '#3B82F6',
+    '#10B981',
+    '#F59E0B',
+    '#EF4444',
+    '#8B5CF6',
+    '#EC4899'
+  ];
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -258,10 +344,8 @@ export default function PlayerDetail() {
 
   return (
     <div className="space-y-6">
-      {/* ヘッダーエリア */}
       <div className="bg-gradient-to-r from-primary-600 to-primary-800 rounded-2xl shadow-lg p-6 text-white">
         <div className="flex flex-col md:flex-row items-center gap-6">
-          {/* 顔写真 */}
           <div className="relative flex-shrink-0">
             {player.passportUrl ? (
               <img
@@ -287,17 +371,14 @@ export default function PlayerDetail() {
             )}
           </div>
 
-          {/* 選手情報 */}
           <div className="flex-1 text-center md:text-left">
             <div className="flex flex-col md:flex-row items-center md:items-start gap-4">
-              {/* 背番号 */}
               <div className="flex-shrink-0 bg-white/20 rounded-xl px-6 py-3 backdrop-blur-sm">
                 <span className="text-4xl md:text-5xl font-bold">
                   {player.number ? `No.${player.number}` : '-'}
                 </span>
               </div>
               
-              {/* 名前とポジション */}
               <div className="flex-1">
                 <h1 className="text-3xl md:text-4xl font-bold tracking-wide">
                   {player.name}
@@ -319,7 +400,6 @@ export default function PlayerDetail() {
             </div>
           </div>
 
-          {/* 編集ボタン */}
           {canEdit && !editing && (
             <button
               onClick={startEditing}
@@ -332,7 +412,6 @@ export default function PlayerDetail() {
         </div>
       </div>
 
-      {/* 編集モーダル */}
       {editing && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">選手情報を編集</h2>
@@ -507,7 +586,6 @@ export default function PlayerDetail() {
         </div>
       )}
 
-      {/* 基本情報カード */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">基本情報</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -568,7 +646,6 @@ export default function PlayerDetail() {
         </div>
       </div>
 
-      {/* タブナビゲーション */}
       <div className="border-b border-gray-200">
         <nav className="flex gap-6 overflow-x-auto">
           {tabs.map((tab) => {
@@ -591,42 +668,110 @@ export default function PlayerDetail() {
         </nav>
       </div>
 
-      {/* 評価データタブ */}
       {activeTab === 'evaluation' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">評価サマリー</h2>
-          {evaluationSummary.length > 0 ? (
-            <div className="space-y-3">
-              {evaluationSummary.map((s) => (
-                <div key={s.item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="text-sm font-medium text-gray-700">{s.item.name}</span>
-                  <div className="flex items-center gap-4">
-                    <div className="w-32 bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-primary-500 h-2 rounded-full transition-all"
-                        style={{ width: `${(s.latestScore / 5) * 100}%` }}
-                      />
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">指導者評価 vs 自己評価</h2>
+            {evaluationComparison.hasData && evaluationComparison.comparison.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">大項目</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">中項目</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-600">項目名</th>
+                      <th className="text-center py-3 px-4 font-medium text-gray-600">指導者</th>
+                      <th className="text-center py-3 px-4 font-medium text-gray-600">自己</th>
+                      <th className="text-center py-3 px-4 font-medium text-gray-600">ギャップ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {evaluationComparison.comparison.map((row, idx) => (
+                      <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-4 text-gray-700">{row.category || '-'}</td>
+                        <td className="py-3 px-4 text-gray-700">{row.subCategory || '-'}</td>
+                        <td className="py-3 px-4 font-medium text-gray-900">{row.itemName}</td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg font-bold ${getScoreColor(row.coachScore)} ${getScoreTextColor(row.coachScore)}`}>
+                            {row.coachScore ?? '-'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg font-bold ${getScoreColor(row.selfScore)} ${getScoreTextColor(row.selfScore)}`}>
+                            {row.selfScore ?? '-'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          {getGapBadge(row.gap)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <ClipboardList className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-sm text-gray-500">評価データがありません</p>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">評価サマリー（ヒートマップ）</h2>
+            {Object.keys(heatmapData.categoryGroups).length > 0 ? (
+              <div className="space-y-6">
+                {Object.entries(heatmapData.categoryGroups).map(([category, items]) => (
+                  <div key={category}>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">{category}</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {items.map((item) => (
+                        <div
+                          key={item.id}
+                          className={`relative group px-3 py-2 rounded-lg ${getHeatmapColor(item.percentage)} transition-all cursor-default`}
+                          title={`${item.name}: ${item.score}/5 (${item.percentage.toFixed(0)}%)`}
+                        >
+                          <span className={`text-xs font-medium ${item.percentage > 60 ? 'text-white' : 'text-gray-700'}`}>
+                            {item.name}
+                          </span>
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                            {item.score}/5 ({item.percentage.toFixed(0)}%)
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <span className="text-lg font-bold text-gray-900 w-8 text-right">{s.latestScore}</span>
-                    {s.progress !== 0 && (
-                      <span className={`text-sm font-medium ${s.progress > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {s.progress > 0 ? '+' : ''}{s.progress}
-                      </span>
-                    )}
+                  </div>
+                ))}
+                <div className="flex items-center gap-4 pt-4 border-t border-gray-200">
+                  <span className="text-xs text-gray-500">達成度:</span>
+                  <div className="flex items-center gap-1">
+                    <div className="w-8 h-4 bg-gray-200 rounded"></div>
+                    <span className="text-xs text-gray-500">0%</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-8 h-4 bg-blue-200 rounded"></div>
+                    <span className="text-xs text-gray-500">40%</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-8 h-4 bg-blue-400 rounded"></div>
+                    <span className="text-xs text-gray-500">80%</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-8 h-4 bg-blue-500 rounded"></div>
+                    <span className="text-xs text-gray-500">100%</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <ClipboardList className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-sm text-gray-500">まだ評価がありません</p>
-            </div>
-          )}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <ClipboardList className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-sm text-gray-500">評価項目がありません</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* 動画タブ */}
       {activeTab === 'videos' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">動画一覧</h2>
@@ -653,12 +798,10 @@ export default function PlayerDetail() {
         </div>
       )}
 
-      {/* コメント/ノートタブ */}
       {activeTab === 'notes' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">コメント/ノート</h2>
           
-          {/* ノート入力エリア（コーチ・管理者のみ） */}
           {isCoachOrAdmin && (
             <div className="mb-6">
               <div className="flex gap-3">
@@ -680,7 +823,6 @@ export default function PlayerDetail() {
             </div>
           )}
 
-          {/* ノート一覧 */}
           {notes.length > 0 ? (
             <div className="space-y-4">
               {notes.map((note) => (
@@ -727,18 +869,144 @@ export default function PlayerDetail() {
         </div>
       )}
 
-      {/* 上達状況タブ */}
       {activeTab === 'progress' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">上達状況</h2>
-          <div className="text-center py-8">
-            <TrendingUp className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500">評価データが蓄積されるとグラフが表示されます</p>
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">総合スコア推移</h2>
+            {progressData.progressData.length > 0 ? (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={progressData.progressData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                    <XAxis dataKey="roundName" tick={{ fontSize: 12 }} stroke="#6B7280" />
+                    <YAxis domain={[0, 5]} tick={{ fontSize: 12 }} stroke="#6B7280" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'white', 
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                      }}
+                    />
+                    <Legend />
+                    <Line 
+                      type="monotone" 
+                      dataKey="coachAvg" 
+                      name="指導者評価" 
+                      stroke="#3B82F6" 
+                      strokeWidth={2}
+                      dot={{ fill: '#3B82F6', strokeWidth: 2 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="selfAvg" 
+                      name="自己評価" 
+                      stroke="#10B981" 
+                      strokeWidth={2}
+                      dot={{ fill: '#10B981', strokeWidth: 2 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <TrendingUp className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-sm text-gray-500">評価データが蓄積されるとグラフが表示されます</p>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">カテゴリ別推移（指導者評価）</h2>
+            {progressData.progressData.length > 0 && progressData.categories.length > 0 ? (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={progressData.progressData.map(d => {
+                    const categoryData = { roundName: d.roundName };
+                    progressData.categories.forEach((cat) => {
+                      categoryData[cat] = d.categories[cat]?.coach ? parseFloat(d.categories[cat].coach) : null;
+                    });
+                    return categoryData;
+                  })}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                    <XAxis dataKey="roundName" tick={{ fontSize: 12 }} stroke="#6B7280" />
+                    <YAxis domain={[0, 5]} tick={{ fontSize: 12 }} stroke="#6B7280" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'white', 
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                      }}
+                    />
+                    <Legend />
+                    {progressData.categories.map((cat, idx) => (
+                      <Line 
+                        key={cat}
+                        type="monotone" 
+                        dataKey={cat} 
+                        name={cat} 
+                        stroke={categoryColors[idx % categoryColors.length]} 
+                        strokeWidth={2}
+                        dot={{ fill: categoryColors[idx % categoryColors.length], strokeWidth: 2 }}
+                        connectNulls
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <TrendingUp className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-sm text-gray-500">カテゴリ別データがありません</p>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">評価ギャップ推移</h2>
+            {progressData.progressData.length > 0 && progressData.progressData.some(d => d.gap !== null) ? (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={progressData.progressData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                    <XAxis dataKey="roundName" tick={{ fontSize: 12 }} stroke="#6B7280" />
+                    <YAxis domain={[-2, 2]} tick={{ fontSize: 12 }} stroke="#6B7280" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'white', 
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                      }}
+                      formatter={(value) => [value, 'ギャップ (指導者 - 自己)']}
+                    />
+                    <ReferenceLine y={0} stroke="#9CA3AF" strokeDasharray="3 3" />
+                    <Bar 
+                      dataKey="gap" 
+                      name="ギャップ"
+                      fill="#3B82F6"
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <TrendingUp className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-sm text-gray-500">ギャップデータがありません</p>
+              </div>
+            )}
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <p className="text-xs text-gray-600">
+                <span className="font-medium text-blue-600">プラス (青)</span>: 指導者の方が高く評価 → 選手は謙虚、伸び代あり<br />
+                <span className="font-medium text-red-600">マイナス (赤)</span>: 自己評価の方が高い → 自己認識のズレ、要フィードバック
+              </p>
+            </div>
           </div>
         </div>
       )}
 
-      {/* アピールタブ */}
       {activeTab === 'appeal' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">アピールURL</h2>
