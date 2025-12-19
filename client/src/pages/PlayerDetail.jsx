@@ -872,14 +872,14 @@ export default function PlayerDetail() {
       {activeTab === 'progress' && (
         <div className="space-y-6">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">総合スコア推移</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">総合スコア推移（合計点）</h2>
             {progressData.progressData.length > 0 ? (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={progressData.progressData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                     <XAxis dataKey="roundName" tick={{ fontSize: 12 }} stroke="#6B7280" />
-                    <YAxis domain={[0, 5]} tick={{ fontSize: 12 }} stroke="#6B7280" />
+                    <YAxis tick={{ fontSize: 12 }} stroke="#6B7280" />
                     <Tooltip 
                       contentStyle={{ 
                         backgroundColor: 'white', 
@@ -891,19 +891,21 @@ export default function PlayerDetail() {
                     <Legend />
                     <Line 
                       type="monotone" 
-                      dataKey="coachAvg" 
-                      name="指導者評価" 
+                      dataKey="coachTotal" 
+                      name="指導者評価（合計）" 
                       stroke="#3B82F6" 
                       strokeWidth={2}
                       dot={{ fill: '#3B82F6', strokeWidth: 2 }}
+                      connectNulls
                     />
                     <Line 
                       type="monotone" 
-                      dataKey="selfAvg" 
-                      name="自己評価" 
+                      dataKey="selfTotal" 
+                      name="自己評価（合計）" 
                       stroke="#10B981" 
                       strokeWidth={2}
                       dot={{ fill: '#10B981', strokeWidth: 2 }}
+                      connectNulls
                     />
                   </LineChart>
                 </ResponsiveContainer>

@@ -388,6 +388,8 @@ router.get('/progress/:playerId', authenticate, async (req, res) => {
     const progressData = Object.values(byRound)
       .sort((a, b) => new Date(a.date) - new Date(b.date))
       .map(r => {
+        const coachTotal = r.coach.total;
+        const selfTotal = r.self.total;
         const coachAvg = r.coach.count > 0 ? (r.coach.total / r.coach.count).toFixed(1) : null;
         const selfAvg = r.self.count > 0 ? (r.self.total / r.self.count).toFixed(1) : null;
         
@@ -409,6 +411,8 @@ router.get('/progress/:playerId', authenticate, async (req, res) => {
         return {
           roundName: r.roundName,
           date: r.date,
+          coachTotal: coachTotal > 0 ? coachTotal : null,
+          selfTotal: selfTotal > 0 ? selfTotal : null,
           coachAvg: coachAvg ? parseFloat(coachAvg) : null,
           selfAvg: selfAvg ? parseFloat(selfAvg) : null,
           gap: coachAvg && selfAvg ? parseFloat((coachAvg - selfAvg).toFixed(1)) : null,
