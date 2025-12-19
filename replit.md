@@ -149,6 +149,21 @@ Rich card-based player detail page:
 - Tabbed navigation: 評価データ, 動画, コメント/ノート, 上達状況, アピール
 - Coach notes with add/delete functionality
 
+### Evaluation Visualization (Recharts)
+- **評価データタブ**: Coach vs self-evaluation comparison table with heatmap coloring
+  - Gap badges: blue (+) = coach higher, red (-) = self higher, gray (0) = match
+  - Score cells use gradient blue based on value (1-5)
+- **上達状況タブ**: Progress charts using Recharts library
+  - Total score progression chart (coach vs self over time)
+  - Category-based trend chart
+  - Gap trend bar chart with reference line
+- **評価サマリー**: Block-based heatmap grouped by category
+
+### Evaluation API Endpoints
+- `GET /api/evaluations/comparison/:playerId` - Coach vs self comparison for latest round
+- `GET /api/evaluations/progress/:playerId` - Historical progress data (totals + averages)
+- `GET /api/evaluations/heatmap/:playerId` - Achievement percentage heatmap
+
 ## Recent Changes
 - System admin dashboard with team impersonation feature
 - Separate admin routing (/admin/*) for operators
