@@ -22,7 +22,7 @@ export default function EvaluationEntry() {
   const fetchData = async () => {
     try {
       const [playersRes, itemsRes, roundsRes] = await Promise.all([
-        fetch(`/api/players?teamId=${currentTeam.id}`, { credentials: 'include' }),
+        fetch(`/api/players?teamId=${currentTeam.id}&includeChildren=true`, { credentials: 'include' }),
         fetch(`/api/evaluations/items?teamId=${currentTeam.id}`, { credentials: 'include' }),
         fetch(`/api/evaluations/rounds?teamId=${currentTeam.id}`, { credentials: 'include' }),
       ]);
