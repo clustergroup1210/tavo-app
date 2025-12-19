@@ -55,13 +55,13 @@ export default function PlayerList() {
       let url = '/api/players';
       const params = new URLSearchParams();
       
-      if (isOperator() && filterParentTeam) {
+      if (filterParentTeam) {
         params.append('teamId', filterParentTeam);
         params.append('includeChildren', 'true');
-      } else if (isOperator() && !filterParentTeam) {
       } else if (currentTeam) {
         params.append('teamId', currentTeam.id);
         params.append('includeChildren', 'true');
+      } else if (isOperator()) {
       }
       
       if (params.toString()) {
