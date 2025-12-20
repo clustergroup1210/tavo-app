@@ -551,7 +551,7 @@ router.get('/ranking', authenticate, async (req, res) => {
 
     const players = await prisma.player.findMany({
       where: playerWhere,
-      select: { id: true, name: true, number: true, position: true, photoUrl: true }
+      select: { id: true, name: true, number: true, position: true }
     });
 
     const playerIds = players.map(p => p.id);
