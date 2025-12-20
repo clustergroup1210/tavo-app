@@ -163,6 +163,20 @@ Rich card-based player detail page:
 - `GET /api/evaluations/comparison/:playerId` - Coach vs self comparison for latest round
 - `GET /api/evaluations/progress/:playerId` - Historical progress data (totals + averages)
 - `GET /api/evaluations/heatmap/:playerId` - Achievement percentage heatmap
+- `GET /api/evaluations/ranking` - Team ranking with filters (teamId, roundId, category, position)
+- `POST /api/evaluations/rounds/:id/copy-previous` - Copy evaluations from previous round
+
+### Team Ranking Feature (/ranking)
+- **総合ランキング**: All players ranked by total evaluation score
+- **カテゴリー別**: Filter ranking by evaluation category (心・技・体・戦術 etc.)
+- **ポジション別**: Filter by player position (GK, DF, MF, FW)
+- Visual rank badges (gold trophy for 1st, silver/bronze medals for 2nd/3rd)
+- Score bar visualization with percentage fill
+
+### Period Management
+- Add new evaluation periods (year/month selection)
+- Copy previous round's evaluation data to new period
+- Period selector in evaluation entry page
 
 ## Recent Changes
 - System admin dashboard with team impersonation feature
