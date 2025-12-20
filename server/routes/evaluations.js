@@ -527,4 +527,192 @@ router.get('/heatmap/:playerId', authenticate, async (req, res) => {
   }
 });
 
+router.get('/ranking', authenticate, async (req, res) => {
+  try {
+    const { teamId, roundId, category, position } = req.query;
+
+    if (!teamId || !roundId) {
+      return res.status(400).json({ error: 'teamId and roundId are required' });
+    }
+
+    const team = await prisma.team.findUnique({
+      where: { id: teamId },
+      include: { children: { select: { id: true } } }
+    });
+    const teamIds = [teamId];
+    if (team?.children) {
+      team.children.forEach(child => teamIds.push(child.id));
+    }
+
+    const playerWhere = { teamId: { in: teamIds } };
+    if (position) {
+      playerWhere.position = position;
+    }
+
+    const players = await prisma.player.findMany({
+      where: playerWhere,
+      select: { id: true, name: true, number: true, position: true, photoUrl: true }
+    });
+
+    const playerIds = players.map(p => p.id);
+
+    let itemIds = null;
+    let categories = [];
+
+    const allItems = await prisma.evaluationItem.findMany({
+      where: { teamId: { in: teamIds }, isActive: true }
+    });
+
+    const topLevelItems = allItems.filter(i => !i.parentId);
+    categories = topLevelItems.map(i => ({ id: i.id, name: i.name }));
+
+    if (category) {
+      const getDescendantIds = (parentId) => {
+        const children = allItems.filter(i => i.parentId === parentId);
+        if (children.length === 0) {
+          return [parentId];
+        }
+        let ids = [];
+        children.forEach(c => {
+          const hasChildren = allItems.some(i => i.parentId === c.id);
+          if (!hasChildren) {
+            ids.push(c.id);
+          } else {
+            ids = ids.concat(getDescendantIds(c.id));
+          }
+        });
+        return ids;
+      };
+      itemIds = getDescendantIds(category);
+    }
+
+    const evalWhere = {
+      playerId: { in: playerIds },
+      roundId,
+      raterType: 'COACH'
+    };
+    if (itemIds && itemIds.length > 0) {
+      evalWhere.itemId = { in: itemIds };
+    }
+
+    const evaluations = await prisma.evaluation.findMany({
+      where: evalWhere,
+      include: { item: { select: { id: true, parentId: true } } }
+    });
+
+    const getTopLevelCategory = (itemId) => {
+      const item = allItems.find(i => i.id === itemId);
+      if (!item) return null;
+      if (!item.parentId) return item.id;
+      return getTopLevelCategory(item.parentId);
+    };
+
+    const playerScores = {};
+    players.forEach(p => {
+      playerScores[p.id] = {
+        player: p,
+        totalScore: 0,
+        categoryScores: {}
+      };
+      categories.forEach(cat => {
+        playerScores[p.id].categoryScores[cat.id] = 0;
+      });
+    });
+
+    evaluations.forEach(e => {
+      if (playerScores[e.playerId]) {
+        playerScores[e.playerId].totalScore += e.score;
+        const catId = getTopLevelCategory(e.itemId);
+        if (catId && playerScores[e.playerId].categoryScores[catId] !== undefined) {
+          playerScores[e.playerId].categoryScores[catId] += e.score;
+        }
+      }
+    });
+
+    const ranking = Object.values(playerScores)
+      .sort((a, b) => b.totalScore - a.totalScore)
+      .map((item, index) => ({
+        rank: index + 1,
+        ...item
+      }));
+
+    res.json({ ranking, categories });
+  } catch (error) {
+    console.error('Ranking error:', error);
+    res.status(500).json({ error: 'Failed to fetch ranking data' });
+  }
+});
+
+router.post('/rounds/:id/copy-previous', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const targetRound = await prisma.evaluationRound.findUnique({
+      where: { id },
+      include: { team: true }
+    });
+
+    if (!targetRound) {
+      return res.status(404).json({ error: 'Round not found' });
+    }
+
+    if (!hasTeamAccess(req.user, targetRound.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'])) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const previousRound = await prisma.evaluationRound.findFirst({
+      where: {
+        teamId: targetRound.teamId,
+        startDate: { lt: targetRound.startDate }
+      },
+      orderBy: { startDate: 'desc' }
+    });
+
+    if (!previousRound) {
+      return res.status(404).json({ error: 'No previous round found' });
+    }
+
+    const previousEvaluations = await prisma.evaluation.findMany({
+      where: { roundId: previousRound.id }
+    });
+
+    if (previousEvaluations.length === 0) {
+      return res.status(404).json({ error: 'No evaluations found in previous round' });
+    }
+
+    const existingEvaluations = await prisma.evaluation.findMany({
+      where: { roundId: id },
+      select: { playerId: true, itemId: true, raterType: true }
+    });
+
+    const existingKeys = new Set(
+      existingEvaluations.map(e => `${e.playerId}-${e.itemId}-${e.raterType}`)
+    );
+
+    const newEvaluations = previousEvaluations
+      .filter(e => !existingKeys.has(`${e.playerId}-${e.itemId}-${e.raterType}`))
+      .map(e => ({
+        playerId: e.playerId,
+        itemId: e.itemId,
+        roundId: id,
+        score: e.score,
+        raterUserId: req.user.id,
+        raterType: e.raterType
+      }));
+
+    if (newEvaluations.length > 0) {
+      await prisma.evaluation.createMany({ data: newEvaluations });
+    }
+
+    res.json({
+      message: 'Evaluations copied successfully',
+      copiedCount: newEvaluations.length,
+      previousRoundName: previousRound.name
+    });
+  } catch (error) {
+    console.error('Copy previous error:', error);
+    res.status(500).json({ error: 'Failed to copy previous evaluations' });
+  }
+});
+
 module.exports = router;

@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   LayoutDashboard, Users, UserCircle, ClipboardList, Video, 
   Bell, Settings, Building2, UserCog, ListChecks, Database,
-  Link2, FileText, TrendingUp, LogOut, Megaphone, ArrowLeft, Shield
+  Link2, FileText, TrendingUp, LogOut, Megaphone, ArrowLeft, Shield, Trophy
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -41,6 +41,7 @@ export default function Sidebar() {
           { path: '/teams', label: 'チーム一覧', icon: Building2 },
           { path: '/players', label: '選手一覧', icon: Users },
           { path: '/evaluations/entry', label: '評価データ', icon: ClipboardList },
+          { path: '/ranking', label: 'ランキング', icon: Trophy },
           { path: '/videos', label: '動画管理', icon: Video },
           { path: '/announcements', label: 'お知らせ', icon: Megaphone },
         ],
@@ -60,6 +61,7 @@ export default function Sidebar() {
           { path: '/dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
           { path: '/players', label: '選手一覧', icon: Users },
           { path: '/evaluations/entry', label: '評価入力', icon: ClipboardList },
+          { path: '/ranking', label: 'ランキング', icon: Trophy },
           { path: '/videos', label: '動画・資料', icon: Video },
         ],
         admin: [],

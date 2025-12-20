@@ -23,6 +23,7 @@ import InvitePage from './pages/InvitePage';
 import MyPage from './pages/MyPage';
 import Organizations from './pages/Organizations';
 import Placeholder from './pages/Placeholder';
+import Ranking from './pages/Ranking';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -117,6 +118,7 @@ export default function App() {
           <Route path="/players/:id" element={<PlayerDetail />} />
           <Route path="/evaluations/entry" element={<EvaluationEntry />} />
           <Route path="/evaluations/items" element={<EvaluationItems />} />
+          <Route path="/ranking" element={<Ranking />} />
           <Route path="/users" element={<UserManagement />} />
           <Route path="/invitations" element={<Invitations />} />
           <Route path="/videos" element={<Videos />} />
