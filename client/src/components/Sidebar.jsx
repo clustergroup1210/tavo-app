@@ -34,7 +34,7 @@ export default function Sidebar() {
   };
 
   const getMenuItems = () => {
-    if (isOperator()) {
+    if (isOperator() && !currentTeam) {
       return {
         main: [
           { path: '/dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
@@ -55,6 +55,26 @@ export default function Sidebar() {
       };
     }
 
+    if (currentTeam && isOperator()) {
+      return {
+        main: [
+          { path: '/dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
+          { path: '/players', label: '選手一覧', icon: Users },
+          { path: '/evaluations/entry', label: '評価入力', icon: ClipboardList },
+          { path: '/ranking', label: 'ランキング', icon: Trophy },
+          { path: '/videos', label: '動画・資料', icon: Video },
+          { path: '/announcements', label: 'お知らせ', icon: Megaphone },
+        ],
+        admin: [
+          { path: '/users', label: 'ユーザー管理', icon: UserCog },
+          { path: '/permissions', label: '権限管理', icon: Shield },
+          { path: '/evaluations/items', label: '評価項目管理', icon: ListChecks },
+          { path: '/master', label: 'マスタ設定', icon: Database },
+          { path: '/settings', label: 'システム設定', icon: Settings },
+        ],
+      };
+    }
+
     if (currentTeam && (isTeamAdmin(currentTeam.id) || isCoach(currentTeam.id))) {
       const items = {
         main: [
@@ -63,6 +83,7 @@ export default function Sidebar() {
           { path: '/evaluations/entry', label: '評価入力', icon: ClipboardList },
           { path: '/ranking', label: 'ランキング', icon: Trophy },
           { path: '/videos', label: '動画・資料', icon: Video },
+          { path: '/announcements', label: 'お知らせ', icon: Megaphone },
         ],
         admin: [],
       };
@@ -70,7 +91,6 @@ export default function Sidebar() {
       if (isTeamAdmin(currentTeam.id)) {
         items.admin = [
           { path: '/users', label: 'ユーザー管理', icon: UserCog },
-          { path: `/teams/${currentTeam.id}`, label: 'チーム管理', icon: Building2 },
           { path: '/invitations', label: '招待URL管理', icon: Link2 },
         ];
       }
