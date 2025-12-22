@@ -214,8 +214,10 @@ Rich card-based player detail page:
 - Players and operators see full history
 
 ## Recent Changes
-- Staff management UI with role assignment
-- Transfer data visibility filtering
+- Staff management UI with role assignment and dedicated /staff page
+- Transfer data visibility filtering with multi-period support
+- Security hardening: Evaluation endpoints require shared team membership and matching PlayerTeamHistory records
+- getPlayerTeamMembershipPeriods helper aggregates intervals across team, parent, and child teams
 - Goal management system with custom categories
 - Player profile fields: roleModel, playStyle
 - JFA Passport photo upload on MyPage
