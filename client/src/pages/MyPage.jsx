@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { UserCircle, TrendingUp, Video, Link2 } from 'lucide-react';
+import { UserCircle, TrendingUp, Link2, Edit3, Save, X } from 'lucide-react';
 
 export default function MyPage() {
   const { user } = useAuth();
   const [playerData, setPlayerData] = useState(null);
   const [evaluationSummary, setEvaluationSummary] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ roleModel: '', playStyle: '' });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchMyData();
@@ -20,6 +23,10 @@ export default function MyPage() {
 
       if (myPlayer) {
         setPlayerData(myPlayer);
+        setEditForm({
+          roleModel: myPlayer.roleModel || '',
+          playStyle: myPlayer.playStyle || '',
+        });
         const summaryRes = await fetch(`/api/evaluations/summary/${myPlayer.id}`, {
           credentials: 'include',
         });
@@ -31,6 +38,39 @@ export default function MyPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSave = async () => {
+    if (!playerData) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/players/${playerData.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          roleModel: editForm.roleModel,
+          playStyle: editForm.playStyle,
+        }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setPlayerData(updated);
+        setEditing(false);
+      }
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setEditForm({
+      roleModel: playerData?.roleModel || '',
+      playStyle: playerData?.playStyle || '',
+    });
+    setEditing(false);
   };
 
   if (loading) {
@@ -74,6 +114,80 @@ export default function MyPage() {
           </div>
         </div>
       </div>
+
+      {playerData && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">プロフィール</h3>
+            {!editing ? (
+              <button
+                onClick={() => setEditing(true)}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-primary-600 hover:bg-primary-50 rounded-lg"
+              >
+                <Edit3 className="w-4 h-4" />
+                編集
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCancel}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+                >
+                  <X className="w-4 h-4" />
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  保存
+                </button>
+              </div>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                目標とする選手
+              </label>
+              {editing ? (
+                <input
+                  type="text"
+                  value={editForm.roleModel}
+                  onChange={(e) => setEditForm({ ...editForm, roleModel: e.target.value })}
+                  placeholder="例: リオネル・メッシ"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                />
+              ) : (
+                <p className="text-gray-900 py-2">
+                  {playerData.roleModel || <span className="text-gray-400">未設定</span>}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                プレースタイル
+              </label>
+              {editing ? (
+                <input
+                  type="text"
+                  value={editForm.playStyle}
+                  onChange={(e) => setEditForm({ ...editForm, playStyle: e.target.value })}
+                  placeholder="例: ドリブル突破、パス重視"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                />
+              ) : (
+                <p className="text-gray-900 py-2">
+                  {playerData.playStyle || <span className="text-gray-400">未設定</span>}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
