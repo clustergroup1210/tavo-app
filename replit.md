@@ -214,6 +214,11 @@ Rich card-based player detail page:
 - Players and operators see full history
 
 ## Recent Changes
+- Admin-Player page linking: User account linking from PlayerDetail page for coaches/operators
+- Player self-data access: GET /api/players now returns player's own data via userId fallback
+- Evaluation summary enhancement: Returns both coach (latestCoachScore) and self (latestSelfScore) evaluations
+- MyPage improvements: Displays coach and self evaluations separately with clear labels
+- API endpoints: POST /api/players/:id/link-user and DELETE /api/players/:id/unlink-user for account management
 - Staff management UI with role assignment and dedicated /staff page
 - Transfer data visibility filtering with multi-period support
 - Security hardening: Evaluation endpoints require shared team membership and matching PlayerTeamHistory records
