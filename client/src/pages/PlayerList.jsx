@@ -276,11 +276,17 @@ export default function PlayerList() {
               className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
             >
               <option value="">全カテゴリー</option>
-              {filteredCategories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.parentName ? `${cat.parentName} / ${cat.name}` : cat.name}
-                </option>
-              ))}
+              {(() => {
+                const childCategories = filteredCategories.filter(c => c.parentId !== null);
+                if (childCategories.length > 0) {
+                  return childCategories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ));
+                }
+                return filteredCategories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ));
+              })()}
             </select>
           </div>
 
@@ -427,11 +433,24 @@ export default function PlayerList() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   required
                 >
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.parentName ? `${cat.parentName} / ${cat.name}` : cat.name}
-                    </option>
-                  ))}
+                  {(() => {
+                    if (isOperator()) {
+                      return categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.parentName ? `${cat.parentName} / ${cat.name}` : cat.name}
+                        </option>
+                      ));
+                    }
+                    const childCategories = categories.filter(c => c.parentId !== null);
+                    if (childCategories.length > 0) {
+                      return childCategories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ));
+                    }
+                    return categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ));
+                  })()}
                 </select>
               </div>
               <div className="flex justify-end gap-3">

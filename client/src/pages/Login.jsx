@@ -16,8 +16,8 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await login(email, password);
-      navigate('/dashboard');
+      const result = await login(email, password);
+      navigate(result.roles?.isOperator ? '/admin' : '/dashboard');
     } catch (err) {
       setError(err.message);
     } finally {
