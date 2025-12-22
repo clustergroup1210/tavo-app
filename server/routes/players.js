@@ -40,11 +40,15 @@ router.get('/', authenticate, async (req, res) => {
       
       if (!isOperator) {
         const teamIds = req.user.teams?.map(t => t.teamId) || [];
-        where.teamId = { in: teamIds };
+        if (teamIds.length > 0) {
+          where.teamId = { in: teamIds };
+        } else {
+          where.userId = req.user.id;
+        }
       }
     }
 
-    const players = await prisma.player.findMany({
+    let players = await prisma.player.findMany({
       where,
       include: {
         team: { include: { parent: true } },
@@ -52,6 +56,20 @@ router.get('/', authenticate, async (req, res) => {
         evaluations: { take: 5, orderBy: { evaluatedAt: 'desc' } }
       }
     });
+
+    if (players.length === 0 && !req.query.teamId) {
+      const ownPlayer = await prisma.player.findFirst({
+        where: { userId: req.user.id },
+        include: {
+          team: { include: { parent: true } },
+          user: { select: { id: true, email: true, name: true } },
+          evaluations: { take: 5, orderBy: { evaluatedAt: 'desc' } }
+        }
+      });
+      if (ownPlayer) {
+        players = [ownPlayer];
+      }
+    }
 
     res.json(players);
   } catch (error) {
@@ -314,6 +332,81 @@ router.post('/:id/passport', authenticate, upload.single('passport'), async (req
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: 'Failed to upload passport' });
+  }
+});
+
+router.post('/:id/link-user', authenticate, async (req, res) => {
+  try {
+    const { email } = req.body;
+    const player = await prisma.player.findUnique({ where: { id: req.params.id } });
+    
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+    
+    const isCoachOrAdmin = hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']);
+    const isOperator = req.user.organizations?.some(o => 
+      ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+    );
+    
+    if (!isCoachOrAdmin && !isOperator) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    if (player.userId) {
+      return res.status(400).json({ error: 'この選手は既にユーザーアカウントに紐付けられています' });
+    }
+    
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ error: 'ユーザーが見つかりません。先にアカウントを作成してください。' });
+    }
+    
+    const existingPlayer = await prisma.player.findFirst({ where: { userId: user.id } });
+    if (existingPlayer) {
+      return res.status(400).json({ error: 'このユーザーは既に別の選手に紐付けられています' });
+    }
+    
+    const updated = await prisma.player.update({
+      where: { id: req.params.id },
+      data: { userId: user.id },
+      include: { user: { select: { id: true, email: true, name: true } } }
+    });
+    
+    res.json(updated);
+  } catch (error) {
+    console.error('Link user error:', error);
+    res.status(500).json({ error: 'Failed to link user' });
+  }
+});
+
+router.delete('/:id/unlink-user', authenticate, async (req, res) => {
+  try {
+    const player = await prisma.player.findUnique({ where: { id: req.params.id } });
+    
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+    
+    const isCoachOrAdmin = hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']);
+    const isOperator = req.user.organizations?.some(o => 
+      ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+    );
+    
+    if (!isCoachOrAdmin && !isOperator) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const updated = await prisma.player.update({
+      where: { id: req.params.id },
+      data: { userId: null },
+      include: { user: { select: { id: true, email: true, name: true } } }
+    });
+    
+    res.json(updated);
+  } catch (error) {
+    console.error('Unlink user error:', error);
+    res.status(500).json({ error: 'Failed to unlink user' });
   }
 });
 

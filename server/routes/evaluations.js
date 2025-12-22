@@ -236,9 +236,16 @@ router.post('/', authenticate, async (req, res) => {
 
 router.get('/summary/:playerId', authenticate, async (req, res) => {
   try {
+    const { raterType } = req.query;
+    
+    const where = { playerId: req.params.playerId };
+    if (raterType) {
+      where.raterType = raterType;
+    }
+    
     const evaluations = await prisma.evaluation.findMany({
-      where: { playerId: req.params.playerId },
-      include: { item: true, round: true },
+      where,
+      include: { item: true, round: true, rater: { select: { id: true, name: true } } },
       orderBy: { evaluatedAt: 'desc' }
     });
 
@@ -251,15 +258,23 @@ router.get('/summary/:playerId', authenticate, async (req, res) => {
     });
 
     const summary = Object.values(byItem).map(({ item, evaluations }) => {
-      const latest = evaluations[0];
+      const coachEvals = evaluations.filter(e => e.raterType === 'COACH');
+      const selfEvals = evaluations.filter(e => e.raterType === 'SELF');
+      
+      const latestCoach = coachEvals[0];
+      const latestSelf = selfEvals[0];
+      const latest = latestCoach || latestSelf || evaluations[0];
+      
       const progress = evaluations.length > 1 
         ? latest.score - evaluations[evaluations.length - 1].score 
         : 0;
       
       return {
         item,
-        latestScore: latest.score,
-        latestRound: latest.round,
+        latestScore: latest?.score || 0,
+        latestCoachScore: latestCoach?.score || null,
+        latestSelfScore: latestSelf?.score || null,
+        latestRound: latest?.round,
         progress,
         history: evaluations.slice(0, 10)
       };
