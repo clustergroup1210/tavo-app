@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   LayoutDashboard, Users, UserCircle, ClipboardList, Video, 
   Bell, Settings, Building2, UserCog, ListChecks, Database,
-  Link2, FileText, TrendingUp, LogOut, Megaphone, ArrowLeft, Shield, Trophy
+  Link2, FileText, TrendingUp, LogOut, Megaphone, ArrowLeft, Shield, Trophy, Target
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -92,6 +92,7 @@ export default function Sidebar() {
         items.admin = [
           { path: '/users', label: 'ユーザー管理', icon: UserCog },
           { path: '/invitations', label: '招待URL管理', icon: Link2 },
+          { path: '/goal-categories', label: '目標カテゴリー管理', icon: Target },
         ];
       }
 

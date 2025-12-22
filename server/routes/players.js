@@ -251,10 +251,14 @@ router.post('/:id/passport', authenticate, upload.single('passport'), async (req
   try {
     const player = await prisma.player.findUnique({ where: { id: req.params.id } });
     
+    const isOperatorUser = req.user.organizations?.some(o => 
+      ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+    );
     const canUpload = 
       player.userId === req.user.id ||
       req.user.parentPlayers?.some(pp => pp.playerId === req.params.id) ||
-      hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']);
+      hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']) ||
+      isOperatorUser;
 
     if (!canUpload) {
       return res.status(403).json({ error: 'Access denied' });

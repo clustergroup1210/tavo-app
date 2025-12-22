@@ -14,6 +14,7 @@ const appealRoutes = require('./routes/appeals');
 const videoRoutes = require('./routes/videos');
 const organizationRoutes = require('./routes/organizations');
 const adminRoutes = require('./routes/admin');
+const goalRoutes = require('./routes/goals');
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use('/api/appeals', appealRoutes);
 app.use('/api/videos', videoRoutes);
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/goals', goalRoutes);
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));

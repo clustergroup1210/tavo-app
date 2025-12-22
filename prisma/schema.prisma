@@ -49,6 +49,7 @@ model Team {
   evaluationItems EvaluationItem[]
   evaluationRounds EvaluationRound[]
   invitations    Invitation[]
+  goalCategories GoalCategory[]
 }
 
 model User {
@@ -124,6 +125,7 @@ model Player {
   videos      Video[]
   teamHistory PlayerTeamHistory[]
   notes       PlayerNote[]
+  goals       Goal[]
 }
 
 model PlayerParent {
@@ -246,4 +248,32 @@ model Video {
   createdAt   DateTime @default(now())
 
   player Player? @relation(fields: [playerId], references: [id])
+}
+
+model GoalCategory {
+  id          String   @id @default(uuid())
+  teamId      String
+  name        String
+  description String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  team  Team   @relation(fields: [teamId], references: [id])
+  goals Goal[]
+}
+
+model Goal {
+  id          String   @id @default(uuid())
+  playerId    String
+  categoryId  String
+  content     String
+  progress    Int?
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  player   Player       @relation(fields: [playerId], references: [id])
+  category GoalCategory @relation(fields: [categoryId], references: [id])
 }

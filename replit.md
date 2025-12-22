@@ -178,7 +178,32 @@ Rich card-based player detail page:
 - Copy previous round's evaluation data to new period
 - Period selector in evaluation entry page
 
+### Goal Management System
+- **Custom Goal Categories**: Teams can create their own goal categories (短期目標, 長期目標, 技術目標, etc.)
+- **GoalCategoryManagement**: Admin page for managing categories (/goal-categories)
+- **Player Goals**: Players can set and edit goals by category on their MyPage
+- **Goal API Endpoints**:
+  - `GET /api/goals/categories?teamId=` - Get categories for a team
+  - `POST /api/goals/categories` - Create category
+  - `GET /api/goals/player/:playerId` - Get player's goals
+  - `POST /api/goals` - Create goal
+  - `PUT /api/goals/:id` - Update goal
+  - `DELETE /api/goals/:id` - Delete goal
+
+### Player Profile Fields
+- `roleModel`: Player's role model/aspiring player
+- `playStyle`: Player's play style description
+- `passportUrl`: JFA Passport photo URL
+
+### JFA Passport Photo
+- Players can upload their JFA Passport photo on MyPage
+- Photo displayed as thumbnail with camera hover overlay
+- Coaches and admins can also upload player passport photos
+
 ## Recent Changes
+- Goal management system with custom categories
+- Player profile fields: roleModel, playStyle
+- JFA Passport photo upload on MyPage
 - System admin dashboard with team impersonation feature
 - Separate admin routing (/admin/*) for operators
 - AdminSidebar and AdminLayout for system management views
