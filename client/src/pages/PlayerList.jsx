@@ -251,7 +251,7 @@ export default function PlayerList() {
             <span className="text-sm font-medium text-gray-700">フィルター:</span>
           </div>
           
-          {isOperator() && (
+          {isOperator() && !currentTeam && (
             <div>
               <select
                 value={filterParentTeam}
