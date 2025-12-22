@@ -3,7 +3,8 @@ import { useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   UserCircle, Upload, Link2, TrendingUp, Video, ClipboardList, Edit2, Save, X,
-  Calendar, Ruler, Weight, MapPin, GraduationCap, Users, Footprints, MessageSquare, Send, Trash2
+  Calendar, Ruler, Weight, MapPin, GraduationCap, Users, Footprints, MessageSquare, Send, Trash2,
+  Star, Zap
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -641,6 +642,20 @@ export default function PlayerDetail() {
             <div>
               <p className="text-xs text-gray-500">前所属チーム</p>
               <p className="font-medium text-gray-900">{player.previousTeam || '-'}</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+            <Star className="w-5 h-5 text-primary-500 mt-0.5" />
+            <div>
+              <p className="text-xs text-gray-500">目標とする選手</p>
+              <p className="font-medium text-gray-900">{player.roleModel || '-'}</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+            <Zap className="w-5 h-5 text-primary-500 mt-0.5" />
+            <div>
+              <p className="text-xs text-gray-500">プレースタイル</p>
+              <p className="font-medium text-gray-900">{player.playStyle || '-'}</p>
             </div>
           </div>
         </div>
