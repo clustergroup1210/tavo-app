@@ -413,15 +413,28 @@ export default function MyPage() {
           {evaluationSummary.length > 0 ? (
             <div className="space-y-3">
               {evaluationSummary.slice(0, 5).map((s) => (
-                <div key={s.item.id} className="flex items-center justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm text-gray-600">{s.item.name}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-semibold text-gray-900">{s.latestScore}</span>
+                <div key={s.item.id} className="py-2 border-b border-gray-100">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm text-gray-600">{s.item.name}</span>
                     {s.progress !== 0 && (
                       <span className={`text-xs ${s.progress > 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {s.progress > 0 ? '+' : ''}{s.progress}
                       </span>
                     )}
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-500">指導者:</span>
+                      <span className="text-lg font-semibold text-primary-600">
+                        {s.latestCoachScore ?? '-'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-500">自己:</span>
+                      <span className="text-lg font-semibold text-gray-600">
+                        {s.latestSelfScore ?? '-'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))}

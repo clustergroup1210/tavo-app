@@ -28,6 +28,9 @@ export default function PlayerDetail() {
   const [notes, setNotes] = useState([]);
   const [newNote, setNewNote] = useState('');
   const [submittingNote, setSubmittingNote] = useState(false);
+  const [linkEmail, setLinkEmail] = useState('');
+  const [linkingUser, setLinkingUser] = useState(false);
+  const [linkError, setLinkError] = useState('');
 
   useEffect(() => {
     fetchPlayer();
@@ -110,6 +113,49 @@ export default function PlayerDetail() {
       fetchNotes();
     } catch (error) {
       console.error('Failed to delete note:', error);
+    }
+  };
+
+  const handleLinkUser = async () => {
+    if (!linkEmail.trim()) return;
+    setLinkingUser(true);
+    setLinkError('');
+    try {
+      const res = await fetch(`/api/players/${id}/link-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: linkEmail }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPlayer(prev => ({ ...prev, userId: data.userId, user: data.user }));
+        setLinkEmail('');
+      } else {
+        setLinkError(data.error || 'ユーザーの紐付けに失敗しました');
+      }
+    } catch (error) {
+      setLinkError('ユーザーの紐付けに失敗しました');
+    } finally {
+      setLinkingUser(false);
+    }
+  };
+
+  const handleUnlinkUser = async () => {
+    if (!confirm('このユーザーとの紐付けを解除しますか？')) return;
+    setLinkingUser(true);
+    try {
+      const res = await fetch(`/api/players/${id}/unlink-user`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        setPlayer(prev => ({ ...prev, userId: null, user: null }));
+      }
+    } catch (error) {
+      console.error('Failed to unlink user:', error);
+    } finally {
+      setLinkingUser(false);
     }
   };
 
@@ -584,6 +630,55 @@ export default function PlayerDetail() {
               キャンセル
             </button>
           </div>
+        </div>
+      )}
+
+      {(isCoach || isOperator) && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Link2 className="w-5 h-5 text-primary-500" />
+            アカウント紐付け
+          </h2>
+          {player?.user ? (
+            <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div>
+                <p className="text-sm text-green-700 font-medium">紐付け済み</p>
+                <p className="text-sm text-green-600">{player.user.email}</p>
+              </div>
+              <button
+                onClick={handleUnlinkUser}
+                disabled={linkingUser}
+                className="px-4 py-2 text-sm text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+              >
+                解除
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600">
+                この選手にログインアカウントを紐付けると、選手本人がマイページで評価データを確認できるようになります。
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={linkEmail}
+                  onChange={(e) => setLinkEmail(e.target.value)}
+                  placeholder="ユーザーのメールアドレス"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                />
+                <button
+                  onClick={handleLinkUser}
+                  disabled={linkingUser || !linkEmail.trim()}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                >
+                  {linkingUser ? '処理中...' : '紐付ける'}
+                </button>
+              </div>
+              {linkError && (
+                <p className="text-sm text-red-600">{linkError}</p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
