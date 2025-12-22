@@ -166,6 +166,36 @@ router.post('/:id/logo', authenticate, upload.single('logo'), async (req, res) =
   }
 });
 
+router.get('/:id/staff', authenticate, async (req, res) => {
+  try {
+    const isOperator = req.user.organizations?.some(o => 
+      ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+    );
+    
+    if (!isOperator && !hasTeamAccess(req.user, req.params.id, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const staff = await prisma.userTeam.findMany({
+      where: {
+        teamId: req.params.id,
+        role: { in: ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH', 'TEAM_EXTERNAL_COACH'] }
+      },
+      include: {
+        user: {
+          select: { id: true, name: true, email: true, avatarUrl: true }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    res.json(staff);
+  } catch (error) {
+    console.error('Get staff error:', error);
+    res.status(500).json({ error: 'スタッフの取得に失敗しました' });
+  }
+});
+
 router.post('/:id/members', authenticate, async (req, res) => {
   try {
     if (!hasTeamAccess(req.user, req.params.id, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {

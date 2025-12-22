@@ -25,6 +25,7 @@ import Organizations from './pages/Organizations';
 import Placeholder from './pages/Placeholder';
 import Ranking from './pages/Ranking';
 import GoalCategoryManagement from './pages/GoalCategoryManagement';
+import StaffManagement from './pages/StaffManagement';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -130,6 +131,7 @@ export default function App() {
           <Route path="/master" element={<Placeholder />} />
           <Route path="/settings" element={<Placeholder />} />
           <Route path="/goal-categories" element={<GoalCategoryManagement />} />
+          <Route path="/staff" element={<StaffManagement />} />
         </Route>
       </Route>
     </Routes>

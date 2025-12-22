@@ -151,11 +151,21 @@ router.put('/:id', authenticate, async (req, res) => {
     if (previousTeam !== undefined) updateData.previousTeam = previousTeam;
     if (roleModel !== undefined) updateData.roleModel = roleModel;
     if (playStyle !== undefined) updateData.playStyle = playStyle;
-    if (teamId !== undefined && canChangeTeam) {
+    if (teamId !== undefined && canChangeTeam && teamId !== player.teamId) {
       const canAccessDestination = isOperator || hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
       if (!canAccessDestination) {
         return res.status(403).json({ error: 'Access denied to destination team' });
       }
+      
+      await prisma.playerTeamHistory.updateMany({
+        where: { 
+          playerId: req.params.id, 
+          teamId: player.teamId,
+          leftAt: null 
+        },
+        data: { leftAt: new Date() }
+      });
+      
       updateData.teamId = teamId;
       await prisma.playerTeamHistory.create({
         data: { playerId: req.params.id, teamId, joinedAt: new Date() }
@@ -244,6 +254,37 @@ router.delete('/:id/notes/:noteId', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Delete note error:', error);
     res.status(500).json({ error: 'Failed to delete note' });
+  }
+});
+
+router.get('/:id/history', authenticate, async (req, res) => {
+  try {
+    const history = await prisma.playerTeamHistory.findMany({
+      where: { playerId: req.params.id },
+      include: {
+        player: {
+          include: {
+            team: { select: { id: true, name: true } }
+          }
+        }
+      },
+      orderBy: { joinedAt: 'desc' }
+    });
+
+    const historyWithTeams = await Promise.all(
+      history.map(async (h) => {
+        const team = await prisma.team.findUnique({
+          where: { id: h.teamId },
+          select: { id: true, name: true, logoUrl: true }
+        });
+        return { ...h, team };
+      })
+    );
+
+    res.json(historyWithTeams);
+  } catch (error) {
+    console.error('Get player history error:', error);
+    res.status(500).json({ error: 'Failed to fetch player history' });
   }
 });
 

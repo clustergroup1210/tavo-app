@@ -200,7 +200,22 @@ Rich card-based player detail page:
 - Photo displayed as thumbnail with camera hover overlay
 - Coaches and admins can also upload player passport photos
 
+### Staff Management (/staff)
+- Dedicated page for managing team coaches and administrators
+- Add staff by email with role selection
+- Change roles (admin, head coach, coach, external coach)
+- Remove staff members from team
+
+### Transfer Data Visibility
+- PlayerTeamHistory tracks joinedAt and leftAt dates
+- When a player transfers, previous team record is closed (leftAt set)
+- Evaluation data filtered by team membership period
+- Coaches only see evaluations from when player was on their team
+- Players and operators see full history
+
 ## Recent Changes
+- Staff management UI with role assignment
+- Transfer data visibility filtering
 - Goal management system with custom categories
 - Player profile fields: roleModel, playStyle
 - JFA Passport photo upload on MyPage

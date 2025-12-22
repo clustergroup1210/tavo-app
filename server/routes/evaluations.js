@@ -5,6 +5,55 @@ const { authenticate, hasTeamAccess } = require('../middleware/auth');
 const router = express.Router();
 const prisma = new PrismaClient();
 
+async function getPlayerTeamMembershipPeriods(playerId, teamId) {
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    select: { id: true, parentId: true }
+  });
+  
+  if (!team) return [];
+  
+  const teamIds = [teamId];
+  if (team.parentId) {
+    teamIds.push(team.parentId);
+  }
+  
+  const childTeams = await prisma.team.findMany({
+    where: { parentId: teamId },
+    select: { id: true }
+  });
+  childTeams.forEach(ct => teamIds.push(ct.id));
+  
+  const histories = await prisma.playerTeamHistory.findMany({
+    where: { 
+      playerId, 
+      teamId: { in: teamIds }
+    },
+    orderBy: { joinedAt: 'asc' }
+  });
+  
+  return histories.map(h => ({
+    joinedAt: h.joinedAt,
+    leftAt: h.leftAt
+  }));
+}
+
+function isWithinMembershipPeriods(evalDate, periods) {
+  if (!periods || periods.length === 0) return false;
+  
+  return periods.some(period => {
+    if (evalDate < period.joinedAt) return false;
+    if (period.leftAt && evalDate > period.leftAt) return false;
+    return true;
+  });
+}
+
+function isOperator(user) {
+  return user.organizations?.some(o => 
+    ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+  );
+}
+
 router.get('/items', authenticate, async (req, res) => {
   try {
     const { teamId } = req.query;
@@ -228,11 +277,32 @@ router.get('/comparison/:playerId', authenticate, async (req, res) => {
     
     const player = await prisma.player.findUnique({
       where: { id: req.params.playerId },
-      include: { team: true }
+      include: { team: { include: { parent: true } } }
     });
     
     if (!player) {
       return res.status(404).json({ error: 'Player not found' });
+    }
+
+    const isSelf = player.userId === req.user.id;
+    const isOp = isOperator(req.user);
+    const isParentOfPlayer = req.user.parentPlayers?.some(pp => pp.playerId === player.id);
+    
+    let membershipPeriods = null;
+    if (!isSelf && !isOp && !isParentOfPlayer) {
+      const userTeamIds = req.user.teams?.map(t => t.teamId) || [];
+      const playerTeamIds = [player.teamId, player.team?.parentId].filter(Boolean);
+      const sharedTeamId = userTeamIds.find(tid => playerTeamIds.includes(tid));
+      
+      if (!sharedTeamId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      membershipPeriods = await getPlayerTeamMembershipPeriods(req.params.playerId, sharedTeamId);
+      
+      if (membershipPeriods.length === 0) {
+        return res.status(403).json({ error: 'Access denied - no team membership found' });
+      }
     }
 
     const items = await prisma.evaluationItem.findMany({
@@ -243,11 +313,17 @@ router.get('/comparison/:playerId', authenticate, async (req, res) => {
     const evalWhere = { playerId: req.params.playerId };
     if (roundId) evalWhere.roundId = roundId;
 
-    const evaluations = await prisma.evaluation.findMany({
+    let evaluations = await prisma.evaluation.findMany({
       where: evalWhere,
       include: { item: { include: { parent: { include: { parent: true } } } }, round: true },
       orderBy: { evaluatedAt: 'desc' }
     });
+
+    if (membershipPeriods) {
+      evaluations = evaluations.filter(e => 
+        isWithinMembershipPeriods(new Date(e.evaluatedAt), membershipPeriods)
+      );
+    }
 
     const latestRoundId = roundId || (evaluations.length > 0 ? evaluations[0].roundId : null);
     const latestEvals = evaluations.filter(e => e.roundId === latestRoundId);
@@ -344,14 +420,35 @@ router.get('/progress/:playerId', authenticate, async (req, res) => {
   try {
     const player = await prisma.player.findUnique({
       where: { id: req.params.playerId },
-      include: { team: true }
+      include: { team: { include: { parent: true } } }
     });
     
     if (!player) {
       return res.status(404).json({ error: 'Player not found' });
     }
 
-    const evaluations = await prisma.evaluation.findMany({
+    const isSelf = player.userId === req.user.id;
+    const isOp = isOperator(req.user);
+    const isParentOfPlayer = req.user.parentPlayers?.some(pp => pp.playerId === player.id);
+    
+    let membershipPeriods = null;
+    if (!isSelf && !isOp && !isParentOfPlayer) {
+      const userTeamIds = req.user.teams?.map(t => t.teamId) || [];
+      const playerTeamIds = [player.teamId, player.team?.parentId].filter(Boolean);
+      const sharedTeamId = userTeamIds.find(tid => playerTeamIds.includes(tid));
+      
+      if (!sharedTeamId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      membershipPeriods = await getPlayerTeamMembershipPeriods(req.params.playerId, sharedTeamId);
+      
+      if (membershipPeriods.length === 0) {
+        return res.status(403).json({ error: 'Access denied - no team membership found' });
+      }
+    }
+
+    let evaluations = await prisma.evaluation.findMany({
       where: { playerId: req.params.playerId },
       include: { 
         item: { include: { parent: true } }, 
@@ -359,6 +456,12 @@ router.get('/progress/:playerId', authenticate, async (req, res) => {
       },
       orderBy: { evaluatedAt: 'asc' }
     });
+
+    if (membershipPeriods) {
+      evaluations = evaluations.filter(e => 
+        isWithinMembershipPeriods(new Date(e.evaluatedAt), membershipPeriods)
+      );
+    }
 
     const byRound = {};
     evaluations.forEach(e => {
@@ -438,11 +541,32 @@ router.get('/heatmap/:playerId', authenticate, async (req, res) => {
   try {
     const player = await prisma.player.findUnique({
       where: { id: req.params.playerId },
-      include: { team: true }
+      include: { team: { include: { parent: true } } }
     });
     
     if (!player) {
       return res.status(404).json({ error: 'Player not found' });
+    }
+
+    const isSelf = player.userId === req.user.id;
+    const isOp = isOperator(req.user);
+    const isParentOfPlayer = req.user.parentPlayers?.some(pp => pp.playerId === player.id);
+    
+    let membershipPeriods = null;
+    if (!isSelf && !isOp && !isParentOfPlayer) {
+      const userTeamIds = req.user.teams?.map(t => t.teamId) || [];
+      const playerTeamIds = [player.teamId, player.team?.parentId].filter(Boolean);
+      const sharedTeamId = userTeamIds.find(tid => playerTeamIds.includes(tid));
+      
+      if (!sharedTeamId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      membershipPeriods = await getPlayerTeamMembershipPeriods(req.params.playerId, sharedTeamId);
+      
+      if (membershipPeriods.length === 0) {
+        return res.status(403).json({ error: 'Access denied - no team membership found' });
+      }
     }
 
     const items = await prisma.evaluationItem.findMany({
@@ -450,10 +574,16 @@ router.get('/heatmap/:playerId', authenticate, async (req, res) => {
       orderBy: { sortOrder: 'asc' }
     });
 
-    const evaluations = await prisma.evaluation.findMany({
+    let evaluations = await prisma.evaluation.findMany({
       where: { playerId: req.params.playerId },
       orderBy: { evaluatedAt: 'desc' }
     });
+
+    if (membershipPeriods) {
+      evaluations = evaluations.filter(e => 
+        isWithinMembershipPeriods(new Date(e.evaluatedAt), membershipPeriods)
+      );
+    }
 
     const latestByItem = {};
     evaluations.forEach(e => {
