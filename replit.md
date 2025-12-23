@@ -214,11 +214,16 @@ Rich card-based player detail page:
 - Players and operators see full history
 
 ## Recent Changes
+- MyPage redesign: Matches PlayerDetail layout with gradient header card, player photo, number, name, position badge, team info
+- Photo upload: Players can upload their profile photo directly from MyPage using same passportUrl field
+- Basic info grid: Displays birthDate, height, weight, dominantFoot, hometown, school, previousTeam, roleModel, playStyle
+- Full edit modal: Players can edit all their profile fields from MyPage
 - Admin-Player page linking: User account linking from PlayerDetail page for coaches/operators
 - Player self-data access: GET /api/players now returns player's own data via userId fallback
 - Evaluation summary enhancement: Returns both coach (latestCoachScore) and self (latestSelfScore) evaluations
 - MyPage improvements: Displays coach and self evaluations separately with clear labels
 - API endpoints: POST /api/players/:id/link-user and DELETE /api/players/:id/unlink-user for account management
+- API endpoints: POST /api/players/:id/photo for player photo upload
 - Staff management UI with role assignment and dedicated /staff page
 - Transfer data visibility filtering with multi-period support
 - Security hardening: Evaluation endpoints require shared team membership and matching PlayerTeamHistory records

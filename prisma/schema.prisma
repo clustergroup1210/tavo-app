@@ -111,6 +111,7 @@ model Player {
   hometown     String?
   school       String?
   previousTeam String?
+  photoUrl     String?
   passportUrl  String?
   roleModel    String?
   playStyle    String?
