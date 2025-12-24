@@ -97,6 +97,7 @@ export default function Sidebar() {
           { path: '/users', label: 'ユーザー管理', icon: UserCog },
           { path: '/staff', label: 'スタッフ管理', icon: Shield },
           { path: '/invitations', label: '招待URL管理', icon: Link2 },
+          { path: '/team-categories', label: 'カテゴリー管理', icon: Users },
           { path: '/goal-categories', label: '目標カテゴリー管理', icon: Target },
         ];
       }

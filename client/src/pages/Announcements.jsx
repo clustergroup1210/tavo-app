@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Bell, Plus, X, Edit2, Trash2, AlertCircle, Info, Megaphone,
-  Clock, Building2, Users
+  Clock, Building2, Users, Tag
 } from 'lucide-react';
 
 export default function Announcements() {
   const { user, isCoach, isOperator } = useAuth();
   const [announcements, setAnnouncements] = useState([]);
   const [manageAnnouncements, setManageAnnouncements] = useState([]);
+  const [teamCategories, setTeamCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
@@ -18,7 +19,8 @@ export default function Announcements() {
     content: '',
     priority: 'normal',
     isPublished: true,
-    expiresAt: ''
+    expiresAt: '',
+    categoryIds: []
   });
 
   const currentTeamId = user?.teams?.[0]?.teamId;
@@ -28,6 +30,9 @@ export default function Announcements() {
     fetchAnnouncements();
     if (canManage) {
       fetchManageAnnouncements();
+      if (currentTeamId) {
+        fetchTeamCategories();
+      }
     }
   }, []);
 
@@ -56,6 +61,16 @@ export default function Announcements() {
     }
   };
 
+  const fetchTeamCategories = async () => {
+    try {
+      const res = await fetch(`/api/team-categories?teamId=${currentTeamId}`, { credentials: 'include' });
+      const data = await res.json();
+      setTeamCategories(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to fetch team categories:', error);
+    }
+  };
+
   const openCreateModal = () => {
     setEditingAnnouncement(null);
     setForm({
@@ -63,7 +78,8 @@ export default function Announcements() {
       content: '',
       priority: 'normal',
       isPublished: true,
-      expiresAt: ''
+      expiresAt: '',
+      categoryIds: []
     });
     setShowModal(true);
   };
@@ -75,9 +91,19 @@ export default function Announcements() {
       content: announcement.content,
       priority: announcement.priority,
       isPublished: announcement.isPublished,
-      expiresAt: announcement.expiresAt ? announcement.expiresAt.split('T')[0] : ''
+      expiresAt: announcement.expiresAt ? announcement.expiresAt.split('T')[0] : '',
+      categoryIds: announcement.categoryTargets?.map(ct => ct.teamCategoryId) || []
     });
     setShowModal(true);
+  };
+
+  const handleCategoryToggle = (categoryId) => {
+    setForm(prev => ({
+      ...prev,
+      categoryIds: prev.categoryIds.includes(categoryId)
+        ? prev.categoryIds.filter(id => id !== categoryId)
+        : [...prev.categoryIds, categoryId]
+    }));
   };
 
   const handleSubmit = async () => {
@@ -88,7 +114,8 @@ export default function Announcements() {
         content: form.content,
         priority: form.priority,
         isPublished: form.isPublished,
-        expiresAt: form.expiresAt || null
+        expiresAt: form.expiresAt || null,
+        categoryIds: form.categoryIds
       };
 
       if (editingAnnouncement) {
@@ -203,10 +230,15 @@ export default function Announcements() {
                       <Icon className="w-5 h-5" />
                     </div>
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className={`px-2 py-0.5 text-xs rounded-full ${config.color}`}>
                           {config.label}
                         </span>
+                        {announcement.categoryTargets?.map(ct => (
+                          <span key={ct.id} className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-800">
+                            {ct.teamCategory?.name}
+                          </span>
+                        ))}
                         <h3 className="font-semibold text-gray-900">{announcement.title}</h3>
                       </div>
                       <p className="text-gray-600 whitespace-pre-wrap">{announcement.content}</p>
@@ -252,13 +284,25 @@ export default function Announcements() {
                 <div key={announcement.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className={`px-2 py-0.5 text-xs rounded-full ${config.color}`}>
                           {config.label}
                         </span>
                         {!announcement.isPublished && (
                           <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800">
                             下書き
+                          </span>
+                        )}
+                        {announcement.categoryTargets?.length > 0 ? (
+                          announcement.categoryTargets.map(ct => (
+                            <span key={ct.id} className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-800 flex items-center gap-1">
+                              <Tag className="w-3 h-3" />
+                              {ct.teamCategory?.name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">
+                            全員
                           </span>
                         )}
                         <h3 className="font-semibold text-gray-900">{announcement.title}</h3>
@@ -346,6 +390,34 @@ export default function Announcements() {
                   <option value="low">低</option>
                 </select>
               </div>
+
+              {teamCategories.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    配信対象カテゴリー
+                    <span className="text-xs text-gray-500 ml-2">（選択しない場合は全員に配信）</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {teamCategories.map(category => (
+                      <button
+                        key={category.id}
+                        type="button"
+                        onClick={() => handleCategoryToggle(category.id)}
+                        className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
+                          form.categoryIds.includes(category.id)
+                            ? 'bg-purple-600 text-white border-purple-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-purple-400'
+                        }`}
+                      >
+                        {category.name}
+                      </button>
+                    ))}
+                  </div>
+                  {form.categoryIds.length === 0 && (
+                    <p className="text-xs text-green-600 mt-1">全員に配信されます</p>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">有効期限（任意）</label>

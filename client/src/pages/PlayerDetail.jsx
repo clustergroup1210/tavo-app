@@ -31,6 +31,7 @@ export default function PlayerDetail() {
   const [linkEmail, setLinkEmail] = useState('');
   const [linkingUser, setLinkingUser] = useState(false);
   const [linkError, setLinkError] = useState('');
+  const [teamCategories, setTeamCategories] = useState([]);
 
   useEffect(() => {
     fetchPlayer();
@@ -178,6 +179,17 @@ export default function PlayerDetail() {
     }
   };
 
+  const fetchTeamCategories = async () => {
+    if (!player?.teamId) return;
+    try {
+      const res = await fetch(`/api/team-categories?teamId=${player.teamId}`, { credentials: 'include' });
+      const data = await res.json();
+      setTeamCategories(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to fetch team categories:', error);
+    }
+  };
+
   const fetchPlayer = async () => {
     try {
       const res = await fetch(`/api/players/${id}`, { credentials: 'include' });
@@ -248,9 +260,11 @@ export default function PlayerDetail() {
       hometown: player.hometown || '',
       school: player.school || '',
       previousTeam: player.previousTeam || '',
-      teamId: player.teamId || ''
+      teamId: player.teamId || '',
+      teamCategoryId: player.teamCategoryId || ''
     });
     setEditing(true);
+    fetchTeamCategories();
   };
 
   const cancelEditing = () => {
@@ -597,7 +611,7 @@ export default function PlayerDetail() {
                 </div>
                 {getCurrentParentId() && getChildTeams(getCurrentParentId()).length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">カテゴリー</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">サブチーム</label>
                     <select
                       value={editForm.teamId}
                       onChange={(e) => setEditForm({ ...editForm, teamId: e.target.value })}
@@ -606,6 +620,24 @@ export default function PlayerDetail() {
                       <option value="">選択してください</option>
                       {getChildTeams(getCurrentParentId()).map((team) => (
                         <option key={team.id} value={team.id}>{team.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {teamCategories.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      お知らせカテゴリー
+                      <span className="text-xs text-gray-500 ml-2">（お知らせの配信先に使用）</span>
+                    </label>
+                    <select
+                      value={editForm.teamCategoryId}
+                      onChange={(e) => setEditForm({ ...editForm, teamCategoryId: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    >
+                      <option value="">未設定</option>
+                      {teamCategories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
                       ))}
                     </select>
                   </div>

@@ -84,6 +84,7 @@ router.get('/:id', authenticate, async (req, res) => {
       where: { id: req.params.id },
       include: {
         team: { include: { parent: true } },
+        teamCategory: { select: { id: true, name: true } },
         user: { select: { id: true, email: true, name: true } },
         parents: { include: { user: { select: { id: true, email: true, name: true } } } },
         evaluations: {
@@ -136,7 +137,7 @@ router.post('/', authenticate, async (req, res) => {
 
 router.put('/:id', authenticate, async (req, res) => {
   try {
-    const { name, nameRomaji, number, position, birthDate, height, weight, dominantFoot, hometown, school, previousTeam, teamId, roleModel, playStyle } = req.body;
+    const { name, nameRomaji, number, position, birthDate, height, weight, dominantFoot, hometown, school, previousTeam, teamId, roleModel, playStyle, teamCategoryId } = req.body;
 
     const player = await prisma.player.findUnique({ where: { id: req.params.id } });
     if (!player) {
@@ -169,6 +170,9 @@ router.put('/:id', authenticate, async (req, res) => {
     if (previousTeam !== undefined) updateData.previousTeam = previousTeam;
     if (roleModel !== undefined) updateData.roleModel = roleModel;
     if (playStyle !== undefined) updateData.playStyle = playStyle;
+    if (teamCategoryId !== undefined && (isCoachOrAdmin || isOperator)) {
+      updateData.teamCategoryId = teamCategoryId || null;
+    }
     if (teamId !== undefined && canChangeTeam && teamId !== player.teamId) {
       const canAccessDestination = isOperator || hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
       if (!canAccessDestination) {

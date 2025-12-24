@@ -28,6 +28,7 @@ import GoalCategoryManagement from './pages/GoalCategoryManagement';
 import StaffManagement from './pages/StaffManagement';
 import Calendar from './pages/Calendar';
 import Announcements from './pages/Announcements';
+import TeamCategoryManagement from './pages/TeamCategoryManagement';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -135,6 +136,7 @@ export default function App() {
           <Route path="/settings" element={<Placeholder />} />
           <Route path="/goal-categories" element={<GoalCategoryManagement />} />
           <Route path="/staff" element={<StaffManagement />} />
+          <Route path="/team-categories" element={<TeamCategoryManagement />} />
         </Route>
       </Route>
     </Routes>
