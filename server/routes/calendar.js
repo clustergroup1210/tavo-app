@@ -1,0 +1,219 @@
+const express = require('express');
+const router = express.Router();
+const { PrismaClient } = require('@prisma/client');
+const { authenticate } = require('../middleware/auth');
+
+const prisma = new PrismaClient();
+
+function hasTeamAccess(user, teamId, roles) {
+  return user.teams?.some(ut => ut.teamId === teamId && roles.includes(ut.role));
+}
+
+function isOperator(user) {
+  return user.organizations?.some(o => 
+    ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+  );
+}
+
+router.get('/', authenticate, async (req, res) => {
+  try {
+    const { teamId, month, year } = req.query;
+    const user = req.user;
+    
+    const userTeamIds = user.teams?.map(t => t.teamId) || [];
+    const userOrgIds = user.organizations?.map(o => o.organizationId) || [];
+    
+    let where = {};
+    
+    if (teamId) {
+      where.teamId = teamId;
+    } else {
+      where.OR = [
+        { teamId: { in: userTeamIds } },
+        { organizationId: { in: userOrgIds } },
+        { organizationId: { not: null }, teamId: null }
+      ];
+    }
+    
+    if (month && year) {
+      const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+      const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+      where.startDate = { gte: startDate, lte: endDate };
+    }
+    
+    const events = await prisma.calendarEvent.findMany({
+      where,
+      include: {
+        team: { select: { id: true, name: true } },
+        organization: { select: { id: true, name: true } },
+        author: { select: { id: true, name: true } }
+      },
+      orderBy: { startDate: 'asc' }
+    });
+    
+    res.json(events);
+  } catch (error) {
+    console.error('Get calendar events error:', error);
+    res.status(500).json({ error: 'Failed to fetch calendar events' });
+  }
+});
+
+router.get('/my', authenticate, async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    const user = req.user;
+    
+    const userTeamIds = user.teams?.map(t => t.teamId) || [];
+    const userOrgIds = user.organizations?.map(o => o.organizationId) || [];
+    
+    const player = await prisma.player.findFirst({
+      where: { userId: user.id },
+      include: { team: { include: { parent: true } } }
+    });
+    
+    if (player) {
+      if (player.teamId && !userTeamIds.includes(player.teamId)) {
+        userTeamIds.push(player.teamId);
+      }
+      if (player.team?.parentId && !userTeamIds.includes(player.team.parentId)) {
+        userTeamIds.push(player.team.parentId);
+      }
+    }
+    
+    let where = {
+      OR: [
+        { teamId: { in: userTeamIds } },
+        { organizationId: { in: userOrgIds } },
+        { organizationId: { not: null }, teamId: null }
+      ]
+    };
+    
+    if (month && year) {
+      const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+      const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+      where.startDate = { gte: startDate, lte: endDate };
+    }
+    
+    const events = await prisma.calendarEvent.findMany({
+      where,
+      include: {
+        team: { select: { id: true, name: true } },
+        organization: { select: { id: true, name: true } },
+        author: { select: { id: true, name: true } }
+      },
+      orderBy: { startDate: 'asc' }
+    });
+    
+    res.json(events);
+  } catch (error) {
+    console.error('Get my calendar events error:', error);
+    res.status(500).json({ error: 'Failed to fetch calendar events' });
+  }
+});
+
+router.post('/', authenticate, async (req, res) => {
+  try {
+    const { teamId, organizationId, title, description, startDate, endDate, allDay, eventType, location } = req.body;
+    
+    const canCreate = teamId 
+      ? hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])
+      : isOperator(req.user);
+    
+    if (!canCreate) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const event = await prisma.calendarEvent.create({
+      data: {
+        teamId,
+        organizationId: organizationId || (isOperator(req.user) && !teamId ? req.user.organizations[0]?.organizationId : null),
+        title,
+        description,
+        startDate: new Date(startDate),
+        endDate: endDate ? new Date(endDate) : null,
+        allDay: allDay || false,
+        eventType: eventType || 'event',
+        location,
+        createdBy: req.user.id
+      },
+      include: {
+        team: { select: { id: true, name: true } },
+        author: { select: { id: true, name: true } }
+      }
+    });
+    
+    res.status(201).json(event);
+  } catch (error) {
+    console.error('Create calendar event error:', error);
+    res.status(500).json({ error: 'Failed to create calendar event' });
+  }
+});
+
+router.put('/:id', authenticate, async (req, res) => {
+  try {
+    const event = await prisma.calendarEvent.findUnique({ where: { id: req.params.id } });
+    
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    
+    const canEdit = event.teamId 
+      ? hasTeamAccess(req.user, event.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])
+      : isOperator(req.user);
+    
+    if (!canEdit) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const { title, description, startDate, endDate, allDay, eventType, location } = req.body;
+    
+    const updated = await prisma.calendarEvent.update({
+      where: { id: req.params.id },
+      data: {
+        title,
+        description,
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : null,
+        allDay,
+        eventType,
+        location
+      },
+      include: {
+        team: { select: { id: true, name: true } },
+        author: { select: { id: true, name: true } }
+      }
+    });
+    
+    res.json(updated);
+  } catch (error) {
+    console.error('Update calendar event error:', error);
+    res.status(500).json({ error: 'Failed to update calendar event' });
+  }
+});
+
+router.delete('/:id', authenticate, async (req, res) => {
+  try {
+    const event = await prisma.calendarEvent.findUnique({ where: { id: req.params.id } });
+    
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    
+    const canDelete = event.teamId 
+      ? hasTeamAccess(req.user, event.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])
+      : isOperator(req.user);
+    
+    if (!canDelete) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    await prisma.calendarEvent.delete({ where: { id: req.params.id } });
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete calendar event error:', error);
+    res.status(500).json({ error: 'Failed to delete calendar event' });
+  }
+});
+
+module.exports = router;
