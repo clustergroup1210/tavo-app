@@ -28,11 +28,11 @@ router.get('/', authenticate, async (req, res) => {
     if (teamId) {
       where.teamId = teamId;
     } else {
-      where.OR = [
-        { teamId: { in: userTeamIds } },
-        { organizationId: { in: userOrgIds } },
-        { organizationId: { not: null }, teamId: null }
-      ];
+      const orFilters = [{ teamId: { in: userTeamIds } }];
+      if (userOrgIds.length > 0) {
+        orFilters.push({ organizationId: { in: userOrgIds }, teamId: null });
+      }
+      where.OR = orFilters;
     }
     
     where.AND = [
@@ -79,13 +79,13 @@ router.get('/my', authenticate, async (req, res) => {
       }
     }
     
+    const orFilters = [{ teamId: { in: userTeamIds } }];
+    if (userOrgIds.length > 0) {
+      orFilters.push({ organizationId: { in: userOrgIds }, teamId: null });
+    }
     let where = {
       isPublished: true,
-      OR: [
-        { teamId: { in: userTeamIds } },
-        { organizationId: { in: userOrgIds } },
-        { organizationId: { not: null }, teamId: null }
-      ],
+      OR: orFilters,
       AND: [
         { OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }
       ]
@@ -125,8 +125,11 @@ router.get('/manage', authenticate, async (req, res) => {
     if (teamId) {
       where.teamId = teamId;
     } else if (isOperator(req.user)) {
-      where.organizationId = { not: null };
-      where.teamId = null;
+      const userOrgIds = req.user.organizations?.map(o => o.organizationId) || [];
+      if (userOrgIds.length > 0) {
+        where.organizationId = { in: userOrgIds };
+        where.teamId = null;
+      }
     }
     
     const announcements = await prisma.announcement.findMany({

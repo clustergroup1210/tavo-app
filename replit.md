@@ -213,6 +213,40 @@ Rich card-based player detail page:
 - Coaches only see evaluations from when player was on their team
 - Players and operators see full history
 
+### Calendar System (/calendar)
+- Monthly calendar view with date navigation
+- Event types: practice, match, meeting, event, other (color-coded)
+- All-day and timed events with start/end dates
+- Location and description fields
+- Team-scoped and organization-scoped events
+- Create/edit/delete for coaches and admins
+- View-only for players and parents
+- Events from player's team and parent team visible
+
+### Announcements System (/announcements)
+- Priority levels: high, normal, low (with visual indicators)
+- Publish/draft status for content management
+- Expiration date support
+- Team-scoped and organization-scoped announcements
+- Dual view: "受信したお知らせ" (received) and "配信管理" (manage) tabs for admins
+- Create/edit/delete for coaches and admins
+- Automatic filtering by team/organization membership
+
+### Calendar API Endpoints
+- `GET /api/calendar` - Get events with team filter
+- `GET /api/calendar/my` - Get user's visible events
+- `POST /api/calendar` - Create event (coaches/admins)
+- `PUT /api/calendar/:id` - Update event
+- `DELETE /api/calendar/:id` - Delete event
+
+### Announcement API Endpoints
+- `GET /api/announcements` - Get published announcements
+- `GET /api/announcements/my` - Get user's announcements
+- `GET /api/announcements/manage` - Get manageable announcements
+- `POST /api/announcements` - Create announcement
+- `PUT /api/announcements/:id` - Update announcement
+- `DELETE /api/announcements/:id` - Delete announcement
+
 ## Recent Changes
 - MyPage redesign: Matches PlayerDetail layout with gradient header card, player photo, number, name, position badge, team info
 - Photo upload: Players can upload their profile photo directly from MyPage using same passportUrl field

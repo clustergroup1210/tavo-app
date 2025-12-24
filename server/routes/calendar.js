@@ -28,11 +28,11 @@ router.get('/', authenticate, async (req, res) => {
     if (teamId) {
       where.teamId = teamId;
     } else {
-      where.OR = [
-        { teamId: { in: userTeamIds } },
-        { organizationId: { in: userOrgIds } },
-        { organizationId: { not: null }, teamId: null }
-      ];
+      const orFilters = [{ teamId: { in: userTeamIds } }];
+      if (userOrgIds.length > 0) {
+        orFilters.push({ organizationId: { in: userOrgIds }, teamId: null });
+      }
+      where.OR = orFilters;
     }
     
     if (month && year) {
@@ -80,13 +80,11 @@ router.get('/my', authenticate, async (req, res) => {
       }
     }
     
-    let where = {
-      OR: [
-        { teamId: { in: userTeamIds } },
-        { organizationId: { in: userOrgIds } },
-        { organizationId: { not: null }, teamId: null }
-      ]
-    };
+    const orFilters = [{ teamId: { in: userTeamIds } }];
+    if (userOrgIds.length > 0) {
+      orFilters.push({ organizationId: { in: userOrgIds }, teamId: null });
+    }
+    let where = { OR: orFilters };
     
     if (month && year) {
       const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
