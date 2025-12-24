@@ -231,6 +231,20 @@ Rich card-based player detail page:
 - Dual view: "受信したお知らせ" (received) and "配信管理" (manage) tabs for admins
 - Create/edit/delete for coaches and admins
 - Automatic filtering by team/organization membership
+- **Category-based targeting**: Announcements can target specific player categories
+
+### Team Category System
+- **TeamCategory**: Teams can create announcement categories (e.g., カテゴリーA, カテゴリーB, U-15, U-18)
+- **Category Management** (/team-categories): Admin page for coaches to create and manage categories
+- **Player Assignment**: Players can be assigned to a category in PlayerDetail edit form
+- **Targeted Announcements**: When creating announcements, coaches can select target categories
+- **Filtering Logic**: Players only see announcements matching their category or no-category (全員) announcements
+- **Team Isolation**: All category APIs enforce team membership validation for security
+- **API Endpoints**:
+  - `GET /api/team-categories?teamId=` - Get categories for a team (requires team membership)
+  - `POST /api/team-categories` - Create category (admin/coach only)
+  - `PUT /api/team-categories/:id` - Update category
+  - `DELETE /api/team-categories/:id` - Deactivate category
 
 ### Calendar API Endpoints
 - `GET /api/calendar` - Get events with team filter
