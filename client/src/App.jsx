@@ -26,6 +26,8 @@ import Placeholder from './pages/Placeholder';
 import Ranking from './pages/Ranking';
 import GoalCategoryManagement from './pages/GoalCategoryManagement';
 import StaffManagement from './pages/StaffManagement';
+import Calendar from './pages/Calendar';
+import Announcements from './pages/Announcements';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -126,7 +128,8 @@ export default function App() {
           <Route path="/videos" element={<Videos />} />
           <Route path="/mypage" element={<MyPage />} />
           <Route path="/organizations" element={<Organizations />} />
-          <Route path="/announcements" element={<Placeholder />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/announcements" element={<Announcements />} />
           <Route path="/permissions" element={<Placeholder />} />
           <Route path="/master" element={<Placeholder />} />
           <Route path="/settings" element={<Placeholder />} />

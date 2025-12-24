@@ -4,7 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   LayoutDashboard, Users, UserCircle, ClipboardList, Video, 
   Bell, Settings, Building2, UserCog, ListChecks, Database,
-  Link2, FileText, TrendingUp, LogOut, Megaphone, ArrowLeft, Shield, Trophy, Target
+  Link2, FileText, TrendingUp, LogOut, Megaphone, ArrowLeft, Shield, Trophy, Target,
+  Calendar
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -43,6 +44,7 @@ export default function Sidebar() {
           { path: '/evaluations/entry', label: '評価データ', icon: ClipboardList },
           { path: '/ranking', label: 'ランキング', icon: Trophy },
           { path: '/videos', label: '動画管理', icon: Video },
+          { path: '/calendar', label: 'カレンダー', icon: Calendar },
           { path: '/announcements', label: 'お知らせ', icon: Megaphone },
         ],
         admin: [
@@ -63,6 +65,7 @@ export default function Sidebar() {
           { path: '/evaluations/entry', label: '評価入力', icon: ClipboardList },
           { path: '/ranking', label: 'ランキング', icon: Trophy },
           { path: '/videos', label: '動画・資料', icon: Video },
+          { path: '/calendar', label: 'カレンダー', icon: Calendar },
           { path: '/announcements', label: 'お知らせ', icon: Megaphone },
         ],
         admin: [
@@ -83,6 +86,7 @@ export default function Sidebar() {
           { path: '/evaluations/entry', label: '評価入力', icon: ClipboardList },
           { path: '/ranking', label: 'ランキング', icon: Trophy },
           { path: '/videos', label: '動画・資料', icon: Video },
+          { path: '/calendar', label: 'カレンダー', icon: Calendar },
           { path: '/announcements', label: 'お知らせ', icon: Megaphone },
         ],
         admin: [],
@@ -107,6 +111,8 @@ export default function Sidebar() {
           { path: '/evaluations/entry', label: '評価', icon: ClipboardList },
           { path: '/dashboard', label: '上達状況', icon: TrendingUp },
           { path: '/videos', label: '動画', icon: Video },
+          { path: '/calendar', label: 'カレンダー', icon: Calendar },
+          { path: '/announcements', label: 'お知らせ', icon: Megaphone },
         ],
         admin: [],
       };
@@ -118,6 +124,8 @@ export default function Sidebar() {
           { path: '/mypage', label: 'マイページ', icon: UserCircle },
           { path: '/dashboard', label: '評価（閲覧）', icon: ClipboardList },
           { path: '/videos', label: '動画投稿', icon: Video },
+          { path: '/calendar', label: 'カレンダー', icon: Calendar },
+          { path: '/announcements', label: 'お知らせ', icon: Megaphone },
         ],
         admin: [],
       };
