@@ -15,12 +15,21 @@ function isOperator(user) {
   );
 }
 
+function hasTeamMembership(user, teamId) {
+  return user.teams?.some(ut => ut.teamId === teamId);
+}
+
 router.get('/', authenticate, async (req, res) => {
   try {
     const { teamId } = req.query;
     
     if (!teamId) {
       return res.status(400).json({ error: 'teamId is required' });
+    }
+    
+    // Enforce team isolation: user must be a team member or an operator
+    if (!hasTeamMembership(req.user, teamId) && !isOperator(req.user)) {
+      return res.status(403).json({ error: 'Access denied' });
     }
     
     const categories = await prisma.teamCategory.findMany({
