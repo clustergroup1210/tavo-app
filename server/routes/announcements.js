@@ -26,6 +26,9 @@ router.get('/', authenticate, async (req, res) => {
     let where = { isPublished: true };
     
     if (teamId) {
+      if (!userTeamIds.includes(teamId) && !isOperator(user)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
       where.teamId = teamId;
     } else {
       const orFilters = [{ teamId: { in: userTeamIds } }];
@@ -44,7 +47,12 @@ router.get('/', authenticate, async (req, res) => {
       include: {
         team: { select: { id: true, name: true } },
         organization: { select: { id: true, name: true } },
-        author: { select: { id: true, name: true } }
+        author: { select: { id: true, name: true } },
+        categoryTargets: {
+          include: {
+            teamCategory: { select: { id: true, name: true } }
+          }
+        }
       },
       orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
       take: limit ? parseInt(limit) : undefined
@@ -96,13 +104,38 @@ router.get('/my', authenticate, async (req, res) => {
       include: {
         team: { select: { id: true, name: true } },
         organization: { select: { id: true, name: true } },
-        author: { select: { id: true, name: true } }
+        author: { select: { id: true, name: true } },
+        categoryTargets: {
+          include: {
+            teamCategory: { select: { id: true, name: true } }
+          }
+        }
       },
       orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
-      take: limit ? parseInt(limit) : 10
+      take: limit ? parseInt(limit) : 20
     });
     
-    res.json(announcements);
+    const filteredAnnouncements = announcements.filter(announcement => {
+      if (announcement.categoryTargets.length === 0) {
+        return true;
+      }
+      
+      if (!player || !player.teamCategoryId) {
+        if (isOperator(user) || user.teams?.some(ut => 
+          ut.teamId === announcement.teamId && 
+          ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'].includes(ut.role)
+        )) {
+          return true;
+        }
+        return false;
+      }
+      
+      return announcement.categoryTargets.some(
+        ct => ct.teamCategoryId === player.teamCategoryId
+      );
+    });
+    
+    res.json(filteredAnnouncements);
   } catch (error) {
     console.error('Get my announcements error:', error);
     res.status(500).json({ error: 'Failed to fetch announcements' });
@@ -137,7 +170,12 @@ router.get('/manage', authenticate, async (req, res) => {
       include: {
         team: { select: { id: true, name: true } },
         organization: { select: { id: true, name: true } },
-        author: { select: { id: true, name: true } }
+        author: { select: { id: true, name: true } },
+        categoryTargets: {
+          include: {
+            teamCategory: { select: { id: true, name: true } }
+          }
+        }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -151,7 +189,7 @@ router.get('/manage', authenticate, async (req, res) => {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { teamId, organizationId, title, content, priority, isPublished, publishedAt, expiresAt } = req.body;
+    const { teamId, organizationId, title, content, priority, isPublished, publishedAt, expiresAt, categoryIds } = req.body;
     
     const canCreate = teamId 
       ? hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])
@@ -159,6 +197,16 @@ router.post('/', authenticate, async (req, res) => {
     
     if (!canCreate) {
       return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    if (categoryIds && categoryIds.length > 0 && teamId) {
+      const categories = await prisma.teamCategory.findMany({
+        where: { id: { in: categoryIds } }
+      });
+      const invalidCategories = categories.filter(c => c.teamId !== teamId);
+      if (invalidCategories.length > 0) {
+        return res.status(400).json({ error: 'Categories must belong to the same team' });
+      }
     }
     
     const announcement = await prisma.announcement.create({
@@ -171,11 +219,19 @@ router.post('/', authenticate, async (req, res) => {
         isPublished: isPublished !== false,
         publishedAt: publishedAt ? new Date(publishedAt) : new Date(),
         expiresAt: expiresAt ? new Date(expiresAt) : null,
-        createdBy: req.user.id
+        createdBy: req.user.id,
+        categoryTargets: categoryIds && categoryIds.length > 0 ? {
+          create: categoryIds.map(categoryId => ({ teamCategoryId: categoryId }))
+        } : undefined
       },
       include: {
         team: { select: { id: true, name: true } },
-        author: { select: { id: true, name: true } }
+        author: { select: { id: true, name: true } },
+        categoryTargets: {
+          include: {
+            teamCategory: { select: { id: true, name: true } }
+          }
+        }
       }
     });
     
@@ -188,7 +244,10 @@ router.post('/', authenticate, async (req, res) => {
 
 router.put('/:id', authenticate, async (req, res) => {
   try {
-    const announcement = await prisma.announcement.findUnique({ where: { id: req.params.id } });
+    const announcement = await prisma.announcement.findUnique({ 
+      where: { id: req.params.id },
+      include: { categoryTargets: true }
+    });
     
     if (!announcement) {
       return res.status(404).json({ error: 'Announcement not found' });
@@ -202,7 +261,32 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
     
-    const { title, content, priority, isPublished, expiresAt } = req.body;
+    const { title, content, priority, isPublished, expiresAt, categoryIds } = req.body;
+    
+    if (categoryIds !== undefined && announcement.teamId) {
+      if (categoryIds.length > 0) {
+        const categories = await prisma.teamCategory.findMany({
+          where: { id: { in: categoryIds } }
+        });
+        const invalidCategories = categories.filter(c => c.teamId !== announcement.teamId);
+        if (invalidCategories.length > 0) {
+          return res.status(400).json({ error: 'Categories must belong to the same team' });
+        }
+      }
+      
+      await prisma.announcementCategoryTarget.deleteMany({
+        where: { announcementId: req.params.id }
+      });
+      
+      if (categoryIds.length > 0) {
+        await prisma.announcementCategoryTarget.createMany({
+          data: categoryIds.map(categoryId => ({
+            announcementId: req.params.id,
+            teamCategoryId: categoryId
+          }))
+        });
+      }
+    }
     
     const updated = await prisma.announcement.update({
       where: { id: req.params.id },
@@ -215,7 +299,12 @@ router.put('/:id', authenticate, async (req, res) => {
       },
       include: {
         team: { select: { id: true, name: true } },
-        author: { select: { id: true, name: true } }
+        author: { select: { id: true, name: true } },
+        categoryTargets: {
+          include: {
+            teamCategory: { select: { id: true, name: true } }
+          }
+        }
       }
     });
     
