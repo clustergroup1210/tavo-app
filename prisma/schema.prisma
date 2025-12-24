@@ -43,17 +43,18 @@ model Team {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  parent         Team?        @relation("TeamHierarchy", fields: [parentId], references: [id])
-  children       Team[]       @relation("TeamHierarchy")
-  users          UserTeam[]
-  players        Player[]
-  evaluationItems EvaluationItem[]
+  organization     Organization @relation(fields: [organizationId], references: [id])
+  parent           Team?        @relation("TeamHierarchy", fields: [parentId], references: [id])
+  children         Team[]       @relation("TeamHierarchy")
+  users            UserTeam[]
+  players          Player[]
+  evaluationItems  EvaluationItem[]
   evaluationRounds EvaluationRound[]
-  invitations    Invitation[]
-  goalCategories GoalCategory[]
-  calendarEvents CalendarEvent[]
-  announcements  Announcement[]
+  invitations      Invitation[]
+  goalCategories   GoalCategory[]
+  teamCategories   TeamCategory[]
+  calendarEvents   CalendarEvent[]
+  announcements    Announcement[]
 }
 
 model User {
@@ -103,36 +104,53 @@ model UserTeam {
 }
 
 model Player {
-  id           String   @id @default(uuid())
-  userId       String?
-  teamId       String
-  name         String
-  nameRomaji   String?
-  number       String?
-  position     String?
-  birthDate    DateTime?
-  height       Int?
-  weight       Int?
-  dominantFoot String?
-  hometown     String?
-  school       String?
-  previousTeam String?
-  photoUrl     String?
-  passportUrl  String?
-  roleModel    String?
-  playStyle    String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(uuid())
+  userId         String?
+  teamId         String
+  teamCategoryId String?
+  name           String
+  nameRomaji     String?
+  number         String?
+  position       String?
+  birthDate      DateTime?
+  height         Int?
+  weight         Int?
+  dominantFoot   String?
+  hometown       String?
+  school         String?
+  previousTeam   String?
+  photoUrl       String?
+  passportUrl    String?
+  roleModel      String?
+  playStyle      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  user        User?          @relation(fields: [userId], references: [id])
-  team        Team           @relation(fields: [teamId], references: [id])
-  parents     PlayerParent[]
-  evaluations Evaluation[]
-  appealLinks AppealLink[]
-  videos      Video[]
-  teamHistory PlayerTeamHistory[]
-  notes       PlayerNote[]
-  goals       Goal[]
+  user         User?          @relation(fields: [userId], references: [id])
+  team         Team           @relation(fields: [teamId], references: [id])
+  teamCategory TeamCategory?  @relation(fields: [teamCategoryId], references: [id])
+  parents      PlayerParent[]
+  evaluations  Evaluation[]
+  appealLinks  AppealLink[]
+  videos       Video[]
+  teamHistory  PlayerTeamHistory[]
+  notes        PlayerNote[]
+  goals        Goal[]
+}
+
+model TeamCategory {
+  id        String   @id @default(uuid())
+  teamId    String
+  name      String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  team                        Team                        @relation(fields: [teamId], references: [id])
+  players                     Player[]
+  announcementCategoryTargets AnnouncementCategoryTarget[]
+
+  @@unique([teamId, name])
 }
 
 model PlayerParent {
@@ -319,7 +337,19 @@ model Announcement {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  team         Team?         @relation(fields: [teamId], references: [id])
-  organization Organization? @relation(fields: [organizationId], references: [id])
-  author       User          @relation(fields: [createdBy], references: [id])
+  team            Team?                        @relation(fields: [teamId], references: [id])
+  organization    Organization?                @relation(fields: [organizationId], references: [id])
+  author          User                         @relation(fields: [createdBy], references: [id])
+  categoryTargets AnnouncementCategoryTarget[]
+}
+
+model AnnouncementCategoryTarget {
+  id             String @id @default(uuid())
+  announcementId String
+  teamCategoryId String
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  teamCategory TeamCategory @relation(fields: [teamCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, teamCategoryId])
 }
