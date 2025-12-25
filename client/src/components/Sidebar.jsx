@@ -10,7 +10,7 @@ import {
 import clsx from 'clsx';
 
 export default function Sidebar() {
-  const { user, currentTeam, teams, setCurrentTeam, logout, isOperator, isTeamAdmin, isCoach, isPlayer, isParent } = useAuth();
+  const { user, currentTeam, teams, setCurrentTeam, logout, isOperator, isTeamAdmin, isCoach, isPlayer, isParent, playerData } = useAuth();
   const location = useLocation();
   const [organizations, setOrganizations] = useState([]);
   const [selectedOrg, setSelectedOrg] = useState(null);
@@ -170,22 +170,48 @@ export default function Sidebar() {
           </Link>
         )}
         <div className="flex items-center gap-3">
-          {currentTeam?.logoUrl ? (
-            <img
-              src={currentTeam.logoUrl}
-              alt=""
-              className="w-10 h-10 rounded-lg object-cover"
-            />
+          {isPlayer() && playerData ? (
+            <>
+              {playerData.passportUrl ? (
+                <img
+                  src={playerData.passportUrl}
+                  alt=""
+                  className="w-10 h-10 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
+                  <UserCircle className="w-6 h-6 text-primary-500" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <h2 className="font-semibold text-gray-900 truncate">
+                  {playerData.name}
+                </h2>
+                <p className="text-xs text-gray-500 truncate">
+                  {currentTeam?.name}
+                </p>
+              </div>
+            </>
           ) : (
-            <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-gray-500" />
-            </div>
+            <>
+              {currentTeam?.logoUrl ? (
+                <img
+                  src={currentTeam.logoUrl}
+                  alt=""
+                  className="w-10 h-10 rounded-lg object-cover"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-gray-500" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <h2 className="font-semibold text-gray-900 truncate">
+                  {currentTeam?.name || 'チーム未選択'}
+                </h2>
+              </div>
+            </>
           )}
-          <div className="flex-1 min-w-0">
-            <h2 className="font-semibold text-gray-900 truncate">
-              {currentTeam?.name || 'チーム未選択'}
-            </h2>
-          </div>
         </div>
 
         {isOperator() && organizations.length > 1 && (

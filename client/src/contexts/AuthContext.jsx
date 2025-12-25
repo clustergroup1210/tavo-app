@@ -7,6 +7,7 @@ export function AuthProvider({ children }) {
   const [roles, setRoles] = useState(null);
   const [teams, setTeams] = useState([]);
   const [currentTeam, setCurrentTeam] = useState(null);
+  const [playerData, setPlayerData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,6 +24,10 @@ export function AuthProvider({ children }) {
         setTeams(data.teams || []);
         if (data.teams?.length > 0) {
           setCurrentTeam(data.teams[0].team);
+        }
+        // Store player data for players
+        if (data.players?.length > 0) {
+          setPlayerData(data.players[0]);
         }
       }
     } catch (error) {
@@ -103,6 +108,7 @@ export function AuthProvider({ children }) {
         teams,
         currentTeam,
         setCurrentTeam,
+        playerData,
         loading,
         login,
         register,

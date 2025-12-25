@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Save, Plus, Copy, X, Calendar } from 'lucide-react';
 
 export default function EvaluationEntry() {
-  const { currentTeam, user, isCoach, isPlayer } = useAuth();
+  const { currentTeam, user, isCoach, isPlayer, playerData } = useAuth();
   const [players, setPlayers] = useState([]);
   const [selectedPlayer, setSelectedPlayer] = useState('');
   const [items, setItems] = useState([]);
@@ -20,35 +20,59 @@ export default function EvaluationEntry() {
   const [copyMessage, setCopyMessage] = useState('');
 
   useEffect(() => {
-    if (currentTeam) {
+    // For players, use playerData from context to set selectedPlayer immediately
+    if (isPlayer() && playerData) {
+      setSelectedPlayer(playerData.id);
+    }
+  }, [playerData]);
+
+  useEffect(() => {
+    if (currentTeam || (isPlayer() && playerData)) {
       fetchData();
     }
-  }, [currentTeam]);
+  }, [currentTeam, playerData]);
 
   const fetchData = async () => {
     try {
-      const [playersRes, itemsRes, roundsRes] = await Promise.all([
-        fetch(`/api/players?teamId=${currentTeam.id}&includeChildren=true`, { credentials: 'include' }),
-        fetch(`/api/evaluations/items?teamId=${currentTeam.id}`, { credentials: 'include' }),
-        fetch(`/api/evaluations/rounds?teamId=${currentTeam.id}`, { credentials: 'include' }),
-      ]);
+      // For players, use their team from playerData
+      const teamId = isPlayer() && playerData ? playerData.teamId : currentTeam?.id;
+      if (!teamId) return;
 
-      const playersData = await playersRes.json();
-      const itemsData = await itemsRes.json();
-      const roundsData = await roundsRes.json();
+      // Players don't need to fetch the players list - they only evaluate themselves
+      if (isPlayer() && playerData) {
+        const [itemsRes, roundsRes] = await Promise.all([
+          fetch(`/api/evaluations/items?teamId=${teamId}`, { credentials: 'include' }),
+          fetch(`/api/evaluations/rounds?teamId=${teamId}`, { credentials: 'include' }),
+        ]);
 
-      setPlayers(playersData);
-      setItems(itemsData);
-      setRounds(roundsData);
+        const itemsData = await itemsRes.json();
+        const roundsData = await roundsRes.json();
 
-      if (roundsData.length > 0) {
-        setSelectedRound(roundsData[0].id);
-      }
+        setItems(Array.isArray(itemsData) ? itemsData : []);
+        setRounds(Array.isArray(roundsData) ? roundsData : []);
+        setSelectedPlayer(playerData.id);
 
-      if (isPlayer() && playersData.length > 0) {
-        const myPlayer = playersData.find(p => p.userId === user.id);
-        if (myPlayer) {
-          setSelectedPlayer(myPlayer.id);
+        if (roundsData.length > 0) {
+          setSelectedRound(roundsData[0].id);
+        }
+      } else {
+        // Coaches/admins fetch players list too
+        const [playersRes, itemsRes, roundsRes] = await Promise.all([
+          fetch(`/api/players?teamId=${teamId}&includeChildren=true`, { credentials: 'include' }),
+          fetch(`/api/evaluations/items?teamId=${teamId}`, { credentials: 'include' }),
+          fetch(`/api/evaluations/rounds?teamId=${teamId}`, { credentials: 'include' }),
+        ]);
+
+        const playersData = await playersRes.json();
+        const itemsData = await itemsRes.json();
+        const roundsData = await roundsRes.json();
+
+        setPlayers(Array.isArray(playersData) ? playersData : []);
+        setItems(Array.isArray(itemsData) ? itemsData : []);
+        setRounds(Array.isArray(roundsData) ? roundsData : []);
+
+        if (roundsData.length > 0) {
+          setSelectedRound(roundsData[0].id);
         }
       }
     } catch (error) {
@@ -62,7 +86,7 @@ export default function EvaluationEntry() {
 
   const handleSubmit = async () => {
     if (!selectedPlayer || !selectedRound) {
-      alert('選手と評価ラウンドを選択してください');
+      alert(isPlayer() ? '評価期間を選択してください' : '選手と評価ラウンドを選択してください');
       return;
     }
 
@@ -201,26 +225,31 @@ export default function EvaluationEntry() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">評価入力</h1>
-        <p className="mt-1 text-sm text-gray-500">選手の評価を入力してください</p>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {isPlayer() ? '自己評価' : '評価入力'}
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          {isPlayer() ? '自分の評価を入力してください' : '選手の評価を入力してください'}
+        </p>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">選手</label>
-            <select
-              value={selectedPlayer}
-              onChange={(e) => setSelectedPlayer(e.target.value)}
-              disabled={isPlayer()}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            >
-              <option value="">選択してください</option>
-              {players.map((player) => (
-                <option key={player.id} value={player.id}>{player.name}</option>
-              ))}
-            </select>
-          </div>
+        <div className={`grid grid-cols-1 ${isPlayer() ? 'md:grid-cols-1' : 'md:grid-cols-3'} gap-4 mb-6`}>
+          {!isPlayer() && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">選手</label>
+              <select
+                value={selectedPlayer}
+                onChange={(e) => setSelectedPlayer(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="">選択してください</option>
+                {players.map((player) => (
+                  <option key={player.id} value={player.id}>{player.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">評価期間</label>
@@ -235,27 +264,31 @@ export default function EvaluationEntry() {
                   <option key={round.id} value={round.id}>{round.name}</option>
                 ))}
               </select>
-              <button
-                onClick={() => setShowAddRound(true)}
-                className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                title="新しい期間を追加"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
+              {!isPlayer() && (
+                <button
+                  onClick={() => setShowAddRound(true)}
+                  className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                  title="新しい期間を追加"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              )}
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">データ操作</label>
-            <button
-              onClick={handleCopyPrevious}
-              disabled={copyingPrevious || !selectedRound}
-              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
-            >
-              <Copy className="w-4 h-4" />
-              {copyingPrevious ? 'コピー中...' : '前回のデータをコピー'}
-            </button>
-          </div>
+          {!isPlayer() && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">データ操作</label>
+              <button
+                onClick={handleCopyPrevious}
+                disabled={copyingPrevious || !selectedRound}
+                className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
+              >
+                <Copy className="w-4 h-4" />
+                {copyingPrevious ? 'コピー中...' : '前回のデータをコピー'}
+              </button>
+            </div>
+          )}
         </div>
 
         {copyMessage && (
