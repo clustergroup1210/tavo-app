@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  BarChart, Bar, ReferenceLine
+  BarChart, Bar, ReferenceLine, Cell
 } from 'recharts';
 
 export default function PlayerDetail() {
@@ -1129,9 +1129,15 @@ export default function PlayerDetail() {
                     <Bar 
                       dataKey="gap" 
                       name="ギャップ"
-                      fill="#3B82F6"
                       radius={[4, 4, 0, 0]}
-                    />
+                    >
+                      {progressData.progressData.map((entry, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={entry.gap >= 0 ? '#3B82F6' : '#EF4444'} 
+                        />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
