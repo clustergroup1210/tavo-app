@@ -58,8 +58,20 @@ router.get('/items', authenticate, async (req, res) => {
   try {
     const { teamId } = req.query;
     
+    // Get team and check for parent team
+    const team = await prisma.team.findUnique({
+      where: { id: teamId },
+      select: { id: true, parentId: true }
+    });
+    
+    // Build list of team IDs to check (team + parent)
+    const teamIds = [teamId];
+    if (team?.parentId) {
+      teamIds.push(team.parentId);
+    }
+    
     const items = await prisma.evaluationItem.findMany({
-      where: { teamId, isActive: true },
+      where: { teamId: { in: teamIds }, isActive: true },
       orderBy: { sortOrder: 'asc' }
     });
 
@@ -120,8 +132,20 @@ router.get('/rounds', authenticate, async (req, res) => {
   try {
     const { teamId } = req.query;
     
+    // Get team and check for parent team
+    const team = await prisma.team.findUnique({
+      where: { id: teamId },
+      select: { id: true, parentId: true }
+    });
+    
+    // Build list of team IDs to check (team + parent)
+    const teamIds = [teamId];
+    if (team?.parentId) {
+      teamIds.push(team.parentId);
+    }
+    
     const rounds = await prisma.evaluationRound.findMany({
-      where: { teamId },
+      where: { teamId: { in: teamIds } },
       orderBy: { startDate: 'desc' }
     });
 
