@@ -30,7 +30,8 @@ The system emphasizes a team-centric display and robust role-based access contro
 -   **Communication Tools**:
     -   **Calendar System**: Monthly view for practices, matches, meetings, and events, with color-coding and role-based access. Supports team-scoped and organization-scoped events.
     -   **Announcements System**: Priority levels, publish/draft status, expiration dates, and category-based targeting for team-scoped and organization-scoped announcements.
--   **Public Appeal URL**: Player/coach-generated public profiles for showcasing skills, with random URLs and deactivation capabilities.
+-   **Public Appeal URL**: Player/coach-generated public profiles for showcasing skills, with random URLs, expiration dates, issuer type display (player/club), and comprehensive player info including evaluation categories with coach/self scores. Expired appeals return 410 status.
+-   **Invitation URL System**: Team-based invitation system for players, parents, and staff with role-specific flows. Parent invitations require player selection and auto-create PlayerParent relationships upon registration. Security validation ensures players belong to the target team.
 -   **System Administration**: Dedicated operator dashboard with system-wide statistics, team management, user management, and team impersonation capabilities.
 -   **Data Visibility**: Evaluation data and other records are filtered based on player-team membership periods, ensuring coaches only see relevant historical data.
 -   **Parent Team Inheritance**: Evaluation items and rounds can be inherited from parent teams for sub-teams.
