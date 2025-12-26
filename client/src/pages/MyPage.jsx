@@ -2,13 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   UserCircle, TrendingUp, Link2, Edit2, Save, X, Target, Plus, Trash2, Camera,
-  Calendar, Ruler, Weight, MapPin, GraduationCap, Users, Footprints, Star, Zap, Upload
+  Calendar, Ruler, Weight, MapPin, GraduationCap, Users, Footprints, Star, Zap, Upload, ClipboardList
 } from 'lucide-react';
+import EvaluationComparisonTable from '../components/EvaluationComparisonTable';
 
 export default function MyPage() {
   const { user } = useAuth();
   const [playerData, setPlayerData] = useState(null);
   const [evaluationSummary, setEvaluationSummary] = useState([]);
+  const [evaluationComparison, setEvaluationComparison] = useState({ comparison: [], hasData: false });
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
@@ -46,10 +48,11 @@ export default function MyPage() {
         });
         
         const categoryTeamId = myPlayer.team?.parentId || myPlayer.teamId;
-        const [summaryRes, goalsRes, categoriesRes] = await Promise.all([
+        const [summaryRes, goalsRes, categoriesRes, comparisonRes] = await Promise.all([
           fetch(`/api/evaluations/summary/${myPlayer.id}`, { credentials: 'include' }),
           fetch(`/api/goals/player/${myPlayer.id}`, { credentials: 'include' }),
-          fetch(`/api/goals/categories?teamId=${categoryTeamId}`, { credentials: 'include' })
+          fetch(`/api/goals/categories?teamId=${categoryTeamId}`, { credentials: 'include' }),
+          fetch(`/api/evaluations/comparison/${myPlayer.id}`, { credentials: 'include' })
         ]);
         
         const summary = await summaryRes.json();
@@ -60,6 +63,9 @@ export default function MyPage() {
         
         const categoriesData = await categoriesRes.json();
         setGoalCategories(Array.isArray(categoriesData) ? categoriesData : []);
+        
+        const comparisonData = await comparisonRes.json();
+        setEvaluationComparison(comparisonData);
       }
     } catch (error) {
       console.error('Failed to fetch player data:', error);
@@ -450,6 +456,18 @@ export default function MyPage() {
             ))}
           </div>
         )}
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <ClipboardList className="w-5 h-5 text-primary-600" />
+          <h3 className="text-lg font-semibold text-gray-900">評価データ（認識ギャップ比較）</h3>
+        </div>
+        <EvaluationComparisonTable 
+          data={evaluationComparison.comparison} 
+          loading={loading}
+          hasData={evaluationComparison.hasData}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

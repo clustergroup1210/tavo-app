@@ -10,6 +10,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar, ReferenceLine, Cell
 } from 'recharts';
+import EvaluationComparisonTable from '../components/EvaluationComparisonTable';
 
 export default function PlayerDetail() {
   const { id } = useParams();
@@ -324,34 +325,6 @@ export default function PlayerDetail() {
     if (!dateStr) return '-';
     const date = new Date(dateStr);
     return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
-  };
-
-  const getScoreColor = (score) => {
-    if (!score) return 'bg-gray-100';
-    const colors = [
-      'bg-blue-100',
-      'bg-blue-200',
-      'bg-blue-300',
-      'bg-blue-400',
-      'bg-blue-500'
-    ];
-    return colors[Math.min(score - 1, 4)];
-  };
-
-  const getScoreTextColor = (score) => {
-    if (!score) return 'text-gray-400';
-    if (score >= 4) return 'text-white';
-    return 'text-gray-800';
-  };
-
-  const getGapBadge = (gap) => {
-    if (gap === null || gap === undefined) return null;
-    if (gap > 0) {
-      return <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">+{gap}</span>;
-    } else if (gap < 0) {
-      return <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700">{gap}</span>;
-    }
-    return <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600">0</span>;
   };
 
   const getHeatmapColor = (percentage) => {
@@ -830,50 +803,12 @@ export default function PlayerDetail() {
       {activeTab === 'evaluation' && (
         <div className="space-y-6">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">指導者評価 vs 自己評価</h2>
-            {evaluationComparison.hasData && evaluationComparison.comparison.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">大項目</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">中項目</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-600">項目名</th>
-                      <th className="text-center py-3 px-4 font-medium text-gray-600">指導者</th>
-                      <th className="text-center py-3 px-4 font-medium text-gray-600">自己</th>
-                      <th className="text-center py-3 px-4 font-medium text-gray-600">ギャップ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {evaluationComparison.comparison.map((row, idx) => (
-                      <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4 text-gray-700">{row.category || '-'}</td>
-                        <td className="py-3 px-4 text-gray-700">{row.subCategory || '-'}</td>
-                        <td className="py-3 px-4 font-medium text-gray-900">{row.itemName}</td>
-                        <td className="py-3 px-4 text-center">
-                          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg font-bold ${getScoreColor(row.coachScore)} ${getScoreTextColor(row.coachScore)}`}>
-                            {row.coachScore ?? '-'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg font-bold ${getScoreColor(row.selfScore)} ${getScoreTextColor(row.selfScore)}`}>
-                            {row.selfScore ?? '-'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          {getGapBadge(row.gap)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <ClipboardList className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-sm text-gray-500">評価データがありません</p>
-              </div>
-            )}
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">指導者評価 vs 自己評価（認識ギャップ）</h2>
+            <EvaluationComparisonTable 
+              data={evaluationComparison.comparison} 
+              loading={loading}
+              hasData={evaluationComparison.hasData}
+            />
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
