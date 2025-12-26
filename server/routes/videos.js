@@ -117,6 +117,46 @@ router.get('/:id/stream', authenticate, async (req, res) => {
   }
 });
 
+router.put('/:id', authenticate, async (req, res) => {
+  try {
+    const { title, description } = req.body;
+    
+    const video = await prisma.video.findUnique({
+      where: { id: req.params.id },
+      include: { player: true }
+    });
+
+    if (!video) {
+      return res.status(404).json({ error: 'Video not found' });
+    }
+
+    const isUploader = video.uploadedBy === req.user.id;
+    const isCoach = video.player && hasTeamAccess(req.user, video.player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
+    const isParent = req.user.parentPlayers?.some(pp => pp.playerId === video.playerId);
+
+    if (isParent && !isUploader) {
+      return res.status(403).json({ error: '保護者は自分がアップロードした動画のみ編集できます' });
+    }
+    
+    if (!isUploader && !isCoach) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const updated = await prisma.video.update({
+      where: { id: req.params.id },
+      data: {
+        ...(title !== undefined && { title }),
+        ...(description !== undefined && { description })
+      }
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Update video error:', error);
+    res.status(500).json({ error: 'Failed to update video' });
+  }
+});
+
 router.delete('/:id', authenticate, async (req, res) => {
   try {
     const video = await prisma.video.findUnique({
@@ -128,11 +168,15 @@ router.delete('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Video not found' });
     }
 
-    const canDelete = 
-      video.uploadedBy === req.user.id ||
-      (video.player && hasTeamAccess(req.user, video.player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']));
+    const isUploader = video.uploadedBy === req.user.id;
+    const isCoach = video.player && hasTeamAccess(req.user, video.player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']);
+    const isParent = req.user.parentPlayers?.some(pp => pp.playerId === video.playerId);
 
-    if (!canDelete) {
+    if (isParent && !isUploader) {
+      return res.status(403).json({ error: '保護者は自分がアップロードした動画のみ削除できます' });
+    }
+
+    if (!isUploader && !isCoach) {
       return res.status(403).json({ error: 'Access denied' });
     }
 

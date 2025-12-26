@@ -10,27 +10,51 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const { teamId } = req.query;
 
-    if (!hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
+    if (!hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
     const invitations = await prisma.invitation.findMany({
       where: { teamId },
+      include: {
+        team: { select: { id: true, name: true } },
+        player: { select: { id: true, name: true } }
+      },
       orderBy: { createdAt: 'desc' }
     });
 
-    res.json(invitations);
+    const now = new Date();
+    const enriched = invitations.map(inv => ({
+      ...inv,
+      inviteUrl: `/invite/${inv.token}`,
+      isExpired: new Date(inv.expiresAt) < now,
+      isUsed: !!inv.usedAt
+    }));
+
+    res.json(enriched);
   } catch (error) {
+    console.error('Get invitations error:', error);
     res.status(500).json({ error: 'Failed to fetch invitations' });
   }
 });
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { teamId, role, email, expiryDays = 7 } = req.body;
+    const { teamId, role, email, playerName, playerId, expiryDays = 7 } = req.body;
 
-    if (!hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
+    if (!hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (role === 'PARENT' && !playerId) {
+      return res.status(400).json({ error: '保護者招待には選手IDが必要です' });
+    }
+
+    if (role === 'PARENT' && playerId) {
+      const player = await prisma.player.findUnique({ where: { id: playerId } });
+      if (!player || player.teamId !== teamId) {
+        return res.status(400).json({ error: '指定された選手はこのチームに所属していません' });
+      }
     }
 
     const token = uuidv4();
@@ -38,7 +62,20 @@ router.post('/', authenticate, async (req, res) => {
     expiresAt.setDate(expiresAt.getDate() + expiryDays);
 
     const invitation = await prisma.invitation.create({
-      data: { teamId, token, email, role, expiresAt }
+      data: { 
+        teamId, 
+        token, 
+        email, 
+        playerName,
+        playerId: role === 'PARENT' ? playerId : null,
+        role, 
+        expiresAt,
+        createdBy: req.user.id
+      },
+      include: {
+        team: { select: { id: true, name: true } },
+        player: { select: { id: true, name: true } }
+      }
     });
 
     res.json({
@@ -46,6 +83,7 @@ router.post('/', authenticate, async (req, res) => {
       inviteUrl: `/invite/${token}`
     });
   } catch (error) {
+    console.error('Create invitation error:', error);
     res.status(500).json({ error: 'Failed to create invitation' });
   }
 });
@@ -58,17 +96,22 @@ router.get('/verify/:token', async (req, res) => {
         usedAt: null,
         expiresAt: { gt: new Date() }
       },
-      include: { team: true }
+      include: { 
+        team: { select: { id: true, name: true, logoUrl: true } },
+        player: { select: { id: true, name: true } }
+      }
     });
 
     if (!invitation) {
-      return res.status(404).json({ error: 'Invalid or expired invitation' });
+      return res.status(404).json({ error: 'この招待URLは無効または期限切れです' });
     }
 
     res.json({
       valid: true,
-      teamName: invitation.team.name,
-      role: invitation.role
+      team: invitation.team,
+      role: invitation.role,
+      playerName: invitation.playerName,
+      player: invitation.player
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to verify invitation' });

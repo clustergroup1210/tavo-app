@@ -36,13 +36,35 @@ router.post('/register', async (req, res) => {
         });
 
         if (invitation.role === 'PLAYER') {
-          await prisma.player.create({
+          const player = await prisma.player.create({
             data: {
               userId: user.id,
               teamId: invitation.teamId,
-              name: name
+              name: invitation.playerName || name
             }
           });
+
+          await prisma.playerTeamHistory.create({
+            data: {
+              playerId: player.id,
+              teamId: invitation.teamId,
+              joinedAt: new Date()
+            }
+          });
+        }
+
+        if (invitation.role === 'PARENT' && invitation.playerId) {
+          const player = await prisma.player.findUnique({ 
+            where: { id: invitation.playerId } 
+          });
+          if (player && player.teamId === invitation.teamId) {
+            await prisma.playerParent.create({
+              data: {
+                playerId: invitation.playerId,
+                userId: user.id
+              }
+            });
+          }
         }
 
         await prisma.invitation.update({

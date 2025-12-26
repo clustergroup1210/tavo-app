@@ -1,17 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Copy, Trash2, Link2 } from 'lucide-react';
+import { Plus, Copy, Trash2, Link2, User, Users } from 'lucide-react';
 
 export default function Invitations() {
   const { currentTeam } = useAuth();
   const [invitations, setInvitations] = useState([]);
+  const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [newInvite, setNewInvite] = useState({ role: 'PLAYER', email: '', expiryDays: 7 });
+  const [newInvite, setNewInvite] = useState({ 
+    role: 'PLAYER', 
+    email: '', 
+    playerName: '',
+    playerId: '',
+    expiryDays: 7 
+  });
 
   useEffect(() => {
     if (currentTeam) {
       fetchInvitations();
+      fetchPlayers();
     }
   }, [currentTeam]);
 
@@ -29,23 +37,54 @@ export default function Invitations() {
     }
   };
 
+  const fetchPlayers = async () => {
+    try {
+      const res = await fetch(`/api/players?teamId=${currentTeam.id}`, {
+        credentials: 'include',
+      });
+      const data = await res.json();
+      setPlayers(data);
+    } catch (error) {
+      console.error('Failed to fetch players:', error);
+    }
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
+    
+    if (newInvite.role === 'PARENT' && !newInvite.playerId) {
+      alert('保護者招待の場合は選手を選択してください');
+      return;
+    }
+
     try {
       const res = await fetch('/api/invitations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ ...newInvite, teamId: currentTeam.id }),
+        body: JSON.stringify({ 
+          teamId: currentTeam.id,
+          role: newInvite.role,
+          email: newInvite.email || null,
+          playerName: newInvite.role === 'PLAYER' ? newInvite.playerName : null,
+          playerId: newInvite.role === 'PARENT' ? newInvite.playerId : null,
+          expiryDays: newInvite.expiryDays
+        }),
       });
       const data = await res.json();
+      
+      if (!res.ok) {
+        alert(data.error || '招待URLの発行に失敗しました');
+        return;
+      }
+      
       setShowModal(false);
-      setNewInvite({ role: 'PLAYER', email: '', expiryDays: 7 });
+      setNewInvite({ role: 'PLAYER', email: '', playerName: '', playerId: '', expiryDays: 7 });
       fetchInvitations();
 
       const url = `${window.location.origin}${data.inviteUrl}`;
       navigator.clipboard.writeText(url);
-      alert(`招待URLをコピーしました: ${url}`);
+      alert(`招待URLをコピーしました:\n${url}`);
     } catch (error) {
       console.error('Failed to create invitation:', error);
     }
@@ -72,11 +111,20 @@ export default function Invitations() {
 
   const roleLabels = {
     TEAM_ADMIN: '管理者',
-    TEAM_HEAD_COACH: '代表監督・コーチ',
-    TEAM_COACH: '監督・コーチ',
+    TEAM_HEAD_COACH: '代表監督',
+    TEAM_COACH: '担当コーチ',
     TEAM_EXTERNAL_COACH: '外部コーチ',
     PLAYER: '選手',
     PARENT: '保護者',
+  };
+
+  const roleDescriptions = {
+    TEAM_ADMIN: 'チームの全権限',
+    TEAM_HEAD_COACH: 'チーム全体の評価・管理',
+    TEAM_COACH: '担当選手の評価・管理',
+    TEAM_EXTERNAL_COACH: '限定的な評価権限',
+    PLAYER: '自己評価・閲覧',
+    PARENT: '子供の評価閲覧のみ',
   };
 
   if (loading) {
@@ -92,7 +140,7 @@ export default function Invitations() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">招待URL管理</h1>
-          <p className="mt-1 text-sm text-gray-500">新しいメンバーを招待できます</p>
+          <p className="mt-1 text-sm text-gray-500">選手・保護者・スタッフを招待できます</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
@@ -111,7 +159,7 @@ export default function Invitations() {
                 役割
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                メール
+                対象
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 有効期限
@@ -125,20 +173,29 @@ export default function Invitations() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {invitations.map((invite) => {
-              const isExpired = new Date(invite.expiresAt) < new Date();
-              const isUsed = !!invite.usedAt;
-
-              return (
+            {invitations.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                  招待URLがありません
+                </td>
+              </tr>
+            ) : (
+              invitations.map((invite) => (
                 <tr key={invite.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="inline-flex items-center gap-1">
-                      <Link2 className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-900">{roleLabels[invite.role]}</span>
+                    <span className="inline-flex items-center gap-2">
+                      {invite.role === 'PLAYER' ? (
+                        <User className="w-4 h-4 text-blue-500" />
+                      ) : invite.role === 'PARENT' ? (
+                        <Users className="w-4 h-4 text-purple-500" />
+                      ) : (
+                        <Link2 className="w-4 h-4 text-gray-400" />
+                      )}
+                      <span className="text-sm font-medium text-gray-900">{roleLabels[invite.role]}</span>
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {invite.email || '-'}
+                    {invite.playerName || invite.player?.name || invite.email || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(invite.expiresAt).toLocaleDateString('ja-JP')}
@@ -146,22 +203,23 @@ export default function Invitations() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                        isUsed
+                        invite.isUsed
                           ? 'bg-green-100 text-green-700'
-                          : isExpired
+                          : invite.isExpired
                           ? 'bg-red-100 text-red-700'
                           : 'bg-blue-100 text-blue-700'
                       }`}
                     >
-                      {isUsed ? '使用済み' : isExpired ? '期限切れ' : '有効'}
+                      {invite.isUsed ? '使用済み' : invite.isExpired ? '期限切れ' : '有効'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {!isUsed && !isExpired && (
+                      {!invite.isUsed && !invite.isExpired && (
                         <button
                           onClick={() => copyUrl(invite.token)}
                           className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                          title="URLをコピー"
                         >
                           <Copy className="w-4 h-4" />
                         </button>
@@ -169,14 +227,15 @@ export default function Invitations() {
                       <button
                         onClick={() => handleDelete(invite.id)}
                         className="p-2 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+                        title="削除"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
                 </tr>
-              );
-            })}
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -190,14 +249,53 @@ export default function Invitations() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">役割</label>
                 <select
                   value={newInvite.role}
-                  onChange={(e) => setNewInvite({ ...newInvite, role: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  onChange={(e) => setNewInvite({ ...newInvite, role: e.target.value, playerId: '' })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 >
                   {Object.entries(roleLabels).map(([value, label]) => (
                     <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
+                <p className="mt-1 text-xs text-gray-500">{roleDescriptions[newInvite.role]}</p>
               </div>
+
+              {newInvite.role === 'PLAYER' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    選手名（任意）
+                  </label>
+                  <input
+                    type="text"
+                    value={newInvite.playerName}
+                    onChange={(e) => setNewInvite({ ...newInvite, playerName: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    placeholder="登録後に表示される選手名"
+                  />
+                </div>
+              )}
+
+              {newInvite.role === 'PARENT' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    対象選手 <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={newInvite.playerId}
+                    onChange={(e) => setNewInvite({ ...newInvite, playerId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    required
+                  >
+                    <option value="">選手を選択...</option>
+                    {players.map((player) => (
+                      <option key={player.id} value={player.id}>
+                        {player.name} {player.number ? `(#${player.number})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">この選手の保護者として招待されます</p>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   メール（任意）
@@ -206,23 +304,26 @@ export default function Invitations() {
                   type="email"
                   value={newInvite.email}
                   onChange={(e) => setNewInvite({ ...newInvite, email: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   placeholder="招待先のメールアドレス"
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">有効期間</label>
                 <select
                   value={newInvite.expiryDays}
                   onChange={(e) => setNewInvite({ ...newInvite, expiryDays: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                 >
                   <option value={1}>1日</option>
                   <option value={7}>7日</option>
+                  <option value={14}>14日</option>
                   <option value={30}>30日</option>
                 </select>
               </div>
-              <div className="flex justify-end gap-3">
+
+              <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
@@ -234,7 +335,7 @@ export default function Invitations() {
                   type="submit"
                   className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
                 >
-                  発行
+                  発行してURLをコピー
                 </button>
               </div>
             </form>

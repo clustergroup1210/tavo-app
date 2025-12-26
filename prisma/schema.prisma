@@ -74,6 +74,7 @@ model User {
   playerNotes      PlayerNote[]
   calendarEvents   CalendarEvent[]
   announcements    Announcement[]
+  appealLinks      AppealLink[]
 }
 
 model UserOrganization {
@@ -136,6 +137,7 @@ model Player {
   teamHistory  PlayerTeamHistory[]
   notes        PlayerNote[]
   goals        Goal[]
+  invitations  Invitation[]
 }
 
 model TeamCategory {
@@ -235,29 +237,35 @@ model Evaluation {
 }
 
 model Invitation {
-  id        String   @id @default(uuid())
-  teamId    String
-  token     String   @unique
-  email     String?
-  role      RoleType
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime @default(now())
+  id          String    @id @default(uuid())
+  teamId      String
+  token       String    @unique
+  email       String?
+  playerName  String?
+  playerId    String?
+  role        RoleType
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdBy   String?
+  createdAt   DateTime  @default(now())
 
-  team Team @relation(fields: [teamId], references: [id])
+  team   Team    @relation(fields: [teamId], references: [id])
+  player Player? @relation(fields: [playerId], references: [id])
 }
 
 model AppealLink {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   playerId    String
-  token       String   @unique
+  token       String    @unique
   type        String
   comment     String?
-  isActive    Boolean  @default(true)
+  isActive    Boolean   @default(true)
+  expiresAt   DateTime?
   createdBy   String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
-  player Player @relation(fields: [playerId], references: [id])
+  player  Player @relation(fields: [playerId], references: [id])
+  creator User?  @relation(fields: [createdBy], references: [id])
 }
 
 model Video {
