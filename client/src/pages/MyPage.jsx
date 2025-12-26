@@ -230,28 +230,47 @@ export default function MyPage() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="bg-gradient-to-r from-primary-500 to-primary-600 p-6">
           <div className="flex items-start gap-6">
-            <div className="relative group">
-              <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-white/20 flex items-center justify-center border-4 border-white/30 shadow-xl overflow-hidden">
-                {playerData.passportUrl ? (
-                  <img
-                    src={playerData.passportUrl}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <UserCircle className="w-20 h-20 text-white/60" />
-                )}
+            <div className="flex gap-4">
+              <div className="relative group">
+                <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-white/20 flex items-center justify-center border-4 border-white/30 shadow-xl overflow-hidden">
+                  {playerData.photoUrl ? (
+                    <img
+                      src={playerData.photoUrl}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <UserCircle className="w-20 h-20 text-white/60" />
+                  )}
+                </div>
               </div>
-              <label className="absolute -bottom-2 -right-2 p-2.5 bg-white rounded-full shadow-lg cursor-pointer hover:bg-gray-100 transition-colors">
-                <Upload className="w-5 h-5 text-primary-600" />
-                <input
-                  ref={passportInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handlePassportUpload}
-                  className="hidden"
-                />
-              </label>
+              
+              <div className="relative group">
+                <div className="flex flex-col items-center">
+                  <div className="w-16 h-20 md:w-20 md:h-24 rounded-lg bg-white/20 flex items-center justify-center border-2 border-white/30 shadow-lg overflow-hidden">
+                    {playerData.passportUrl ? (
+                      <img
+                        src={playerData.passportUrl}
+                        alt="選手証"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Camera className="w-6 h-6 text-white/60" />
+                    )}
+                  </div>
+                  <span className="mt-1 text-xs text-white/80">選手証</span>
+                  <label className="absolute -bottom-1 -right-1 p-1.5 bg-white rounded-full shadow-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                    <Upload className="w-3.5 h-3.5 text-primary-600" />
+                    <input
+                      ref={passportInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePassportUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
 
             <div className="flex-1 text-white">

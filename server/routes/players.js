@@ -342,21 +342,22 @@ router.post('/:id/photo', authenticate, upload.single('photo'), async (req, res)
 router.post('/:id/passport', authenticate, upload.single('passport'), async (req, res) => {
   try {
     const player = await prisma.player.findUnique({ where: { id: req.params.id } });
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
     
     const isOperatorUser = req.user.organizations?.some(o => 
       ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
     );
-    const canUpload = 
-      player.userId === req.user.id ||
-      req.user.parentPlayers?.some(pp => pp.playerId === req.params.id) ||
-      hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']) ||
-      isOperatorUser;
+    const isSelf = player.userId === req.user.id;
+    const isCoach = hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
+    const canUpload = isSelf || isCoach || isOperatorUser;
 
     if (!canUpload) {
-      return res.status(403).json({ error: 'Access denied' });
+      return res.status(403).json({ error: '選手証写真の更新権限がありません' });
     }
 
-    const passportUrl = `/uploads/logos/${req.file.filename}`;
+    const passportUrl = `/uploads/${req.file.filename}`;
     const updated = await prisma.player.update({
       where: { id: req.params.id },
       data: { passportUrl }
@@ -364,6 +365,7 @@ router.post('/:id/passport', authenticate, upload.single('passport'), async (req
 
     res.json(updated);
   } catch (error) {
+    console.error('Upload passport error:', error);
     res.status(500).json({ error: 'Failed to upload passport' });
   }
 });
