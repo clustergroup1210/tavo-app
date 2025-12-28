@@ -148,9 +148,10 @@ model TeamCategory {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  team                        Team                        @relation(fields: [teamId], references: [id])
-  players                     Player[]
-  announcementCategoryTargets AnnouncementCategoryTarget[]
+  team                          Team                          @relation(fields: [teamId], references: [id])
+  players                       Player[]
+  announcementCategoryTargets   AnnouncementCategoryTarget[]
+  calendarEventCategoryTargets  CalendarEventCategoryTarget[]
 
   @@unique([teamId, name])
 }
@@ -326,9 +327,21 @@ model CalendarEvent {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  team         Team?         @relation(fields: [teamId], references: [id])
-  organization Organization? @relation(fields: [organizationId], references: [id])
-  author       User          @relation(fields: [createdBy], references: [id])
+  team            Team?                        @relation(fields: [teamId], references: [id])
+  organization    Organization?                @relation(fields: [organizationId], references: [id])
+  author          User                         @relation(fields: [createdBy], references: [id])
+  categoryTargets CalendarEventCategoryTarget[]
+}
+
+model CalendarEventCategoryTarget {
+  id              String @id @default(uuid())
+  calendarEventId String
+  teamCategoryId  String
+
+  calendarEvent CalendarEvent @relation(fields: [calendarEventId], references: [id], onDelete: Cascade)
+  teamCategory  TeamCategory  @relation(fields: [teamCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([calendarEventId, teamCategoryId])
 }
 
 model Announcement {
