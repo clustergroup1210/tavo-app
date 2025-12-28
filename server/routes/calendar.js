@@ -112,7 +112,27 @@ router.get('/my', authenticate, async (req, res) => {
       orderBy: { startDate: 'asc' }
     });
     
-    res.json(events);
+    const filteredEvents = events.filter(event => {
+      if (event.categoryTargets.length === 0) {
+        return true;
+      }
+      
+      if (!player || !player.teamCategoryId) {
+        if (isOperator(user) || user.teams?.some(ut => 
+          ut.teamId === event.teamId && 
+          ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'].includes(ut.role)
+        )) {
+          return true;
+        }
+        return false;
+      }
+      
+      return event.categoryTargets.some(
+        ct => ct.teamCategoryId === player.teamCategoryId
+      );
+    });
+    
+    res.json(filteredEvents);
   } catch (error) {
     console.error('Get my calendar events error:', error);
     res.status(500).json({ error: 'Failed to fetch calendar events' });

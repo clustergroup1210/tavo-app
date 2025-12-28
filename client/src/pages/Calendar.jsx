@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   ChevronLeft, ChevronRight, Plus, X, Calendar as CalendarIcon, 
-  Clock, MapPin, Edit2, Trash2, Save
+  Clock, MapPin, Edit2, Trash2, Save, Tag
 } from 'lucide-react';
 
 export default function Calendar() {
   const { user, isCoach, isOperator } = useAuth();
   const [events, setEvents] = useState([]);
+  const [teamCategories, setTeamCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showModal, setShowModal] = useState(false);
@@ -22,7 +23,8 @@ export default function Calendar() {
     endTime: '',
     allDay: false,
     eventType: 'event',
-    location: ''
+    location: '',
+    categoryIds: []
   });
 
   const currentTeamId = user?.teams?.[0]?.teamId;
@@ -30,6 +32,9 @@ export default function Calendar() {
 
   useEffect(() => {
     fetchEvents();
+    if (canCreate && currentTeamId) {
+      fetchTeamCategories();
+    }
   }, [currentDate]);
 
   const fetchEvents = async () => {
@@ -44,6 +49,25 @@ export default function Calendar() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchTeamCategories = async () => {
+    try {
+      const res = await fetch(`/api/team-categories?teamId=${currentTeamId}`, { credentials: 'include' });
+      const data = await res.json();
+      setTeamCategories(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to fetch team categories:', error);
+    }
+  };
+
+  const handleCategoryToggle = (categoryId) => {
+    setForm(prev => ({
+      ...prev,
+      categoryIds: prev.categoryIds.includes(categoryId)
+        ? prev.categoryIds.filter(id => id !== categoryId)
+        : [...prev.categoryIds, categoryId]
+    }));
   };
 
   const getDaysInMonth = (date) => {
@@ -109,7 +133,8 @@ export default function Calendar() {
       endTime: '10:00',
       allDay: false,
       eventType: 'event',
-      location: ''
+      location: '',
+      categoryIds: []
     });
     setShowModal(true);
   };
@@ -127,7 +152,8 @@ export default function Calendar() {
       endTime: endDate.toTimeString().slice(0, 5),
       allDay: event.allDay,
       eventType: event.eventType,
-      location: event.location || ''
+      location: event.location || '',
+      categoryIds: event.categoryTargets?.map(ct => ct.teamCategoryId) || []
     });
     setShowModal(true);
   };
@@ -149,7 +175,8 @@ export default function Calendar() {
         endDate: endDateTime.toISOString(),
         allDay: form.allDay,
         eventType: form.eventType,
-        location: form.location
+        location: form.location,
+        categoryIds: form.categoryIds
       };
 
       if (editingEvent) {
@@ -306,10 +333,22 @@ export default function Calendar() {
                 <div key={event.id} className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
                   <div className={`w-1 h-full min-h-12 rounded-full ${eventTypeColors[event.eventType] || 'bg-blue-500'}`} />
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className={`px-2 py-0.5 text-xs rounded text-white ${eventTypeColors[event.eventType] || 'bg-blue-500'}`}>
                         {eventTypeLabels[event.eventType] || event.eventType}
                       </span>
+                      {event.categoryTargets?.length > 0 ? (
+                        event.categoryTargets.map(ct => (
+                          <span key={ct.id} className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-800 flex items-center gap-1">
+                            <Tag className="w-3 h-3" />
+                            {ct.teamCategory?.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">
+                          全員
+                        </span>
+                      )}
                       <h4 className="font-medium text-gray-900">{event.title}</h4>
                     </div>
                     {!event.allDay && (
@@ -468,6 +507,32 @@ export default function Calendar() {
                   placeholder="詳細説明（任意）"
                 />
               </div>
+
+              {teamCategories.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Tag className="w-4 h-4 inline mr-1" />
+                    対象カテゴリー
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">選択しない場合は全員に表示されます</p>
+                  <div className="flex flex-wrap gap-2">
+                    {teamCategories.map(category => (
+                      <button
+                        key={category.id}
+                        type="button"
+                        onClick={() => handleCategoryToggle(category.id)}
+                        className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
+                          form.categoryIds.includes(category.id)
+                            ? 'bg-purple-100 border-purple-300 text-purple-800'
+                            : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        {category.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end gap-3 pt-4">
                 <button
