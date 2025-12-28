@@ -46,7 +46,12 @@ router.get('/', authenticate, async (req, res) => {
       include: {
         team: { select: { id: true, name: true } },
         organization: { select: { id: true, name: true } },
-        author: { select: { id: true, name: true } }
+        author: { select: { id: true, name: true } },
+        categoryTargets: {
+          include: {
+            teamCategory: { select: { id: true, name: true } }
+          }
+        }
       },
       orderBy: { startDate: 'asc' }
     });
@@ -97,7 +102,12 @@ router.get('/my', authenticate, async (req, res) => {
       include: {
         team: { select: { id: true, name: true } },
         organization: { select: { id: true, name: true } },
-        author: { select: { id: true, name: true } }
+        author: { select: { id: true, name: true } },
+        categoryTargets: {
+          include: {
+            teamCategory: { select: { id: true, name: true } }
+          }
+        }
       },
       orderBy: { startDate: 'asc' }
     });
@@ -111,7 +121,7 @@ router.get('/my', authenticate, async (req, res) => {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { teamId, organizationId, title, description, startDate, endDate, allDay, eventType, location } = req.body;
+    const { teamId, organizationId, title, description, startDate, endDate, allDay, eventType, location, categoryIds } = req.body;
     
     const canCreate = teamId 
       ? hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])
@@ -119,6 +129,16 @@ router.post('/', authenticate, async (req, res) => {
     
     if (!canCreate) {
       return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    if (categoryIds && categoryIds.length > 0 && teamId) {
+      const categories = await prisma.teamCategory.findMany({
+        where: { id: { in: categoryIds } }
+      });
+      const invalidCategories = categories.filter(c => c.teamId !== teamId);
+      if (invalidCategories.length > 0) {
+        return res.status(400).json({ error: 'Categories must belong to the same team' });
+      }
     }
     
     const event = await prisma.calendarEvent.create({
@@ -132,11 +152,19 @@ router.post('/', authenticate, async (req, res) => {
         allDay: allDay || false,
         eventType: eventType || 'event',
         location,
-        createdBy: req.user.id
+        createdBy: req.user.id,
+        categoryTargets: categoryIds && categoryIds.length > 0 ? {
+          create: categoryIds.map(categoryId => ({ teamCategoryId: categoryId }))
+        } : undefined
       },
       include: {
         team: { select: { id: true, name: true } },
-        author: { select: { id: true, name: true } }
+        author: { select: { id: true, name: true } },
+        categoryTargets: {
+          include: {
+            teamCategory: { select: { id: true, name: true } }
+          }
+        }
       }
     });
     
@@ -163,7 +191,21 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
     
-    const { title, description, startDate, endDate, allDay, eventType, location } = req.body;
+    const { title, description, startDate, endDate, allDay, eventType, location, categoryIds } = req.body;
+    
+    if (categoryIds && categoryIds.length > 0 && event.teamId) {
+      const categories = await prisma.teamCategory.findMany({
+        where: { id: { in: categoryIds } }
+      });
+      const invalidCategories = categories.filter(c => c.teamId !== event.teamId);
+      if (invalidCategories.length > 0) {
+        return res.status(400).json({ error: 'Categories must belong to the same team' });
+      }
+    }
+    
+    await prisma.calendarEventCategoryTarget.deleteMany({
+      where: { calendarEventId: req.params.id }
+    });
     
     const updated = await prisma.calendarEvent.update({
       where: { id: req.params.id },
@@ -174,11 +216,19 @@ router.put('/:id', authenticate, async (req, res) => {
         endDate: endDate ? new Date(endDate) : null,
         allDay,
         eventType,
-        location
+        location,
+        categoryTargets: categoryIds && categoryIds.length > 0 ? {
+          create: categoryIds.map(categoryId => ({ teamCategoryId: categoryId }))
+        } : undefined
       },
       include: {
         team: { select: { id: true, name: true } },
-        author: { select: { id: true, name: true } }
+        author: { select: { id: true, name: true } },
+        categoryTargets: {
+          include: {
+            teamCategory: { select: { id: true, name: true } }
+          }
+        }
       }
     });
     
