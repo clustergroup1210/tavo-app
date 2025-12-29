@@ -30,6 +30,7 @@ import Calendar from './pages/Calendar';
 import Announcements from './pages/Announcements';
 import TeamCategoryManagement from './pages/TeamCategoryManagement';
 import PlayerProgress from './pages/PlayerProgress';
+import MasterSettings from './pages/MasterSettings';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -109,7 +110,7 @@ export default function App() {
           <Route path="/admin/teams/:teamId/dashboard" element={<AdminTeamView />} />
           <Route path="/admin/users" element={<AdminUserManagement />} />
           <Route path="/admin/organizations" element={<Organizations />} />
-          <Route path="/admin/master" element={<Placeholder />} />
+          <Route path="/admin/master" element={<MasterSettings />} />
           <Route path="/admin/notifications" element={<Placeholder />} />
           <Route path="/admin/settings" element={<Placeholder />} />
         </Route>
@@ -133,7 +134,7 @@ export default function App() {
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/announcements" element={<Announcements />} />
           <Route path="/permissions" element={<Placeholder />} />
-          <Route path="/master" element={<Placeholder />} />
+          <Route path="/master" element={<MasterSettings />} />
           <Route path="/settings" element={<Placeholder />} />
           <Route path="/goal-categories" element={<GoalCategoryManagement />} />
           <Route path="/staff" element={<StaffManagement />} />
