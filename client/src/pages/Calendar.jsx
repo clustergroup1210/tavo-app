@@ -508,31 +508,39 @@ export default function Calendar() {
                 />
               </div>
 
-              {teamCategories.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <Tag className="w-4 h-4 inline mr-1" />
-                    対象カテゴリー
-                  </label>
-                  <p className="text-xs text-gray-500 mb-2">選択しない場合は全員に表示されます</p>
-                  <div className="flex flex-wrap gap-2">
-                    {teamCategories.map(category => (
-                      <button
-                        key={category.id}
-                        type="button"
-                        onClick={() => handleCategoryToggle(category.id)}
-                        className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
-                          form.categoryIds.includes(category.id)
-                            ? 'bg-purple-100 border-purple-300 text-purple-800'
-                            : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                        }`}
-                      >
-                        {category.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Tag className="w-4 h-4 inline mr-1" />
+                  対象カテゴリー
+                </label>
+                {teamCategories.length > 0 ? (
+                  <>
+                    <p className="text-xs text-gray-500 mb-2">選択しない場合は全員に表示されます</p>
+                    <div className="flex flex-wrap gap-2">
+                      {teamCategories.map(category => (
+                        <button
+                          key={category.id}
+                          type="button"
+                          onClick={() => handleCategoryToggle(category.id)}
+                          className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
+                            form.categoryIds.includes(category.id)
+                              ? 'bg-purple-100 border-purple-300 text-purple-800'
+                              : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                          }`}
+                        >
+                          {category.name}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg">
+                    カテゴリーが未設定のため全員に表示されます。
+                    <br />
+                    カテゴリーを追加するには「マスタ設定」から設定してください。
+                  </p>
+                )}
+              </div>
 
               <div className="flex justify-end gap-3 pt-4">
                 <button

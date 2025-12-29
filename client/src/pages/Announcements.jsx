@@ -391,33 +391,39 @@ export default function Announcements() {
                 </select>
               </div>
 
-              {teamCategories.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    配信対象カテゴリー
-                    <span className="text-xs text-gray-500 ml-2">（選択しない場合は全員に配信）</span>
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {teamCategories.map(category => (
-                      <button
-                        key={category.id}
-                        type="button"
-                        onClick={() => handleCategoryToggle(category.id)}
-                        className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
-                          form.categoryIds.includes(category.id)
-                            ? 'bg-purple-600 text-white border-purple-600'
-                            : 'bg-white text-gray-700 border-gray-300 hover:border-purple-400'
-                        }`}
-                      >
-                        {category.name}
-                      </button>
-                    ))}
-                  </div>
-                  {form.categoryIds.length === 0 && (
-                    <p className="text-xs text-green-600 mt-1">全員に配信されます</p>
-                  )}
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Tag className="w-4 h-4 inline mr-1" />
+                  配信対象カテゴリー
+                </label>
+                {teamCategories.length > 0 ? (
+                  <>
+                    <p className="text-xs text-gray-500 mb-2">選択しない場合は全員に配信されます</p>
+                    <div className="flex flex-wrap gap-2">
+                      {teamCategories.map(category => (
+                        <button
+                          key={category.id}
+                          type="button"
+                          onClick={() => handleCategoryToggle(category.id)}
+                          className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
+                            form.categoryIds.includes(category.id)
+                              ? 'bg-purple-100 border-purple-300 text-purple-800'
+                              : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                          }`}
+                        >
+                          {category.name}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg">
+                    カテゴリーが未設定のため全員に配信されます。
+                    <br />
+                    カテゴリーを追加するには「マスタ設定」から設定してください。
+                  </p>
+                )}
+              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">有効期限（任意）</label>
