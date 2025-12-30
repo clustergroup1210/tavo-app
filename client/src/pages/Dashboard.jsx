@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, ClipboardList, TrendingUp, Video, Building2, Plus, Upload, Edit2, X, User, Tag } from 'lucide-react';
+import { Users, ClipboardList, TrendingUp, Video, Building2, Plus, Upload, Edit2, X, User, Tag, Trash2 } from 'lucide-react';
 
 export default function Dashboard() {
   const { user, currentTeam, isOperator, isPlayer, isTeamAdmin } = useAuth();
@@ -14,6 +14,8 @@ export default function Dashboard() {
   const [description, setDescription] = useState('');
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [editCategoryName, setEditCategoryName] = useState('');
   const [showPlayerModal, setShowPlayerModal] = useState(false);
   const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: '', teamCategoryId: '' });
   const [error, setError] = useState('');
@@ -114,6 +116,50 @@ export default function Dashboard() {
     } catch (error) {
       setError('カテゴリーの作成に失敗しました');
     }
+  };
+
+  const handleEditCategory = async (e) => {
+    e.preventDefault();
+    if (!editingCategory) return;
+    setError('');
+    try {
+      const res = await fetch(`/api/team-categories/${editingCategory.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ name: editCategoryName }),
+      });
+      if (res.ok) {
+        setEditingCategory(null);
+        setEditCategoryName('');
+        fetchTeamData();
+      } else {
+        const data = await res.json();
+        setError(data.error || 'カテゴリーの更新に失敗しました');
+      }
+    } catch (error) {
+      setError('カテゴリーの更新に失敗しました');
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId) => {
+    if (!confirm('このカテゴリーを削除しますか？')) return;
+    try {
+      const res = await fetch(`/api/team-categories/${categoryId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        fetchTeamData();
+      }
+    } catch (error) {
+      console.error('Failed to delete category:', error);
+    }
+  };
+
+  const startEditCategory = (category) => {
+    setEditingCategory(category);
+    setEditCategoryName(category.name);
   };
 
   const handleCreatePlayer = async (e) => {
@@ -293,6 +339,24 @@ export default function Dashboard() {
                     {category._count?.players || 0}名
                   </p>
                 </div>
+                {canEdit && (
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => startEditCategory(category)}
+                      className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded"
+                      title="編集"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCategory(category.id)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                      title="削除"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -385,6 +449,45 @@ export default function Dashboard() {
                   className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
                 >
                   作成
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingCategory && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">カテゴリー編集</h2>
+              <button onClick={() => { setEditingCategory(null); setError(''); }} className="p-1 hover:bg-gray-100 rounded">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+            <form onSubmit={handleEditCategory}>
+              <input
+                type="text"
+                placeholder="カテゴリー名"
+                value={editCategoryName}
+                onChange={(e) => setEditCategoryName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4"
+                required
+              />
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setEditingCategory(null); setError(''); }}
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  保存
                 </button>
               </div>
             </form>
