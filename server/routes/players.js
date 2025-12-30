@@ -52,6 +52,7 @@ router.get('/', authenticate, async (req, res) => {
       where,
       include: {
         team: { include: { parent: true } },
+        teamCategory: { select: { id: true, name: true } },
         user: { select: { id: true, email: true, name: true } },
         evaluations: { take: 5, orderBy: { evaluatedAt: 'desc' } }
       }
@@ -62,6 +63,7 @@ router.get('/', authenticate, async (req, res) => {
         where: { userId: req.user.id },
         include: {
           team: { include: { parent: true } },
+          teamCategory: { select: { id: true, name: true } },
           user: { select: { id: true, email: true, name: true } },
           evaluations: { take: 5, orderBy: { evaluatedAt: 'desc' } }
         }
@@ -108,7 +110,7 @@ router.get('/:id', authenticate, async (req, res) => {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { teamId, name, number, position, birthDate } = req.body;
+    const { teamId, name, number, position, birthDate, teamCategoryId } = req.body;
 
     if (!hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
@@ -120,7 +122,8 @@ router.post('/', authenticate, async (req, res) => {
         name,
         number,
         position,
-        birthDate: birthDate ? new Date(birthDate) : null
+        birthDate: birthDate ? new Date(birthDate) : null,
+        teamCategoryId: teamCategoryId || null
       }
     });
 

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, ClipboardList, TrendingUp, Video, Building2, Plus, Upload, Edit2, X, User } from 'lucide-react';
+import { Users, ClipboardList, TrendingUp, Video, Building2, Plus, Upload, Edit2, X, User, Tag } from 'lucide-react';
 
 export default function Dashboard() {
   const { user, currentTeam, isOperator, isPlayer, isTeamAdmin } = useAuth();
   const [team, setTeam] = useState(null);
   const [players, setPlayers] = useState([]);
+  const [teamCategories, setTeamCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
@@ -14,7 +15,7 @@ export default function Dashboard() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [showPlayerModal, setShowPlayerModal] = useState(false);
-  const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: '', teamId: '' });
+  const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: '', teamCategoryId: '' });
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -27,9 +28,10 @@ export default function Dashboard() {
 
   const fetchTeamData = async () => {
     try {
-      const [teamRes, playersRes] = await Promise.all([
+      const [teamRes, playersRes, categoriesRes] = await Promise.all([
         fetch(`/api/teams/${currentTeam.id}`, { credentials: 'include' }),
-        fetch(`/api/players?teamId=${currentTeam.id}&includeChildren=true`, { credentials: 'include' })
+        fetch(`/api/players?teamId=${currentTeam.id}&includeChildren=true`, { credentials: 'include' }),
+        fetch(`/api/team-categories?teamId=${currentTeam.id}`, { credentials: 'include' })
       ]);
 
       if (teamRes.ok) {
@@ -41,6 +43,10 @@ export default function Dashboard() {
       if (playersRes.ok) {
         const playersData = await playersRes.json();
         setPlayers(Array.isArray(playersData) ? playersData : []);
+      }
+      if (categoriesRes.ok) {
+        const categoriesData = await categoriesRes.json();
+        setTeamCategories(Array.isArray(categoriesData) ? categoriesData : []);
       }
     } catch (error) {
       console.error('Failed to fetch team data:', error);
@@ -87,11 +93,15 @@ export default function Dashboard() {
     e.preventDefault();
     setError('');
     try {
-      const res = await fetch('/api/teams', {
+      const res = await fetch('/api/team-categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name: newCategoryName, parentId: currentTeam.id }),
+        body: JSON.stringify({ 
+          teamId: currentTeam.id, 
+          name: newCategoryName, 
+          sortOrder: teamCategories.length 
+        }),
       });
       if (res.ok) {
         setNewCategoryName('');
@@ -115,12 +125,15 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          ...newPlayer,
-          teamId: newPlayer.teamId || currentTeam.id,
+          name: newPlayer.name,
+          number: newPlayer.number,
+          position: newPlayer.position,
+          teamId: currentTeam.id,
+          teamCategoryId: newPlayer.teamCategoryId || null,
         }),
       });
       if (res.ok) {
-        setNewPlayer({ name: '', number: '', position: '', teamId: '' });
+        setNewPlayer({ name: '', number: '', position: '', teamCategoryId: '' });
         setShowPlayerModal(false);
         fetchTeamData();
       } else {
@@ -156,8 +169,7 @@ export default function Dashboard() {
     );
   }
 
-  const categories = team.children || [];
-  const allTeamOptions = [{ id: currentTeam.id, name: currentTeam.name }, ...categories];
+  const categories = teamCategories;
 
   return (
     <div className="space-y-6">
@@ -271,8 +283,8 @@ export default function Dashboard() {
                 key={category.id}
                 className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
               >
-                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
-                  <Building2 className="w-5 h-5 text-gray-400" />
+                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                  <Tag className="w-5 h-5 text-purple-600" />
                 </div>
                 <div className="flex-1">
                   <p className="font-medium text-gray-900">{category.name}</p>
@@ -330,7 +342,7 @@ export default function Dashboard() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-gray-600">{player.number || '-'}</td>
                     <td className="px-4 py-3 whitespace-nowrap text-gray-600">{player.position || '-'}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">{player.team?.name || '-'}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">{player.teamCategory?.name || '-'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -428,12 +440,13 @@ export default function Dashboard() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">カテゴリー</label>
                   <select
-                    value={newPlayer.teamId}
-                    onChange={(e) => setNewPlayer({ ...newPlayer, teamId: e.target.value })}
+                    value={newPlayer.teamCategoryId}
+                    onChange={(e) => setNewPlayer({ ...newPlayer, teamCategoryId: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   >
-                    {allTeamOptions.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
+                    <option value="">なし</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                 </div>
