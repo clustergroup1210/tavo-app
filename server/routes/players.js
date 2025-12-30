@@ -157,7 +157,7 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
     
-    const canChangeTeam = isCoachOrAdmin || isOperator;
+    const canChangeTeam = isOperator;
 
     const updateData = {};
     if (name !== undefined) updateData.name = name;
@@ -177,10 +177,6 @@ router.put('/:id', authenticate, async (req, res) => {
       updateData.teamCategoryId = teamCategoryId || null;
     }
     if (teamId !== undefined && canChangeTeam && teamId !== player.teamId) {
-      const canAccessDestination = isOperator || hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
-      if (!canAccessDestination) {
-        return res.status(403).json({ error: 'Access denied to destination team' });
-      }
       
       await prisma.playerTeamHistory.updateMany({
         where: { 

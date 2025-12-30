@@ -582,56 +582,50 @@ export default function PlayerDetail() {
             </div>
             {isCoachOrAdmin && (
               <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">チーム</label>
-                  <select
-                    value={getCurrentParentId()}
-                    onChange={(e) => {
-                      const parentId = e.target.value;
-                      const children = getChildTeams(parentId);
-                      setEditForm({ ...editForm, teamId: children.length > 0 ? '' : parentId });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  >
-                    <option value="">選択してください</option>
-                    {getParentTeams().map((team) => (
-                      <option key={team.id} value={team.id}>{team.name}</option>
-                    ))}
-                  </select>
-                </div>
-                {getCurrentParentId() && getChildTeams(getCurrentParentId()).length > 0 && (
+                {isOperator() ? (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">サブチーム</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      チーム
+                      <span className="text-xs text-gray-500 ml-2">（選手移籍時のみ変更可能）</span>
+                    </label>
                     <select
                       value={editForm.teamId}
-                      onChange={(e) => setEditForm({ ...editForm, teamId: e.target.value })}
+                      onChange={(e) => {
+                        setEditForm({ ...editForm, teamId: e.target.value, teamCategoryId: '' });
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     >
                       <option value="">選択してください</option>
-                      {getChildTeams(getCurrentParentId()).map((team) => (
+                      {teams.map((team) => (
                         <option key={team.id} value={team.id}>{team.name}</option>
                       ))}
                     </select>
                   </div>
-                )}
-                {teamCategories.length > 0 && (
+                ) : (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      お知らせカテゴリー
-                      <span className="text-xs text-gray-500 ml-2">（お知らせの配信先に使用）</span>
-                    </label>
-                    <select
-                      value={editForm.teamCategoryId}
-                      onChange={(e) => setEditForm({ ...editForm, teamCategoryId: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    >
-                      <option value="">未設定</option>
-                      {teamCategories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </select>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">チーム</label>
+                    <input
+                      type="text"
+                      value={player.team?.name || ''}
+                      disabled
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">チームの変更はシステム管理者のみ可能です</p>
                   </div>
                 )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">カテゴリー</label>
+                  <select
+                    value={editForm.teamCategoryId}
+                    onChange={(e) => setEditForm({ ...editForm, teamCategoryId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">未設定</option>
+                    {teamCategories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
               </>
             )}
           </div>
