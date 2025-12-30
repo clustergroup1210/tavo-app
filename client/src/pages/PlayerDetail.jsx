@@ -273,19 +273,11 @@ export default function PlayerDetail() {
     setEditForm({});
   };
 
-  const getParentTeams = () => teams.filter(t => !t.parentId);
-  const getChildTeams = (parentId) => teams.filter(t => t.parentId === parentId);
-  const getCurrentParentId = () => {
-    const currentTeam = teams.find(t => t.id === editForm.teamId);
-    if (!currentTeam) return '';
-    return currentTeam.parentId || currentTeam.id;
-  };
-
   const handleSave = async () => {
     setSaving(true);
     try {
       const payload = { ...editForm };
-      if (!isCoachOrAdmin || editForm.teamId === player.teamId) {
+      if (!isOperator() || editForm.teamId === player.teamId) {
         delete payload.teamId;
       }
       const res = await fetch(`/api/players/${id}`, {
@@ -596,7 +588,7 @@ export default function PlayerDetail() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     >
                       <option value="">選択してください</option>
-                      {teams.map((team) => (
+                      {teams.filter(t => !t.parentId).map((team) => (
                         <option key={team.id} value={team.id}>{team.name}</option>
                       ))}
                     </select>
