@@ -13,6 +13,8 @@ export default function GoalCategoryManagement() {
   useEffect(() => {
     if (currentTeam) {
       fetchCategories();
+    } else {
+      setLoading(false);
     }
   }, [currentTeam]);
 

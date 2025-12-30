@@ -15,6 +15,8 @@ export default function TeamCategoryManagement() {
   useEffect(() => {
     if (currentTeamId) {
       fetchCategories();
+    } else {
+      setLoading(false);
     }
   }, [currentTeamId]);
 
