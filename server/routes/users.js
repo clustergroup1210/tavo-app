@@ -86,7 +86,7 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Operator access required' });
     }
 
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required' });
@@ -102,11 +102,32 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    
+    const userData = {
+      name,
+      email,
+      password: hashedPassword
+    };
+
+    if (role && role.startsWith('OPERATOR_')) {
+      const operatorOrg = req.user.organizations?.find(o => 
+        ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+      );
+      
+      if (operatorOrg) {
+        userData.organizations = {
+          create: {
+            organizationId: operatorOrg.organizationId,
+            role: role
+          }
+        };
+      }
+    }
+
     const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword
+      data: userData,
+      include: {
+        organizations: true
       }
     });
 
@@ -114,6 +135,7 @@ router.post('/', authenticate, async (req, res) => {
       id: user.id,
       name: user.name,
       email: user.email,
+      organizations: user.organizations,
       createdAt: user.createdAt
     });
   } catch (error) {

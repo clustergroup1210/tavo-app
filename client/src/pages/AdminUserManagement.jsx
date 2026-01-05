@@ -12,6 +12,7 @@ export default function AdminUserManagement() {
     name: '',
     email: '',
     password: '',
+    role: '',
   });
 
   useEffect(() => {
@@ -45,7 +46,7 @@ export default function AdminUserManagement() {
       });
       if (res.ok) {
         setShowCreateModal(false);
-        setNewUser({ name: '', email: '', password: '' });
+        setNewUser({ name: '', email: '', password: '', role: '' });
         fetchUsers();
       } else {
         const data = await res.json();
@@ -237,6 +238,20 @@ export default function AdminUserManagement() {
                     required
                   />
                   <p className="text-xs text-gray-500 mt-1">6文字以上</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">役割</label>
+                  <select
+                    value={newUser.role}
+                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">未割当</option>
+                    <option value="OPERATOR_ADMIN">オペレーター管理者</option>
+                    <option value="OPERATOR_MANAGER">オペレーターマネージャー</option>
+                    <option value="OPERATOR_STAFF">オペレータースタッフ</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">チーム役割は後から設定できます</p>
                 </div>
               </div>
               <div className="flex justify-end gap-3 mt-6">
