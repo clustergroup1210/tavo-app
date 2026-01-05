@@ -6,13 +6,38 @@ const { authenticate, hasTeamAccess } = require('../middleware/auth');
 const router = express.Router();
 const prisma = new PrismaClient();
 
+function isOperatorUser(user) {
+  return user.organizations?.some(o => 
+    ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+  );
+}
+
 router.get('/', authenticate, async (req, res) => {
   try {
     const { teamId, organizationId } = req.query;
 
-    const isOperator = req.user.organizations?.some(o => 
-      ['OPERATOR_ADMIN', 'OPERATOR_MANAGER'].includes(o.role)
-    );
+    const isOperator = isOperatorUser(req.user);
+
+    if (isOperator && !teamId && !organizationId) {
+      const users = await prisma.user.findMany({
+        include: {
+          organizations: true,
+          teams: { include: { team: true } },
+          players: { select: { id: true } }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+      return res.json(users.map(u => ({
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        avatarUrl: u.avatarUrl,
+        organizations: u.organizations,
+        teams: u.teams,
+        players: u.players,
+        createdAt: u.createdAt
+      })));
+    }
 
     let users;
     if (isOperator && organizationId) {
@@ -52,6 +77,48 @@ router.get('/', authenticate, async (req, res) => {
     })));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+router.post('/', authenticate, async (req, res) => {
+  try {
+    if (!isOperatorUser(req.user)) {
+      return res.status(403).json({ error: 'Operator access required' });
+    }
+
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Name, email, and password are required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ error: 'このメールアドレスは既に登録されています' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword
+      }
+    });
+
+    res.status(201).json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      createdAt: user.createdAt
+    });
+  } catch (error) {
+    console.error('Create user error:', error);
+    res.status(500).json({ error: 'ユーザーの作成に失敗しました' });
   }
 });
 
