@@ -6,22 +6,42 @@ const { authenticate, hasTeamAccess } = require('../middleware/auth');
 const router = express.Router();
 const prisma = new PrismaClient();
 
+function isOperatorUser(user) {
+  return user.organizations?.some(o => 
+    ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+  );
+}
+
 router.get('/', authenticate, async (req, res) => {
   try {
     const { teamId } = req.query;
+    const isOperator = isOperatorUser(req.user);
 
-    if (!hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'])) {
-      return res.status(403).json({ error: 'Access denied' });
+    let invitations;
+    if (isOperator && !teamId) {
+      invitations = await prisma.invitation.findMany({
+        include: {
+          team: { select: { id: true, name: true } },
+          player: { select: { id: true, name: true } }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+    } else if (teamId) {
+      if (!hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'])) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      invitations = await prisma.invitation.findMany({
+        where: { teamId },
+        include: {
+          team: { select: { id: true, name: true } },
+          player: { select: { id: true, name: true } }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+    } else {
+      return res.status(400).json({ error: 'teamId required' });
     }
-
-    const invitations = await prisma.invitation.findMany({
-      where: { teamId },
-      include: {
-        team: { select: { id: true, name: true } },
-        player: { select: { id: true, name: true } }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
 
     const now = new Date();
     const enriched = invitations.map(inv => ({
@@ -41,8 +61,9 @@ router.get('/', authenticate, async (req, res) => {
 router.post('/', authenticate, async (req, res) => {
   try {
     const { teamId, role, email, playerName, playerId, expiryDays = 7 } = req.body;
+    const isOperator = isOperatorUser(req.user);
 
-    if (!hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'])) {
+    if (!isOperator && !hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -128,7 +149,8 @@ router.delete('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Invitation not found' });
     }
 
-    if (!hasTeamAccess(req.user, invitation.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
+    const isOperator = isOperatorUser(req.user);
+    if (!isOperator && !hasTeamAccess(req.user, invitation.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
