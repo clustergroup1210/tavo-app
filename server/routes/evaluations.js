@@ -698,7 +698,7 @@ router.get('/heatmap/:playerId', authenticate, async (req, res) => {
 
 router.get('/ranking', authenticate, async (req, res) => {
   try {
-    const { teamId, roundId, category, position } = req.query;
+    const { teamId, roundId, category, position, teamCategoryId } = req.query;
 
     if (!teamId || !roundId) {
       return res.status(400).json({ error: 'teamId and roundId are required' });
@@ -717,10 +717,19 @@ router.get('/ranking', authenticate, async (req, res) => {
     if (position) {
       playerWhere.position = position;
     }
+    if (teamCategoryId) {
+      playerWhere.teamCategoryId = teamCategoryId;
+    }
 
     const players = await prisma.player.findMany({
       where: playerWhere,
-      select: { id: true, name: true, number: true, position: true }
+      select: { 
+        id: true, 
+        name: true, 
+        number: true, 
+        position: true,
+        teamCategory: { select: { id: true, name: true } }
+      }
     });
 
     const playerIds = players.map(p => p.id);

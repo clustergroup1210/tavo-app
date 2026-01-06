@@ -6,137 +6,50 @@ import { UserCircle, Plus, ChevronUp, ChevronDown, Filter, X } from 'lucide-reac
 export default function PlayerList() {
   const { currentTeam, isCoach, isOperator } = useAuth();
   const [players, setPlayers] = useState([]);
-  const [parentTeams, setParentTeams] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [teamCategories, setTeamCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: '', teamId: '' });
+  const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: '', teamCategoryId: '' });
 
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
-  const [filterParentTeam, setFilterParentTeam] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterPosition, setFilterPosition] = useState('');
 
   useEffect(() => {
-    fetchAllTeams();
-  }, [currentTeam]);
-
-  useEffect(() => {
-    if (currentTeam || isOperator()) {
-      fetchPlayers();
-    }
-  }, [currentTeam, filterParentTeam]);
-  
-  const getDefaultTeamId = () => {
-    return filterCategory || filterParentTeam || currentTeam?.id || (categories.length > 0 ? categories[0].id : '');
-  };
-
-  useEffect(() => {
-    if (categories.length > 0 && !newPlayer.teamId) {
-      setNewPlayer(prev => ({ ...prev, teamId: getDefaultTeamId() }));
-    }
-  }, [categories]);
-
-  useEffect(() => {
-    const newTeamId = getDefaultTeamId();
-    if (newTeamId) {
-      setNewPlayer(prev => ({ ...prev, teamId: newTeamId }));
-    }
-  }, [filterCategory, filterParentTeam, currentTeam]);
-  
-  const openCreateModal = () => {
-    setNewPlayer({ name: '', number: '', position: '', teamId: getDefaultTeamId() });
-    setShowCreateModal(true);
-  };
-
-  const fetchPlayers = async () => {
-    try {
-      let url = '/api/players';
-      const params = new URLSearchParams();
-      
-      if (filterParentTeam) {
-        params.append('teamId', filterParentTeam);
-        params.append('includeChildren', 'true');
-      } else if (currentTeam) {
-        params.append('teamId', currentTeam.id);
-        params.append('includeChildren', 'true');
-      } else if (isOperator()) {
-      }
-      
-      if (params.toString()) {
-        url += '?' + params.toString();
-      }
-      
-      const res = await fetch(url, { credentials: 'include' });
-      const data = await res.json();
-      setPlayers(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('Failed to fetch players:', error);
-    } finally {
+    if (currentTeam) {
+      fetchData();
+    } else {
       setLoading(false);
     }
-  };
+  }, [currentTeam]);
 
-  const fetchAllTeams = async () => {
+  const fetchData = async () => {
     try {
-      const cats = [];
+      const [playersRes, categoriesRes] = await Promise.all([
+        fetch(`/api/players?teamId=${currentTeam.id}&includeChildren=true`, { credentials: 'include' }),
+        fetch(`/api/team-categories?teamId=${currentTeam.id}`, { credentials: 'include' })
+      ]);
       
-      if (isOperator()) {
-        const res = await fetch('/api/teams', { credentials: 'include' });
-        const teams = await res.json();
-        setParentTeams(Array.isArray(teams) ? teams : []);
-        
-        if (Array.isArray(teams)) {
-          teams.forEach(team => {
-            cats.push({ id: team.id, name: team.name, parentId: null });
-            if (team.children) {
-              team.children.forEach(child => {
-                cats.push({ id: child.id, name: child.name, parentId: team.id, parentName: team.name });
-              });
-            }
-          });
-        }
-      } else if (currentTeam) {
-        const teamRes = await fetch(`/api/teams/${currentTeam.id}`, { credentials: 'include' });
-        const teamData = await teamRes.json();
-        if (teamData) {
-          if (teamData.parent) {
-            const parentRes = await fetch(`/api/teams/${teamData.parent.id}`, { credentials: 'include' });
-            const parentData = await parentRes.json();
-            if (parentData) {
-              cats.push({ id: parentData.id, name: parentData.name, parentId: null });
-              if (parentData.children) {
-                parentData.children.forEach(child => {
-                  cats.push({ id: child.id, name: child.name, parentId: parentData.id, parentName: parentData.name });
-                });
-              }
-            }
-          } else {
-            cats.push({ id: teamData.id, name: teamData.name, parentId: null });
-            if (teamData.children) {
-              teamData.children.forEach(child => {
-                cats.push({ id: child.id, name: child.name, parentId: teamData.id, parentName: teamData.name });
-              });
-            }
-          }
-        }
+      if (playersRes.ok) {
+        const data = await playersRes.json();
+        setPlayers(Array.isArray(data) ? data : []);
       }
-      
-      setCategories(cats);
+      if (categoriesRes.ok) {
+        const data = await categoriesRes.json();
+        setTeamCategories(Array.isArray(data) ? data : []);
+      }
     } catch (error) {
-      console.error('Failed to fetch teams:', error);
+      console.error('Failed to fetch data:', error);
+    } finally {
       setLoading(false);
     }
   };
 
   const handleCreatePlayer = async (e) => {
     e.preventDefault();
-    const targetTeamId = newPlayer.teamId || filterCategory || currentTeam?.id || (categories.length > 0 ? categories[0].id : '');
-    if (!targetTeamId) {
-      console.error('No team selected');
-      return;
-    }
+    if (!currentTeam) return;
+    
     try {
       const res = await fetch('/api/players', {
         method: 'POST',
@@ -146,14 +59,14 @@ export default function PlayerList() {
           name: newPlayer.name,
           number: newPlayer.number,
           position: newPlayer.position,
-          teamId: targetTeamId
+          teamId: currentTeam.id,
+          teamCategoryId: newPlayer.teamCategoryId || null
         }),
       });
       if (res.ok) {
-        const defaultTeamId = filterCategory || currentTeam?.id || (categories.length > 0 ? categories[0].id : '');
-        setNewPlayer({ name: '', number: '', position: '', teamId: defaultTeamId });
+        setNewPlayer({ name: '', number: '', position: '', teamCategoryId: '' });
         setShowCreateModal(false);
-        fetchPlayers();
+        fetchData();
       }
     } catch (error) {
       console.error('Failed to create player:', error);
@@ -180,7 +93,7 @@ export default function PlayerList() {
     let result = [...players];
 
     if (filterCategory) {
-      result = result.filter(p => p.teamId === filterCategory);
+      result = result.filter(p => p.teamCategoryId === filterCategory);
     }
 
     if (filterPosition) {
@@ -205,16 +118,11 @@ export default function PlayerList() {
   };
 
   const clearFilters = () => {
-    setFilterParentTeam('');
     setFilterCategory('');
     setFilterPosition('');
   };
 
-  const hasActiveFilters = filterParentTeam || filterCategory || filterPosition;
-  
-  const filteredCategories = filterParentTeam 
-    ? categories.filter(c => c.parentId === filterParentTeam || c.id === filterParentTeam)
-    : categories;
+  const hasActiveFilters = filterCategory || filterPosition;
 
   if (loading) {
     return (
@@ -233,9 +141,9 @@ export default function PlayerList() {
           <h1 className="text-2xl font-bold text-gray-900">選手一覧</h1>
           <p className="mt-1 text-sm text-gray-500">{players.length}名の選手</p>
         </div>
-        {(isOperator() || (currentTeam && isCoach(currentTeam.id))) && (
+        {currentTeam && (isOperator() || isCoach(currentTeam.id)) && (
           <button
-            onClick={openCreateModal}
+            onClick={() => setShowCreateModal(true)}
             className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
           >
             <Plus className="w-4 h-4" />
@@ -250,24 +158,6 @@ export default function PlayerList() {
             <Filter className="w-4 h-4 text-gray-500" />
             <span className="text-sm font-medium text-gray-700">フィルター:</span>
           </div>
-          
-          {isOperator() && !currentTeam && (
-            <div>
-              <select
-                value={filterParentTeam}
-                onChange={(e) => {
-                  setFilterParentTeam(e.target.value);
-                  setFilterCategory('');
-                }}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
-              >
-                <option value="">全チーム</option>
-                {parentTeams.map((team) => (
-                  <option key={team.id} value={team.id}>{team.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
 
           <div>
             <select
@@ -276,17 +166,9 @@ export default function PlayerList() {
               className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
             >
               <option value="">全カテゴリー</option>
-              {(() => {
-                const childCategories = filteredCategories.filter(c => c.parentId !== null);
-                if (childCategories.length > 0) {
-                  return childCategories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ));
-                }
-                return filteredCategories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ));
-              })()}
+              {teamCategories.map((cat) => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
             </select>
           </div>
 
@@ -367,7 +249,7 @@ export default function PlayerList() {
                   {player.position || '-'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {player.team?.name || '-'}
+                  {player.teamCategory?.name || '-'}
                 </td>
               </tr>
             ))}
@@ -426,31 +308,16 @@ export default function PlayerList() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">所属カテゴリー</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">カテゴリー</label>
                 <select
-                  value={newPlayer.teamId}
-                  onChange={(e) => setNewPlayer({ ...newPlayer, teamId: e.target.value })}
+                  value={newPlayer.teamCategoryId}
+                  onChange={(e) => setNewPlayer({ ...newPlayer, teamCategoryId: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  required
                 >
-                  {(() => {
-                    if (isOperator()) {
-                      return categories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.parentName ? `${cat.parentName} / ${cat.name}` : cat.name}
-                        </option>
-                      ));
-                    }
-                    const childCategories = categories.filter(c => c.parentId !== null);
-                    if (childCategories.length > 0) {
-                      return childCategories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ));
-                    }
-                    return categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ));
-                  })()}
+                  <option value="">なし</option>
+                  {teamCategories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
                 </select>
               </div>
               <div className="flex justify-end gap-3">

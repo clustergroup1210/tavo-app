@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, ClipboardList, TrendingUp, Video, Building2, Plus, Upload, Edit2, X, User, Tag, Trash2 } from 'lucide-react';
+import { Building2, Plus, Upload, Edit2, X, Users, Tag, Trash2 } from 'lucide-react';
 
 export default function Dashboard() {
-  const { user, currentTeam, isOperator, isPlayer, isTeamAdmin } = useAuth();
+  const { currentTeam, isOperator, isTeamAdmin } = useAuth();
   const [team, setTeam] = useState(null);
-  const [players, setPlayers] = useState([]);
   const [teamCategories, setTeamCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -16,8 +14,6 @@ export default function Dashboard() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingCategory, setEditingCategory] = useState(null);
   const [editCategoryName, setEditCategoryName] = useState('');
-  const [showPlayerModal, setShowPlayerModal] = useState(false);
-  const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: '', teamCategoryId: '' });
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -30,9 +26,8 @@ export default function Dashboard() {
 
   const fetchTeamData = async () => {
     try {
-      const [teamRes, playersRes, categoriesRes] = await Promise.all([
+      const [teamRes, categoriesRes] = await Promise.all([
         fetch(`/api/teams/${currentTeam.id}`, { credentials: 'include' }),
-        fetch(`/api/players?teamId=${currentTeam.id}&includeChildren=true`, { credentials: 'include' }),
         fetch(`/api/team-categories?teamId=${currentTeam.id}`, { credentials: 'include' })
       ]);
 
@@ -41,10 +36,6 @@ export default function Dashboard() {
         setTeam(teamData);
         setName(teamData.name);
         setDescription(teamData.description || '');
-      }
-      if (playersRes.ok) {
-        const playersData = await playersRes.json();
-        setPlayers(Array.isArray(playersData) ? playersData : []);
       }
       if (categoriesRes.ok) {
         const categoriesData = await categoriesRes.json();
@@ -160,35 +151,6 @@ export default function Dashboard() {
   const startEditCategory = (category) => {
     setEditingCategory(category);
     setEditCategoryName(category.name);
-  };
-
-  const handleCreatePlayer = async (e) => {
-    e.preventDefault();
-    setError('');
-    try {
-      const res = await fetch('/api/players', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          name: newPlayer.name,
-          number: newPlayer.number,
-          position: newPlayer.position,
-          teamId: currentTeam.id,
-          teamCategoryId: newPlayer.teamCategoryId || null,
-        }),
-      });
-      if (res.ok) {
-        setNewPlayer({ name: '', number: '', position: '', teamCategoryId: '' });
-        setShowPlayerModal(false);
-        fetchTeamData();
-      } else {
-        const data = await res.json();
-        setError(data.error || '選手の追加に失敗しました');
-      }
-    } catch (error) {
-      setError('選手の追加に失敗しました');
-    }
   };
 
   const canEdit = currentTeam && (isTeamAdmin(currentTeam.id) || isOperator());
@@ -365,58 +327,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">選手一覧</h3>
-          {canEdit && (
-            <button
-              onClick={() => setShowPlayerModal(true)}
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-            >
-              <Plus className="w-4 h-4" />
-              選手追加
-            </button>
-          )}
-        </div>
-        {players.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">選手</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">背番号</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ポジション</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">カテゴリー</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {players.map((player) => (
-                  <tr key={player.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <Link to={`/players/${player.id}`} className="flex items-center gap-3 hover:text-primary-600">
-                        {player.photoUrl ? (
-                          <img src={player.photoUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                            <User className="w-4 h-4 text-gray-400" />
-                          </div>
-                        )}
-                        <span className="font-medium text-gray-900">{player.name}</span>
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">{player.number || '-'}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">{player.position || '-'}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">{player.teamCategory?.name || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="text-sm text-gray-500">選手は登録されていません</p>
-        )}
-      </div>
-
       {showCategoryModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
@@ -488,85 +398,6 @@ export default function Dashboard() {
                   className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
                 >
                   保存
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showPlayerModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">選手追加</h2>
-              <button onClick={() => { setShowPlayerModal(false); setError(''); }} className="p-1 hover:bg-gray-100 rounded">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
-            <form onSubmit={handleCreatePlayer}>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">名前 *</label>
-                  <input
-                    type="text"
-                    value={newPlayer.name}
-                    onChange={(e) => setNewPlayer({ ...newPlayer, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">背番号</label>
-                  <input
-                    type="text"
-                    value={newPlayer.number}
-                    onChange={(e) => setNewPlayer({ ...newPlayer, number: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ポジション</label>
-                  <select
-                    value={newPlayer.position}
-                    onChange={(e) => setNewPlayer({ ...newPlayer, position: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  >
-                    <option value="">選択してください</option>
-                    <option value="GK">GK</option>
-                    <option value="DF">DF</option>
-                    <option value="MF">MF</option>
-                    <option value="FW">FW</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">カテゴリー</label>
-                  <select
-                    value={newPlayer.teamCategoryId}
-                    onChange={(e) => setNewPlayer({ ...newPlayer, teamCategoryId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  >
-                    <option value="">なし</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => { setShowPlayerModal(false); setError(''); }}
-                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                >
-                  追加
                 </button>
               </div>
             </form>

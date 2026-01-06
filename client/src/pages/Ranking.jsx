@@ -7,7 +7,8 @@ export default function Ranking() {
   const [rounds, setRounds] = useState([]);
   const [selectedRound, setSelectedRound] = useState('');
   const [ranking, setRanking] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [teamCategories, setTeamCategories] = useState([]);
+  const [evaluationCategories, setEvaluationCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedPosition, setSelectedPosition] = useState('');
   const [activeTab, setActiveTab] = useState('total');
@@ -17,7 +18,7 @@ export default function Ranking() {
 
   useEffect(() => {
     if (currentTeam) {
-      fetchRounds();
+      fetchInitialData();
     }
   }, [currentTeam]);
 
@@ -27,18 +28,26 @@ export default function Ranking() {
     }
   }, [selectedRound, selectedCategory, selectedPosition, activeTab]);
 
-  const fetchRounds = async () => {
+  const fetchInitialData = async () => {
     try {
-      const res = await fetch(`/api/evaluations/rounds?teamId=${currentTeam.id}`, {
-        credentials: 'include'
-      });
-      const data = await res.json();
-      setRounds(data);
-      if (data.length > 0) {
-        setSelectedRound(data[0].id);
+      const [roundsRes, categoriesRes] = await Promise.all([
+        fetch(`/api/evaluations/rounds?teamId=${currentTeam.id}`, { credentials: 'include' }),
+        fetch(`/api/team-categories?teamId=${currentTeam.id}`, { credentials: 'include' })
+      ]);
+      
+      if (roundsRes.ok) {
+        const data = await roundsRes.json();
+        setRounds(data);
+        if (data.length > 0) {
+          setSelectedRound(data[0].id);
+        }
+      }
+      if (categoriesRes.ok) {
+        const data = await categoriesRes.json();
+        setTeamCategories(Array.isArray(data) ? data : []);
       }
     } catch (error) {
-      console.error('Failed to fetch rounds:', error);
+      console.error('Failed to fetch initial data:', error);
     }
   };
 
@@ -48,7 +57,7 @@ export default function Ranking() {
     try {
       let url = `/api/evaluations/ranking?teamId=${currentTeam.id}&roundId=${selectedRound}`;
       if (activeTab === 'category' && selectedCategory) {
-        url += `&category=${selectedCategory}`;
+        url += `&teamCategoryId=${selectedCategory}`;
       }
       if (activeTab === 'position' && selectedPosition) {
         url += `&position=${selectedPosition}`;
@@ -57,7 +66,7 @@ export default function Ranking() {
       const res = await fetch(url, { credentials: 'include' });
       const data = await res.json();
       setRanking(data.ranking || []);
-      setCategories(data.categories || []);
+      setEvaluationCategories(data.categories || []);
     } catch (error) {
       console.error('Failed to fetch ranking:', error);
     } finally {
@@ -163,7 +172,17 @@ export default function Ranking() {
 
         {activeTab === 'category' && (
           <div className="mb-4 flex gap-2 flex-wrap">
-            {categories.map((cat) => (
+            <button
+              onClick={() => setSelectedCategory('')}
+              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                selectedCategory === ''
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              全て
+            </button>
+            {teamCategories.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
@@ -220,8 +239,9 @@ export default function Ranking() {
                   <th className="text-left py-3 px-2 font-medium text-gray-600 w-16">順位</th>
                   <th className="text-left py-3 px-2 font-medium text-gray-600">選手</th>
                   <th className="text-left py-3 px-2 font-medium text-gray-600 w-20">ポジション</th>
+                  <th className="text-left py-3 px-2 font-medium text-gray-600 w-24">カテゴリー</th>
                   <th className="text-left py-3 px-2 font-medium text-gray-600 w-48">スコア</th>
-                  {activeTab === 'total' && categories.slice(0, 4).map((cat) => (
+                  {activeTab === 'total' && evaluationCategories.slice(0, 4).map((cat) => (
                     <th key={cat.id} className="text-center py-3 px-2 font-medium text-gray-600 w-20">
                       {cat.name}
                     </th>
@@ -264,6 +284,9 @@ export default function Ranking() {
                         </span>
                       )}
                     </td>
+                    <td className="py-3 px-2 text-sm text-gray-500">
+                      {item.player.teamCategory?.name || '-'}
+                    </td>
                     <td className="py-3 px-2">
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden">
@@ -277,7 +300,7 @@ export default function Ranking() {
                         </span>
                       </div>
                     </td>
-                    {activeTab === 'total' && categories.slice(0, 4).map((cat) => (
+                    {activeTab === 'total' && evaluationCategories.slice(0, 4).map((cat) => (
                       <td key={cat.id} className="py-3 px-2 text-center">
                         <span className="text-sm font-medium text-gray-700">
                           {item.categoryScores[cat.id] || 0}
