@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 
 export default function Announcements() {
-  const { user, isCoach, isOperator } = useAuth();
+  const { currentTeam, isCoach, isOperator } = useAuth();
   const [announcements, setAnnouncements] = useState([]);
   const [manageAnnouncements, setManageAnnouncements] = useState([]);
   const [teamCategories, setTeamCategories] = useState([]);
@@ -23,18 +23,21 @@ export default function Announcements() {
     categoryIds: []
   });
 
-  const currentTeamId = user?.teams?.[0]?.teamId;
+  const currentTeamId = currentTeam?.id;
   const canManage = isCoach(currentTeamId) || isOperator();
 
   useEffect(() => {
     fetchAnnouncements();
+  }, []);
+
+  useEffect(() => {
     if (canManage) {
       fetchManageAnnouncements();
       if (currentTeamId) {
         fetchTeamCategories();
       }
     }
-  }, []);
+  }, [currentTeamId, canManage]);
 
   const fetchAnnouncements = async () => {
     try {

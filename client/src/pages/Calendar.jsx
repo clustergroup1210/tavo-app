@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 
 export default function Calendar() {
-  const { user, isCoach, isOperator } = useAuth();
+  const { currentTeam, isCoach, isOperator } = useAuth();
   const [events, setEvents] = useState([]);
   const [teamCategories, setTeamCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,15 +27,18 @@ export default function Calendar() {
     categoryIds: []
   });
 
-  const currentTeamId = user?.teams?.[0]?.teamId;
+  const currentTeamId = currentTeam?.id;
   const canCreate = isCoach(currentTeamId) || isOperator();
 
   useEffect(() => {
     fetchEvents();
+  }, [currentDate]);
+
+  useEffect(() => {
     if (canCreate && currentTeamId) {
       fetchTeamCategories();
     }
-  }, [currentDate]);
+  }, [currentTeamId, canCreate]);
 
   const fetchEvents = async () => {
     try {
