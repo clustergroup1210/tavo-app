@@ -32,7 +32,7 @@ export default function Calendar() {
 
   useEffect(() => {
     fetchEvents();
-  }, [currentDate]);
+  }, [currentDate, currentTeamId]);
 
   useEffect(() => {
     if (canCreate && currentTeamId) {
@@ -44,7 +44,11 @@ export default function Calendar() {
     try {
       const month = currentDate.getMonth() + 1;
       const year = currentDate.getFullYear();
-      const res = await fetch(`/api/calendar/my?month=${month}&year=${year}`, { credentials: 'include' });
+      let url = `/api/calendar/my?month=${month}&year=${year}`;
+      if (currentTeamId) {
+        url += `&teamId=${currentTeamId}`;
+      }
+      const res = await fetch(url, { credentials: 'include' });
       const data = await res.json();
       setEvents(Array.isArray(data) ? data : []);
     } catch (error) {

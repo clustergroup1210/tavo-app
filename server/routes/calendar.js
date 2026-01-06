@@ -65,7 +65,7 @@ router.get('/', authenticate, async (req, res) => {
 
 router.get('/my', authenticate, async (req, res) => {
   try {
-    const { month, year } = req.query;
+    const { month, year, teamId } = req.query;
     const user = req.user;
     
     const userTeamIds = user.teams?.map(t => t.teamId) || [];
@@ -82,6 +82,12 @@ router.get('/my', authenticate, async (req, res) => {
       }
       if (player.team?.parentId && !userTeamIds.includes(player.team.parentId)) {
         userTeamIds.push(player.team.parentId);
+      }
+    }
+    
+    if (teamId && !userTeamIds.includes(teamId)) {
+      if (isOperator(user) || hasTeamAccess(user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'])) {
+        userTeamIds.push(teamId);
       }
     }
     
