@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminTeamManagement from './pages/AdminTeamManagement';
 import AdminTeamView from './pages/AdminTeamView';
 import AdminUserManagement from './pages/AdminUserManagement';
 import TeamList from './pages/TeamList';
@@ -106,7 +107,7 @@ export default function App() {
       <Route element={<OperatorRoute />}>
         <Route element={<AdminLayoutWrapper />}>
           <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/teams" element={<AdminDashboard />} />
+          <Route path="/admin/teams" element={<AdminTeamManagement />} />
           <Route path="/admin/teams/:teamId/dashboard" element={<AdminTeamView />} />
           <Route path="/admin/users" element={<AdminUserManagement />} />
           <Route path="/admin/organizations" element={<Organizations />} />
