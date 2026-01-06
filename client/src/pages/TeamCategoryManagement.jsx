@@ -3,26 +3,25 @@ import { useAuth } from '../contexts/AuthContext';
 import { Plus, X, Edit2, Trash2, Users, Tag, Save } from 'lucide-react';
 
 export default function TeamCategoryManagement() {
-  const { user } = useAuth();
+  const { currentTeam } = useAuth();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [form, setForm] = useState({ name: '', sortOrder: 0 });
-
-  const currentTeamId = user?.teams?.[0]?.teamId;
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (currentTeamId) {
+    if (currentTeam?.id) {
       fetchCategories();
     } else {
       setLoading(false);
     }
-  }, [currentTeamId]);
+  }, [currentTeam]);
 
   const fetchCategories = async () => {
     try {
-      const res = await fetch(`/api/team-categories?teamId=${currentTeamId}`, { credentials: 'include' });
+      const res = await fetch(`/api/team-categories?teamId=${currentTeam.id}`, { credentials: 'include' });
       const data = await res.json();
       setCategories(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -45,32 +44,47 @@ export default function TeamCategoryManagement() {
   };
 
   const handleSubmit = async () => {
+    if (!form.name.trim()) {
+      setError('カテゴリー名を入力してください');
+      return;
+    }
+    setError('');
+    
     try {
       const payload = {
-        teamId: currentTeamId,
-        name: form.name,
+        teamId: currentTeam.id,
+        name: form.name.trim(),
         sortOrder: form.sortOrder
       };
 
+      let res;
       if (editingCategory) {
-        await fetch(`/api/team-categories/${editingCategory.id}`, {
+        res = await fetch(`/api/team-categories/${editingCategory.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify(payload)
         });
       } else {
-        await fetch('/api/team-categories', {
+        res = await fetch('/api/team-categories', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify(payload)
         });
       }
+      
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || '保存に失敗しました');
+        return;
+      }
+      
       setShowModal(false);
       fetchCategories();
     } catch (error) {
       console.error('Failed to save category:', error);
+      setError('保存に失敗しました');
     }
   };
 
@@ -172,18 +186,24 @@ export default function TeamCategoryManagement() {
               <h3 className="text-lg font-semibold text-gray-900">
                 {editingCategory ? 'カテゴリーを編集' : '新しいカテゴリー'}
               </h3>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => { setShowModal(false); setError(''); }} className="text-gray-400 hover:text-gray-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {error}
+              </div>
+            )}
+            
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">カテゴリー名</label>
                 <input
                   type="text"
                   value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  onChange={(e) => { setForm({ ...form, name: e.target.value }); setError(''); }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   placeholder="例: カテゴリーA、U-15など"
                 />
@@ -201,7 +221,7 @@ export default function TeamCategoryManagement() {
 
               <div className="flex justify-end gap-3 pt-4">
                 <button
-                  onClick={() => setShowModal(false)}
+                  onClick={() => { setShowModal(false); setError(''); }}
                   className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
                 >
                   キャンセル
