@@ -46,10 +46,14 @@ export default function PlayerProgress() {
       const res = await fetch(`/api/evaluations/progress/${playerId}`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
-        setProgressData(data);
+        setProgressData(data || { progressData: [], categories: [] });
+      } else {
+        console.error('Progress data fetch failed:', res.status);
+        setProgressData({ progressData: [], categories: [] });
       }
     } catch (error) {
       console.error('Failed to fetch progress data:', error);
+      setProgressData({ progressData: [], categories: [] });
     }
   };
 
@@ -128,13 +132,13 @@ export default function PlayerProgress() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">評価ギャップ推移</h2>
-        {progressData.progressData.length > 0 && progressData.progressData.some(d => d.gap !== null) ? (
+        {progressData.progressData.length > 0 && progressData.progressData.some(d => d.gap !== null && d.gap !== undefined) ? (
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={progressData.progressData}>
+              <BarChart data={progressData.progressData.filter(d => d.gap !== null && d.gap !== undefined)}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                 <XAxis dataKey="roundName" tick={{ fontSize: 12 }} stroke="#6B7280" />
-                <YAxis domain={[-2, 2]} tick={{ fontSize: 12 }} stroke="#6B7280" />
+                <YAxis domain={[-5, 5]} tick={{ fontSize: 12 }} stroke="#6B7280" />
                 <Tooltip 
                   contentStyle={{ 
                     backgroundColor: 'white', 
@@ -150,7 +154,7 @@ export default function PlayerProgress() {
                   name="ギャップ"
                   radius={[4, 4, 0, 0]}
                 >
-                  {progressData.progressData.map((entry, index) => (
+                  {progressData.progressData.filter(d => d.gap !== null && d.gap !== undefined).map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
                       fill={entry.gap >= 0 ? '#3B82F6' : '#EF4444'} 
