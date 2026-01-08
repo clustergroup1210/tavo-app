@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { UserCircle, Plus, ChevronUp, ChevronDown, Filter, X } from 'lucide-react';
 
 export default function PlayerList() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { currentTeam, isCoach, isOperator } = useAuth();
   const [players, setPlayers] = useState([]);
   const [teamCategories, setTeamCategories] = useState([]);
@@ -13,7 +14,7 @@ export default function PlayerList() {
 
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
-  const [filterCategory, setFilterCategory] = useState('');
+  const [filterCategory, setFilterCategory] = useState(searchParams.get('categoryId') || '');
   const [filterPosition, setFilterPosition] = useState('');
 
   useEffect(() => {
@@ -117,9 +118,19 @@ export default function PlayerList() {
     return result;
   };
 
+  const handleCategoryChange = (value) => {
+    setFilterCategory(value);
+    if (value) {
+      setSearchParams({ categoryId: value });
+    } else {
+      setSearchParams({});
+    }
+  };
+
   const clearFilters = () => {
     setFilterCategory('');
     setFilterPosition('');
+    setSearchParams({});
   };
 
   const hasActiveFilters = filterCategory || filterPosition;
@@ -162,7 +173,7 @@ export default function PlayerList() {
           <div>
             <select
               value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
+              onChange={(e) => handleCategoryChange(e.target.value)}
               className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg"
             >
               <option value="">全カテゴリー</option>

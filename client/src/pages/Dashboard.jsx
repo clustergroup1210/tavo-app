@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Building2, Plus, Upload, Edit2, X, Users, Tag, Trash2 } from 'lucide-react';
+import { Building2, Plus, Upload, Edit2, X, Users, Tag, Trash2, ChevronRight } from 'lucide-react';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { currentTeam, isOperator, isTeamAdmin } = useAuth();
   const [team, setTeam] = useState(null);
   const [teamCategories, setTeamCategories] = useState([]);
@@ -289,7 +291,8 @@ export default function Dashboard() {
             {categories.map((category) => (
               <div
                 key={category.id}
-                className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                onClick={() => navigate(`/players?categoryId=${category.id}`)}
               >
                 <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
                   <Tag className="w-5 h-5 text-purple-600" />
@@ -302,7 +305,7 @@ export default function Dashboard() {
                   </p>
                 </div>
                 {canEdit && (
-                  <div className="flex gap-1">
+                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => startEditCategory(category)}
                       className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded"
@@ -319,6 +322,7 @@ export default function Dashboard() {
                     </button>
                   </div>
                 )}
+                <ChevronRight className="w-5 h-5 text-gray-400" />
               </div>
             ))}
           </div>
