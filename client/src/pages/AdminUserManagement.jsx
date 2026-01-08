@@ -19,6 +19,8 @@ export default function AdminUserManagement() {
     email: '',
     password: '',
     role: '',
+    teamId: '',
+    teamRole: '',
   });
   const [newInvite, setNewInvite] = useState({
     teamId: '',
@@ -104,7 +106,7 @@ export default function AdminUserManagement() {
       });
       if (res.ok) {
         setShowCreateModal(false);
-        setNewUser({ name: '', email: '', password: '', role: '' });
+        setNewUser({ name: '', email: '', password: '', role: '', teamId: '', teamRole: '' });
         fetchUsers();
       } else {
         const data = await res.json();
@@ -527,19 +529,54 @@ export default function AdminUserManagement() {
                   <p className="text-xs text-gray-500 mt-1">6文字以上</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">役割</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">運営役割</label>
                   <select
                     value={newUser.role}
-                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value, teamId: '', teamRole: '' })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   >
-                    <option value="">未割当</option>
+                    <option value="">運営ではない</option>
                     <option value="OPERATOR_ADMIN">オペレーター管理者</option>
                     <option value="OPERATOR_MANAGER">オペレーターマネージャー</option>
                     <option value="OPERATOR_STAFF">オペレータースタッフ</option>
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">チーム役割は後から設定できます</p>
                 </div>
+                
+                {!newUser.role.startsWith('OPERATOR_') && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        所属チーム {newUser.teamRole && ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH', 'PLAYER'].includes(newUser.teamRole) ? '*' : ''}
+                      </label>
+                      <select
+                        value={newUser.teamId}
+                        onChange={(e) => setNewUser({ ...newUser, teamId: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        required={newUser.teamRole && ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH', 'PLAYER'].includes(newUser.teamRole)}
+                      >
+                        <option value="">チームを選択</option>
+                        {teams.map(team => (
+                          <option key={team.id} value={team.id}>{team.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">チーム役割</label>
+                      <select
+                        value={newUser.teamRole}
+                        onChange={(e) => setNewUser({ ...newUser, teamRole: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      >
+                        <option value="">役割を選択</option>
+                        <option value="TEAM_ADMIN">チーム管理者</option>
+                        <option value="TEAM_HEAD_COACH">代表監督・コーチ</option>
+                        <option value="TEAM_COACH">監督・コーチ</option>
+                        <option value="PLAYER">選手</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">監督・選手の場合はチーム選択が必須です</p>
+                    </div>
+                  </>
+                )}
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <button
