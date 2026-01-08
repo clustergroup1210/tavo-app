@@ -86,7 +86,7 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Operator access required' });
     }
 
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, teamId, teamRole } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required' });
@@ -94,6 +94,13 @@ router.post('/', authenticate, async (req, res) => {
 
     if (password.length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    const isOperatorRole = role && role.startsWith('OPERATOR_');
+    const isTeamRole = ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH', 'PLAYER'].includes(teamRole);
+
+    if (!isOperatorRole && isTeamRole && !teamId) {
+      return res.status(400).json({ error: 'チーム役割を選択した場合、チームの選択は必須です' });
     }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -109,7 +116,7 @@ router.post('/', authenticate, async (req, res) => {
       password: hashedPassword
     };
 
-    if (role && role.startsWith('OPERATOR_')) {
+    if (isOperatorRole) {
       const operatorOrg = req.user.organizations?.find(o => 
         ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
       );
@@ -124,10 +131,20 @@ router.post('/', authenticate, async (req, res) => {
       }
     }
 
+    if (teamId && teamRole) {
+      userData.teams = {
+        create: {
+          teamId: teamId,
+          role: teamRole
+        }
+      };
+    }
+
     const user = await prisma.user.create({
       data: userData,
       include: {
-        organizations: true
+        organizations: true,
+        teams: { include: { team: true } }
       }
     });
 
@@ -136,6 +153,7 @@ router.post('/', authenticate, async (req, res) => {
       name: user.name,
       email: user.email,
       organizations: user.organizations,
+      teams: user.teams,
       createdAt: user.createdAt
     });
   } catch (error) {
