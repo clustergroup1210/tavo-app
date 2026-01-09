@@ -14,6 +14,25 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+router.get('/public', async (req, res) => {
+  try {
+    const teams = await prisma.team.findMany({
+      where: { parentId: null },
+      select: {
+        id: true,
+        name: true,
+        logoUrl: true,
+        description: true
+      },
+      orderBy: { sortOrder: 'asc' }
+    });
+    res.json(teams);
+  } catch (error) {
+    console.error('Get public teams error:', error);
+    res.status(500).json({ error: 'Failed to fetch teams' });
+  }
+});
+
 router.get('/', authenticate, async (req, res) => {
   try {
     const isOperator = req.user.organizations?.some(o => 
