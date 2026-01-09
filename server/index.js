@@ -18,6 +18,7 @@ const goalRoutes = require('./routes/goals');
 const calendarRoutes = require('./routes/calendar');
 const announcementRoutes = require('./routes/announcements');
 const teamCategoryRoutes = require('./routes/teamCategories');
+const joinRequestRoutes = require('./routes/joinRequests');
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use('/api/goals', goalRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/team-categories', teamCategoryRoutes);
+app.use('/api/join-requests', joinRequestRoutes);
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));
