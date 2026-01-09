@@ -139,50 +139,52 @@ router.put('/:id/approve', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'この申請は既に処理されています' });
     }
 
-    const player = await prisma.player.create({
-      data: {
-        userId: request.userId,
-        teamId: request.teamId,
-        name: request.playerName
-      }
-    });
+    const updatedRequest = await prisma.$transaction(async (tx) => {
+      const player = await tx.player.create({
+        data: {
+          userId: request.userId,
+          teamId: request.teamId,
+          name: request.playerName
+        }
+      });
 
-    await prisma.playerTeamHistory.create({
-      data: {
-        playerId: player.id,
-        teamId: request.teamId,
-        joinedAt: new Date()
-      }
-    });
+      await tx.playerTeamHistory.create({
+        data: {
+          playerId: player.id,
+          teamId: request.teamId,
+          joinedAt: new Date()
+        }
+      });
 
-    await prisma.userTeam.upsert({
-      where: {
-        userId_teamId_role: {
+      await tx.userTeam.upsert({
+        where: {
+          userId_teamId_role: {
+            userId: request.userId,
+            teamId: request.teamId,
+            role: 'PLAYER'
+          }
+        },
+        update: {},
+        create: {
           userId: request.userId,
           teamId: request.teamId,
           role: 'PLAYER'
         }
-      },
-      update: {},
-      create: {
-        userId: request.userId,
-        teamId: request.teamId,
-        role: 'PLAYER'
-      }
-    });
+      });
 
-    const updatedRequest = await prisma.teamJoinRequest.update({
-      where: { id: req.params.id },
-      data: {
-        status: 'approved',
-        reviewedBy: req.user.id,
-        reviewedAt: new Date()
-      },
-      include: {
-        user: { select: { id: true, name: true, email: true } },
-        team: { select: { id: true, name: true } },
-        reviewer: { select: { id: true, name: true } }
-      }
+      return await tx.teamJoinRequest.update({
+        where: { id: req.params.id },
+        data: {
+          status: 'approved',
+          reviewedBy: req.user.id,
+          reviewedAt: new Date()
+        },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+          team: { select: { id: true, name: true } },
+          reviewer: { select: { id: true, name: true } }
+        }
+      });
     });
 
     res.json(updatedRequest);

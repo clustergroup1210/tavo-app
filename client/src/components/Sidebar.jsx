@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, UserCircle, ClipboardList, Video, 
   Bell, Settings, Building2, UserCog, ListChecks, Database,
   Link2, FileText, TrendingUp, LogOut, Megaphone, ArrowLeft, Shield, Trophy, Target,
-  Calendar
+  Calendar, UserPlus
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -97,6 +97,7 @@ export default function Sidebar() {
           { path: '/users', label: 'ユーザー管理', icon: UserCog },
           { path: '/staff', label: 'スタッフ管理', icon: Shield },
           { path: '/invitations', label: '招待URL管理', icon: Link2 },
+          { path: '/join-requests', label: '参加申請', icon: UserPlus },
           { path: '/team-categories', label: 'カテゴリー管理', icon: Users },
           { path: '/goal-categories', label: '目標カテゴリー管理', icon: Target },
         ];

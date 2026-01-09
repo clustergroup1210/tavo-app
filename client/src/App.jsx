@@ -32,6 +32,7 @@ import Announcements from './pages/Announcements';
 import TeamCategoryManagement from './pages/TeamCategoryManagement';
 import PlayerProgress from './pages/PlayerProgress';
 import MasterSettings from './pages/MasterSettings';
+import JoinRequests from './pages/JoinRequests';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -141,6 +142,7 @@ export default function App() {
           <Route path="/staff" element={<StaffManagement />} />
           <Route path="/team-categories" element={<TeamCategoryManagement />} />
           <Route path="/progress" element={<PlayerProgress />} />
+          <Route path="/join-requests" element={<JoinRequests />} />
         </Route>
       </Route>
     </Routes>
