@@ -194,16 +194,16 @@ model PlayerNote {
 }
 
 model EvaluationItem {
-  id          String   @id @default(uuid())
-  teamId      String
-  parentId    String?
-  name        String
-  description String?
-  position    String?
-  sortOrder   Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(uuid())
+  teamId          String
+  parentId        String?
+  name            String
+  description     String?
+  targetPositions String[] @default([])
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   team        Team             @relation(fields: [teamId], references: [id])
   parent      EvaluationItem?  @relation("ItemHierarchy", fields: [parentId], references: [id])

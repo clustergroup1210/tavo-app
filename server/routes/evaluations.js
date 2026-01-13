@@ -56,15 +56,13 @@ function isOperator(user) {
 
 router.get('/items', authenticate, async (req, res) => {
   try {
-    const { teamId } = req.query;
+    const { teamId, position } = req.query;
     
-    // Get team and check for parent team
     const team = await prisma.team.findUnique({
       where: { id: teamId },
       select: { id: true, parentId: true }
     });
     
-    // Build list of team IDs to check (team + parent)
     const teamIds = [teamId];
     if (team?.parentId) {
       teamIds.push(team.parentId);
@@ -75,8 +73,16 @@ router.get('/items', authenticate, async (req, res) => {
       orderBy: { sortOrder: 'asc' }
     });
 
+    const filterByPosition = (items) => {
+      if (!position) return items;
+      return items.filter(item => {
+        if (!item.targetPositions || item.targetPositions.length === 0) return true;
+        return item.targetPositions.includes(position);
+      });
+    };
+
     const buildHierarchy = (items, parentId = null) => {
-      return items
+      return filterByPosition(items)
         .filter(item => item.parentId === parentId)
         .map(item => ({
           ...item,
@@ -92,14 +98,21 @@ router.get('/items', authenticate, async (req, res) => {
 
 router.post('/items', authenticate, async (req, res) => {
   try {
-    const { teamId, parentId, name, description, position, sortOrder } = req.body;
+    const { teamId, parentId, name, description, targetPositions, sortOrder } = req.body;
 
-    if (!hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
+    if (!hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']) && !isOperator(req.user)) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
     const item = await prisma.evaluationItem.create({
-      data: { teamId, parentId, name, description, position, sortOrder: sortOrder || 0 }
+      data: { 
+        teamId, 
+        parentId, 
+        name, 
+        description, 
+        targetPositions: targetPositions || [],
+        sortOrder: sortOrder || 0 
+      }
     });
 
     res.json(item);
@@ -110,16 +123,23 @@ router.post('/items', authenticate, async (req, res) => {
 
 router.put('/items/:id', authenticate, async (req, res) => {
   try {
-    const { name, description, position, sortOrder, isActive } = req.body;
+    const { name, description, targetPositions, sortOrder, isActive } = req.body;
 
     const item = await prisma.evaluationItem.findUnique({ where: { id: req.params.id } });
-    if (!hasTeamAccess(req.user, item.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
+    if (!hasTeamAccess(req.user, item.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']) && !isOperator(req.user)) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (targetPositions !== undefined) updateData.targetPositions = targetPositions;
+    if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
+    if (isActive !== undefined) updateData.isActive = isActive;
+
     const updated = await prisma.evaluationItem.update({
       where: { id: req.params.id },
-      data: { name, description, position, sortOrder, isActive }
+      data: updateData
     });
 
     res.json(updated);
@@ -201,6 +221,97 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
   }
 });
 
+router.get('/form/:playerId', authenticate, async (req, res) => {
+  try {
+    const { roundId } = req.query;
+    
+    const player = await prisma.player.findUnique({
+      where: { id: req.params.playerId },
+      include: { team: { include: { parent: true } } }
+    });
+    
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
+    const teamIds = [player.teamId];
+    if (player.team?.parentId) {
+      teamIds.push(player.team.parentId);
+    }
+    
+    const allItems = await prisma.evaluationItem.findMany({
+      where: { teamId: { in: teamIds }, isActive: true },
+      orderBy: { sortOrder: 'asc' }
+    });
+
+    const filterByPosition = (items) => {
+      if (!player.position) return items;
+      return items.filter(item => {
+        if (!item.targetPositions || item.targetPositions.length === 0) return true;
+        return item.targetPositions.includes(player.position);
+      });
+    };
+
+    const buildHierarchy = (items, parentId = null) => {
+      return filterByPosition(items)
+        .filter(item => item.parentId === parentId)
+        .map(item => ({
+          ...item,
+          children: buildHierarchy(items, item.id)
+        }));
+    };
+
+    const items = buildHierarchy(allItems);
+
+    let existingEvaluations = { coach: {}, self: {} };
+    let canSubmitCoach = true;
+    let canSubmitSelf = true;
+    let existingCoachRater = null;
+
+    if (roundId) {
+      const evaluations = await prisma.evaluation.findMany({
+        where: { playerId: req.params.playerId, roundId },
+        include: { rater: { select: { id: true, name: true } } }
+      });
+
+      evaluations.forEach(e => {
+        if (e.raterType === 'COACH') {
+          existingEvaluations.coach[e.itemId] = e.score;
+          canSubmitCoach = false;
+          existingCoachRater = e.rater;
+        } else if (e.raterType === 'SELF') {
+          existingEvaluations.self[e.itemId] = e.score;
+          canSubmitSelf = false;
+        }
+      });
+    }
+
+    const isCoach = hasTeamAccess(req.user, player.teamId, [
+      'TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH', 'TEAM_EXTERNAL_COACH'
+    ]) || isOperator(req.user);
+    const isSelf = player.userId === req.user.id;
+
+    res.json({
+      player: {
+        id: player.id,
+        name: player.name,
+        position: player.position,
+        teamId: player.teamId
+      },
+      items,
+      existingEvaluations,
+      permissions: {
+        canSubmitCoach: isCoach && canSubmitCoach,
+        canSubmitSelf: isSelf && canSubmitSelf,
+        existingCoachRater
+      }
+    });
+  } catch (error) {
+    console.error('Evaluation form error:', error);
+    res.status(500).json({ error: 'Failed to fetch evaluation form data' });
+  }
+});
+
 router.post('/', authenticate, async (req, res) => {
   try {
     const { playerId, roundId, evaluations } = req.body;
@@ -212,7 +323,7 @@ router.post('/', authenticate, async (req, res) => {
 
     const isCoach = hasTeamAccess(req.user, player.teamId, [
       'TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH', 'TEAM_EXTERNAL_COACH'
-    ]);
+    ]) || isOperator(req.user);
     const isSelf = player.userId === req.user.id;
 
     if (!isCoach && !isSelf) {
@@ -221,21 +332,35 @@ router.post('/', authenticate, async (req, res) => {
 
     const raterType = isSelf && !isCoach ? 'SELF' : 'COACH';
 
-    const existingEvaluations = await prisma.evaluation.findMany({
-      where: {
-        playerId,
-        roundId,
-        raterUserId: req.user.id,
-        raterType
-      }
-    });
-
-    if (existingEvaluations.length > 0) {
-      return res.status(400).json({ 
-        error: raterType === 'SELF' 
-          ? 'このラウンドで既に自己評価を提出しています' 
-          : 'このラウンドで既にこの選手を評価しています'
+    if (raterType === 'COACH') {
+      const existingCoachEval = await prisma.evaluation.findFirst({
+        where: {
+          playerId,
+          roundId,
+          raterType: 'COACH'
+        },
+        include: { rater: { select: { name: true } } }
       });
+
+      if (existingCoachEval) {
+        return res.status(400).json({ 
+          error: `このラウンドで既に${existingCoachEval.rater.name}が評価を行っています。1ラウンドにつき指導者評価は1名のみです。`
+        });
+      }
+    } else {
+      const existingSelfEval = await prisma.evaluation.findFirst({
+        where: {
+          playerId,
+          roundId,
+          raterType: 'SELF'
+        }
+      });
+
+      if (existingSelfEval) {
+        return res.status(400).json({ 
+          error: 'このラウンドで既に自己評価を提出しています'
+        });
+      }
     }
 
     const created = await prisma.$transaction(
