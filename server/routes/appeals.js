@@ -6,9 +6,21 @@ const { authenticate, hasTeamAccess } = require('../middleware/auth');
 const router = express.Router();
 const prisma = new PrismaClient();
 
+const crypto = require('crypto');
+
+function generateSecureToken() {
+  return crypto.randomBytes(32).toString('base64url');
+}
+
+function isOperator(user) {
+  return user.organizations?.some(o => 
+    ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+  );
+}
+
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { playerId, type = 'simple', comment, expiresAt } = req.body;
+    const { playerId, type = 'simple', selfPrText, recommendationText, expiresAt, displayConfig } = req.body;
 
     const player = await prisma.player.findUnique({ where: { id: playerId } });
     if (!player) {
@@ -18,7 +30,7 @@ router.post('/', authenticate, async (req, res) => {
     const isSelf = player.userId === req.user.id;
     const isCoach = hasTeamAccess(req.user, player.teamId, [
       'TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'
-    ]);
+    ]) || isOperator(req.user);
 
     if (type === 'simple' && !isSelf) {
       return res.status(403).json({ error: 'Only player can create simple appeal' });
@@ -28,13 +40,15 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Only coach can create recommended appeal' });
     }
 
-    const token = uuidv4();
+    const token = generateSecureToken();
     const appealLink = await prisma.appealLink.create({
       data: {
         playerId,
         token,
         type,
-        comment: type === 'recommended' ? comment : null,
+        selfPrText: type === 'simple' ? selfPrText : null,
+        recommendationText: type === 'recommended' ? recommendationText : null,
+        displayConfig: displayConfig || null,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
         createdBy: req.user.id
       },
@@ -77,6 +91,68 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
   }
 });
 
+router.put('/:id', authenticate, async (req, res) => {
+  try {
+    const { selfPrText, recommendationText, isActive, expiresAt, displayConfig } = req.body;
+
+    const appeal = await prisma.appealLink.findUnique({
+      where: { id: req.params.id },
+      include: { player: true }
+    });
+
+    if (!appeal) {
+      return res.status(404).json({ error: 'Appeal not found' });
+    }
+
+    const isSelf = appeal.player.userId === req.user.id;
+    const isCoach = hasTeamAccess(req.user, appeal.player.teamId, [
+      'TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'
+    ]) || isOperator(req.user);
+
+    if (!isSelf && !isCoach) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const updateData = {};
+    
+    if (isSelf && selfPrText !== undefined) {
+      updateData.selfPrText = selfPrText;
+    }
+    
+    if (isCoach && recommendationText !== undefined) {
+      updateData.recommendationText = recommendationText;
+    }
+    
+    if (isCoach && displayConfig !== undefined) {
+      updateData.displayConfig = displayConfig;
+    }
+    
+    if (isActive !== undefined) {
+      updateData.isActive = isActive;
+    }
+    
+    if (expiresAt !== undefined) {
+      updateData.expiresAt = expiresAt ? new Date(expiresAt) : null;
+    }
+
+    const updated = await prisma.appealLink.update({
+      where: { id: req.params.id },
+      data: updateData,
+      include: {
+        creator: { select: { id: true, name: true } }
+      }
+    });
+
+    res.json({
+      ...updated,
+      url: `/appeal/${updated.token}`
+    });
+  } catch (error) {
+    console.error('Update appeal error:', error);
+    res.status(500).json({ error: 'Failed to update appeal' });
+  }
+});
+
 router.get('/public/:token', async (req, res) => {
   try {
     const appeal = await prisma.appealLink.findFirst({
@@ -106,6 +182,9 @@ router.get('/public/:token', async (req, res) => {
     if (appeal.expiresAt && new Date(appeal.expiresAt) < new Date()) {
       return res.status(410).json({ error: 'このアピールページは有効期限が切れています' });
     }
+
+    const displayConfig = appeal.displayConfig || {};
+    const shouldShow = (field) => displayConfig[field] !== false;
 
     const coachEvals = {};
     const selfEvals = {};
@@ -151,31 +230,35 @@ router.get('/public/:token', async (req, res) => {
 
     res.json({
       type: appeal.type,
-      comment: appeal.type === 'recommended' ? appeal.comment : null,
+      selfPrText: appeal.selfPrText,
+      recommendationText: appeal.recommendationText,
       issuer: {
         type: issuerType,
         name: issuerName
       },
       player: {
         name: appeal.player.name,
-        nameRomaji: appeal.player.nameRomaji,
-        position: appeal.player.position,
-        number: appeal.player.number,
-        birthDate: appeal.player.birthDate,
-        height: appeal.player.height,
-        weight: appeal.player.weight,
-        dominantFoot: appeal.player.dominantFoot,
+        nameRomaji: shouldShow('nameRomaji') ? appeal.player.nameRomaji : null,
+        position: shouldShow('position') ? appeal.player.position : null,
+        number: shouldShow('number') ? appeal.player.number : null,
+        birthDate: shouldShow('birthDate') ? appeal.player.birthDate : null,
+        height: shouldShow('height') ? appeal.player.height : null,
+        weight: shouldShow('weight') ? appeal.player.weight : null,
+        dominantFoot: shouldShow('dominantFoot') ? appeal.player.dominantFoot : null,
         photoUrl: appeal.player.photoUrl || appeal.player.passportUrl,
-        roleModel: appeal.type === 'recommended' ? appeal.player.roleModel : null,
-        playStyle: appeal.type === 'recommended' ? appeal.player.playStyle : null,
+        roleModel: shouldShow('roleModel') ? appeal.player.roleModel : null,
+        playStyle: shouldShow('playStyle') ? appeal.player.playStyle : null,
+        previousTeam: shouldShow('previousTeam') ? appeal.player.previousTeam : null,
+        school: shouldShow('school') ? appeal.player.school : null,
         team: appeal.player.team
       },
-      evaluationCategories: Object.entries(categories).map(([name, data]) => ({
+      evaluationCategories: shouldShow('evaluations') ? Object.entries(categories).map(([name, data]) => ({
         name,
         avgCoachScore: data.count > 0 ? (data.totalCoach / data.count).toFixed(1) : null,
         avgSelfScore: data.count > 0 ? (data.totalSelf / data.count).toFixed(1) : null,
         items: data.items
-      })),
+      })) : [],
+      displayConfig,
       createdAt: appeal.createdAt,
       expiresAt: appeal.expiresAt
     });

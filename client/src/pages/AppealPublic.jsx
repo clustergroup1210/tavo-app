@@ -69,7 +69,7 @@ export default function AppealPublic() {
     );
   }
 
-  const { player, issuer, evaluationCategories, type, comment, expiresAt } = appeal;
+  const { player, issuer, evaluationCategories, type, selfPrText, recommendationText, expiresAt } = appeal;
   const age = calculateAge(player.birthDate);
 
   return (
@@ -180,13 +180,23 @@ export default function AppealPublic() {
               </div>
             )}
 
-            {type === 'recommended' && comment && (
+            {selfPrText && (
+              <div className="mb-8 p-5 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
+                <div className="flex items-center gap-2 mb-2">
+                  <User className="w-4 h-4 text-green-600" />
+                  <p className="text-sm font-semibold text-green-800">自己PR</p>
+                </div>
+                <p className="text-sm text-green-700 leading-relaxed whitespace-pre-wrap">{selfPrText}</p>
+              </div>
+            )}
+
+            {recommendationText && (
               <div className="mb-8 p-5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
                 <div className="flex items-center gap-2 mb-2">
                   <Star className="w-4 h-4 text-blue-600" />
                   <p className="text-sm font-semibold text-blue-800">推薦コメント</p>
                 </div>
-                <p className="text-sm text-blue-700 leading-relaxed">{comment}</p>
+                <p className="text-sm text-blue-700 leading-relaxed whitespace-pre-wrap">{recommendationText}</p>
               </div>
             )}
 

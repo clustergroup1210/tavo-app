@@ -258,18 +258,24 @@ model Invitation {
 }
 
 model AppealLink {
-  id          String    @id @default(uuid())
-  playerId    String
-  token       String    @unique
-  type        String
-  comment     String?
-  isActive    Boolean   @default(true)
-  expiresAt   DateTime?
-  createdBy   String?
-  createdAt   DateTime  @default(now())
+  id                 String    @id @default(uuid())
+  playerId           String
+  token              String    @unique
+  type               String
+  comment            String?
+  selfPrText         String?
+  recommendationText String?
+  displayConfig      Json?
+  isActive           Boolean   @default(true)
+  expiresAt          DateTime?
+  createdBy          String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @default(now()) @updatedAt
 
   player  Player @relation(fields: [playerId], references: [id])
   creator User?  @relation(fields: [createdBy], references: [id])
+
+  @@index([token])
 }
 
 model Video {
