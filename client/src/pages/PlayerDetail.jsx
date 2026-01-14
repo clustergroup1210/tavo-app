@@ -11,6 +11,7 @@ import {
   BarChart, Bar, ReferenceLine, Cell
 } from 'recharts';
 import EvaluationComparisonTable from '../components/EvaluationComparisonTable';
+import AppealTab from '../components/AppealTab';
 
 export default function PlayerDetail() {
   const { id } = useParams();
@@ -1102,48 +1103,13 @@ export default function PlayerDetail() {
       )}
 
       {activeTab === 'appeal' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">アピールURL</h2>
-          
-          {isSelf && (
-            <button
-              onClick={() => handleCreateAppeal('simple')}
-              className="mb-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-            >
-              シンプル版URLを発行
-            </button>
-          )}
-
-          {player.appealLinks?.length > 0 ? (
-            <div className="space-y-3">
-              {player.appealLinks.map((link) => (
-                <div key={link.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium text-gray-900">
-                      {link.type === 'simple' ? 'シンプル版' : '推薦付き'}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(link.createdAt).toLocaleDateString('ja-JP')}
-                    </p>
-                  </div>
-                  <a
-                    href={`/appeal/${link.token}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-primary-600 hover:underline font-medium"
-                  >
-                    URLを開く
-                  </a>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Link2 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-sm text-gray-500">アピールURLがありません</p>
-            </div>
-          )}
-        </div>
+        <AppealTab 
+          player={player} 
+          isSelf={isSelf} 
+          isCoachOrAdmin={isCoachOrAdmin}
+          onCreateAppeal={handleCreateAppeal}
+          onRefresh={fetchPlayer}
+        />
       )}
     </div>
   );
