@@ -31,7 +31,14 @@ The system emphasizes a team-centric display and robust role-based access contro
     -   **Calendar System**: Monthly view for practices, matches, meetings, and events, with color-coding, role-based access, and category-based targeting. Supports team-scoped and organization-scoped events. Events can target specific team categories (e.g., U-12, U-15), and players only see events matching their category.
     -   **Announcements System**: Priority levels, publish/draft status, expiration dates, and category-based targeting for team-scoped and organization-scoped announcements. Announcements can target specific team categories, and players only see announcements matching their category.
     -   **Category-Based Targeting**: Both calendar events and announcements support category targeting. Events/announcements without category targets are visible to all team members. Category-targeted content is filtered so players only see content for their assigned category, while coaches/operators see all content. Validation ensures categories belong to the same team, preventing cross-team data leakage.
--   **Public Appeal URL**: Player/coach-generated public profiles for showcasing skills, with random URLs, expiration dates, issuer type display (player/club), and comprehensive player info including evaluation categories with coach/self scores. Expired appeals return 410 status.
+-   **Public Appeal URL**: Player/coach-generated public profiles for showcasing skills, with secure random tokens (crypto.randomBytes), expiration dates, issuer type display (player/club), and comprehensive player info including evaluation categories with coach/self scores. Features include:
+    -   Self-PR text (editable by player)
+    -   Coach recommendation text (editable by team coaches/admins)
+    -   Display configuration (controls visibility of personal info fields)
+    -   Appeal management page for players (/appeal-management)
+    -   Coach-facing appeal editing in PlayerDetail
+    -   Expired appeals return 410 status
+    -   Authorization: Players can view/manage their own appeals; coaches can view/manage team player appeals
 -   **Invitation URL System**: Team-based invitation system for players, parents, and staff with role-specific flows. Parent invitations require player selection and auto-create PlayerParent relationships upon registration. Security validation ensures players belong to the target team.
 -   **System Administration**: Dedicated operator dashboard with system-wide statistics, team management, user management, and team impersonation capabilities.
 -   **Data Visibility**: Evaluation data and other records are filtered based on player-team membership periods, ensuring coaches only see relevant historical data.
