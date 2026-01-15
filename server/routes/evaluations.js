@@ -1,6 +1,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { authenticate, hasTeamAccess } = require('../middleware/auth');
+const { createNotification } = require('../services/notificationService');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -375,6 +376,33 @@ router.post('/', authenticate, async (req, res) => {
         }
       }))
     );
+
+    if (raterType === 'COACH' && player.userId) {
+      createNotification({
+        userId: player.userId,
+        type: 'EVALUATION',
+        title: '評価が完了しました',
+        message: `${req.user.name}があなたの評価を行いました`,
+        linkUrl: `/players/${playerId}?tab=evaluations`
+      });
+    } else if (raterType === 'SELF') {
+      const coaches = await prisma.userTeam.findMany({
+        where: {
+          teamId: player.teamId,
+          role: { in: ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'] }
+        },
+        select: { userId: true }
+      });
+      for (const coach of coaches) {
+        createNotification({
+          userId: coach.userId,
+          type: 'SELF_EVALUATION',
+          title: '自己評価が提出されました',
+          message: `${player.name}が自己評価を提出しました`,
+          linkUrl: `/players/${playerId}?tab=evaluations`
+        });
+      }
+    }
 
     res.json(created);
   } catch (error) {
