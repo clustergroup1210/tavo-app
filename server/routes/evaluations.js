@@ -389,7 +389,8 @@ router.post('/', authenticate, async (req, res) => {
       const coaches = await prisma.userTeam.findMany({
         where: {
           teamId: player.teamId,
-          role: { in: ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'] }
+          role: { in: ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'] },
+          isActive: true
         },
         select: { userId: true }
       });

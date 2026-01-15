@@ -43,6 +43,12 @@ The system emphasizes a team-centric display and robust role-based access contro
 -   **System Administration**: Dedicated operator dashboard with system-wide statistics, team management, user management, and team impersonation capabilities.
 -   **Data Visibility**: Evaluation data and other records are filtered based on player-team membership periods, ensuring coaches only see relevant historical data.
 -   **Parent Team Inheritance**: Evaluation items and rounds can be inherited from parent teams for sub-teams.
+-   **Notification System**: 
+    -   Web notifications via header bell icon with unread count badge
+    -   Notification triggers: Coach evaluation, Self-evaluation, Task assignment, Video comments
+    -   Per-user notification settings (enable/disable each type)
+    -   Email notification option (mock implementation, console output)
+    -   Notification settings page at /notification-settings
 
 ### UI/UX Decisions
 -   **Sidebar Navigation**: Clevio-style left-fixed sidebar, dynamic based on user role.
