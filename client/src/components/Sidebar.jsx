@@ -109,9 +109,9 @@ export default function Sidebar() {
     if (isPlayer()) {
       return {
         main: [
+          { path: '/player-dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
           { path: '/mypage', label: 'マイページ', icon: UserCircle },
           { path: '/evaluations/entry', label: '評価', icon: ClipboardList },
-          { path: '/progress', label: '上達状況', icon: TrendingUp },
           { path: '/videos', label: '動画', icon: Video },
           { path: '/calendar', label: 'カレンダー', icon: Calendar },
           { path: '/announcements', label: 'お知らせ', icon: Megaphone },

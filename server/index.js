@@ -20,6 +20,7 @@ const announcementRoutes = require('./routes/announcements');
 const teamCategoryRoutes = require('./routes/teamCategories');
 const joinRequestRoutes = require('./routes/joinRequests');
 const notificationRoutes = require('./routes/notifications');
+const playerDashboardRoutes = require('./routes/playerDashboard');
 
 const app = express();
 
@@ -44,6 +45,7 @@ app.use('/api/announcements', announcementRoutes);
 app.use('/api/team-categories', teamCategoryRoutes);
 app.use('/api/join-requests', joinRequestRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/player-dashboard', playerDashboardRoutes);
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));
