@@ -49,6 +49,12 @@ The system emphasizes a team-centric display and robust role-based access contro
     -   Per-user notification settings (enable/disable each type)
     -   Email notification option (mock implementation, console output)
     -   Notification settings page at /notification-settings
+-   **Player Dashboard** (`/player-dashboard`):
+    -   Three-tab dashboard: Summary, Evaluation Analysis, Progress Tracking
+    -   Summary tab: Total score, achievement rate (progress bar), latest round, unread notifications, next actions
+    -   Evaluation tab: Radar chart (coach vs self by category), gap analysis bar chart, detailed score table
+    -   Progress tab: Line chart for score trends over evaluation rounds with category filter
+    -   Uses Recharts for all visualizations with responsive design for mobile
 
 ### UI/UX Decisions
 -   **Sidebar Navigation**: Clevio-style left-fixed sidebar, dynamic based on user role.

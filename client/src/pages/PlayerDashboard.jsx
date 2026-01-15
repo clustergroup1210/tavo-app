@@ -32,11 +32,9 @@ export default function PlayerDashboard() {
 
   const fetchPlayerInfo = async () => {
     try {
-      const playersRes = await fetch('/api/players', { credentials: 'include' });
-      const players = await playersRes.json();
-      const myPlayer = players.find(p => p.userId === user?.id);
-      
-      if (myPlayer) {
+      const res = await fetch('/api/player-dashboard/my-player', { credentials: 'include' });
+      if (res.ok && res.status !== 204) {
+        const myPlayer = await res.json();
         setPlayerId(myPlayer.id);
         fetchDashboardData(myPlayer.id);
       } else {

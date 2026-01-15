@@ -1,9 +1,44 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
-const { authenticate } = require('../middleware/auth');
+const prisma = require('../lib/prisma');
+const { authenticate, hasTeamAccess } = require('../middleware/auth');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+
+function isOperator(user) {
+  return user.organizations?.some(o => 
+    ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+  );
+}
+
+router.get('/my-player', authenticate, async (req, res) => {
+  try {
+    const player = await prisma.player.findFirst({
+      where: { userId: req.user.id },
+      include: { 
+        team: { select: { id: true, name: true } },
+        teamCategory: { select: { id: true, name: true } }
+      }
+    });
+    
+    if (!player) {
+      return res.status(204).send();
+    }
+    
+    res.json({
+      id: player.id,
+      name: player.name,
+      photoUrl: player.photoUrl,
+      position: player.position,
+      number: player.number,
+      teamId: player.teamId,
+      teamName: player.team.name,
+      categoryName: player.teamCategory?.name
+    });
+  } catch (error) {
+    console.error('My player error:', error);
+    res.status(500).json({ error: 'Failed to fetch player data' });
+  }
+});
 
 router.get('/:playerId', authenticate, async (req, res) => {
   try {
@@ -25,7 +60,7 @@ router.get('/:playerId', authenticate, async (req, res) => {
     const isParentOfPlayer = req.user.parentPlayers?.some(pp => pp.playerId === player.id);
     
     if (!isSelf && !isParentOfPlayer) {
-      return res.status(403).json({ error: 'Access denied' });
+      return res.status(403).json({ error: 'Access denied - use PlayerDetail for staff access' });
     }
 
     const teamIds = [player.teamId];
@@ -50,14 +85,14 @@ router.get('/:playerId', authenticate, async (req, res) => {
         where: { teamId: { in: teamIds }, isActive: true },
         orderBy: { sortOrder: 'asc' }
       }),
-      prisma.notification.findMany({
+      isSelf ? prisma.notification.findMany({
         where: { userId: req.user.id, isRead: false },
         orderBy: { createdAt: 'desc' },
         take: 5
-      }),
-      prisma.notification.count({
+      }) : Promise.resolve([]),
+      isSelf ? prisma.notification.count({
         where: { userId: req.user.id, isRead: false }
-      })
+      }) : Promise.resolve(0)
     ]);
 
     const latestRound = rounds[0] || null;
@@ -171,7 +206,7 @@ router.get('/:playerId', authenticate, async (req, res) => {
 
     const allCategories = [...new Set(progressData.flatMap(d => Object.keys(d.categories)))];
 
-    const hasPendingSelfEval = latestRound && selfCount === 0 && coachCount > 0;
+    const hasPendingSelfEval = isSelf && latestRound && selfCount === 0 && coachCount > 0;
     const nextActions = [];
     if (hasPendingSelfEval) {
       nextActions.push({
