@@ -2,11 +2,11 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { authenticate, hasTeamAccess } = require('../middleware/auth');
+const { transferPlayer } = require('../services/transferService');
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/'),
@@ -176,21 +176,26 @@ router.put('/:id', authenticate, async (req, res) => {
     if (teamCategoryId !== undefined && (isCoachOrAdmin || isOperator)) {
       updateData.teamCategoryId = teamCategoryId || null;
     }
+    
     if (teamId !== undefined && canChangeTeam && teamId !== player.teamId) {
-      
-      await prisma.playerTeamHistory.updateMany({
-        where: { 
-          playerId: req.params.id, 
-          teamId: player.teamId,
-          leftAt: null 
-        },
-        data: { leftAt: new Date() }
+      const transferResult = await transferPlayer(req.params.id, teamId, { 
+        newTeamCategoryId: teamCategoryId || null 
       });
       
-      updateData.teamId = teamId;
-      await prisma.playerTeamHistory.create({
-        data: { playerId: req.params.id, teamId, joinedAt: new Date() }
+      if (Object.keys(updateData).length > 0) {
+        delete updateData.teamCategoryId;
+        await prisma.player.update({
+          where: { id: req.params.id },
+          data: updateData
+        });
+      }
+      
+      const finalPlayer = await prisma.player.findUnique({
+        where: { id: req.params.id },
+        include: { team: { include: { parent: true } }, teamCategory: true }
       });
+      
+      return res.json(finalPlayer);
     }
 
     const updated = await prisma.player.update({
@@ -282,13 +287,6 @@ router.get('/:id/history', authenticate, async (req, res) => {
   try {
     const history = await prisma.playerTeamHistory.findMany({
       where: { playerId: req.params.id },
-      include: {
-        player: {
-          include: {
-            team: { select: { id: true, name: true } }
-          }
-        }
-      },
       orderBy: { joinedAt: 'desc' }
     });
 
@@ -306,6 +304,17 @@ router.get('/:id/history', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Get player history error:', error);
     res.status(500).json({ error: 'Failed to fetch player history' });
+  }
+});
+
+router.get('/:id/transfers', authenticate, async (req, res) => {
+  try {
+    const { getTransferHistory } = require('../services/transferService');
+    const transfers = await getTransferHistory(req.params.id);
+    res.json(transfers);
+  } catch (error) {
+    console.error('Get transfer history error:', error);
+    res.status(500).json({ error: 'Failed to fetch transfer history' });
   }
 });
 

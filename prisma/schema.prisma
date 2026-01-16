@@ -56,6 +56,8 @@ model Team {
   calendarEvents   CalendarEvent[]
   announcements    Announcement[]
   joinRequests     TeamJoinRequest[]
+  transfersFrom    TransferHistory[] @relation("TransferFromTeam")
+  transfersTo      TransferHistory[] @relation("TransferToTeam")
 }
 
 model User {
@@ -132,17 +134,18 @@ model Player {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  user         User?          @relation(fields: [userId], references: [id])
-  team         Team           @relation(fields: [teamId], references: [id])
-  teamCategory TeamCategory?  @relation(fields: [teamCategoryId], references: [id])
-  parents      PlayerParent[]
-  evaluations  Evaluation[]
-  appealLinks  AppealLink[]
-  videos       Video[]
-  teamHistory  PlayerTeamHistory[]
-  notes        PlayerNote[]
-  goals        Goal[]
-  invitations  Invitation[]
+  user             User?          @relation(fields: [userId], references: [id])
+  team             Team           @relation(fields: [teamId], references: [id])
+  teamCategory     TeamCategory?  @relation(fields: [teamCategoryId], references: [id])
+  parents          PlayerParent[]
+  evaluations      Evaluation[]
+  appealLinks      AppealLink[]
+  videos           Video[]
+  teamHistory      PlayerTeamHistory[]
+  notes            PlayerNote[]
+  goals            Goal[]
+  invitations      Invitation[]
+  transferHistory  TransferHistory[]
 }
 
 model TeamCategory {
@@ -440,4 +443,22 @@ model NotificationSetting {
   updatedAt             DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TransferHistory {
+  id            String   @id @default(uuid())
+  playerId      String
+  fromTeamId    String
+  toTeamId      String
+  transferredAt DateTime @default(now())
+  snapshotData  Json
+  createdAt     DateTime @default(now())
+
+  player   Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  fromTeam Team   @relation("TransferFromTeam", fields: [fromTeamId], references: [id])
+  toTeam   Team   @relation("TransferToTeam", fields: [toTeamId], references: [id])
+
+  @@index([playerId])
+  @@index([fromTeamId])
+  @@index([toTeamId])
 }
