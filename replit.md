@@ -43,6 +43,12 @@ The system emphasizes a team-centric display and robust role-based access contro
 -   **System Administration**: Dedicated operator dashboard with system-wide statistics, team management, user management, and team impersonation capabilities.
 -   **Data Visibility**: Evaluation data and other records are filtered based on player-team membership periods, ensuring coaches only see relevant historical data.
 -   **Parent Team Inheritance**: Evaluation items and rounds can be inherited from parent teams for sub-teams.
+-   **Player Transfer System**: 
+    -   Data ownership: All evaluations, goals, videos are tied to player ID (not team), following the player across transfers
+    -   Transfer API (`/api/transfers`) with transactional safety
+    -   Snapshot preservation: Full player state (scores, achievement rate, profile data) captured as JSON at transfer time
+    -   Authorization: Requires operator privileges OR admin access to both source and destination teams
+    -   Transfer history tracking with snapshot access for former teams
 -   **Notification System**: 
     -   Web notifications via header bell icon with unread count badge
     -   Notification triggers: Coach evaluation, Self-evaluation, Task assignment, Video comments
