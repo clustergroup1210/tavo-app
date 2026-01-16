@@ -15,8 +15,21 @@ function isOperator(user) {
   );
 }
 
-function hasTeamMembership(user, teamId) {
-  return user.teams?.some(ut => ut.teamId === teamId);
+async function hasTeamMembershipOrParent(user, teamId) {
+  if (user.teams?.some(ut => ut.teamId === teamId)) {
+    return true;
+  }
+  
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    select: { parentId: true }
+  });
+  
+  if (team?.parentId && user.teams?.some(ut => ut.teamId === team.parentId)) {
+    return true;
+  }
+  
+  return false;
 }
 
 router.get('/', authenticate, async (req, res) => {
@@ -27,8 +40,8 @@ router.get('/', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'teamId is required' });
     }
     
-    // Enforce team isolation: user must be a team member or an operator
-    if (!hasTeamMembership(req.user, teamId) && !isOperator(req.user)) {
+    const hasAccess = await hasTeamMembershipOrParent(req.user, teamId);
+    if (!hasAccess && !isOperator(req.user)) {
       return res.status(403).json({ error: 'Access denied' });
     }
     
