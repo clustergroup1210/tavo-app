@@ -32,8 +32,8 @@ router.post('/', authenticate, async (req, res) => {
     const hasFromTeamAccess = hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']);
     const hasToTeamAccess = hasTeamAccess(req.user, newTeamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']);
 
-    if (!isOp && !hasFromTeamAccess) {
-      return res.status(403).json({ error: 'You must have admin access to the current team' });
+    if (!isOp && (!hasFromTeamAccess || !hasToTeamAccess)) {
+      return res.status(403).json({ error: 'Transfer requires admin access to both source and destination teams, or operator privileges' });
     }
 
     const result = await transferPlayer(playerId, newTeamId, { newTeamCategoryId });

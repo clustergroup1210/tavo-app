@@ -1,7 +1,7 @@
 const prisma = require('../lib/prisma');
 
-async function getPlayerSnapshot(playerId) {
-  const player = await prisma.player.findUnique({
+async function getPlayerSnapshot(playerId, txClient = prisma) {
+  const player = await txClient.player.findUnique({
     where: { id: playerId },
     include: {
       team: { select: { id: true, name: true } },
@@ -125,7 +125,7 @@ async function transferPlayer(playerId, newTeamId, options = {}) {
       throw new Error('Target team not found');
     }
 
-    const snapshot = await getPlayerSnapshot(playerId);
+    const snapshot = await getPlayerSnapshot(playerId, tx);
 
     await tx.transferHistory.create({
       data: {
