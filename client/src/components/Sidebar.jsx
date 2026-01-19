@@ -5,11 +5,11 @@ import {
   LayoutDashboard, Users, UserCircle, ClipboardList, Video, 
   Bell, Settings, Building2, UserCog, ListChecks, Database,
   Link2, FileText, TrendingUp, LogOut, Megaphone, ArrowLeft, Shield, Trophy, Target,
-  Calendar, UserPlus
+  Calendar, UserPlus, X
 } from 'lucide-react';
 import clsx from 'clsx';
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }) {
   const { user, currentTeam, teams, setCurrentTeam, logout, isOperator, isTeamAdmin, isCoach, isPlayer, isParent, playerData } = useAuth();
   const location = useLocation();
   const [organizations, setOrganizations] = useState([]);
@@ -20,6 +20,12 @@ export default function Sidebar() {
       fetchOrganizations();
     }
   }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      onClose?.();
+    }
+  }, [location.pathname]);
 
   const fetchOrganizations = async () => {
     try {
@@ -160,8 +166,24 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 flex flex-col">
+    <aside
+      className={clsx(
+        'fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 flex flex-col z-50 transition-transform duration-300',
+        'lg:translate-x-0',
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      )}
+    >
       <div className="p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between lg:hidden mb-3">
+          <span className="text-sm font-medium text-gray-500">メニュー</span>
+          <button
+            onClick={onClose}
+            className="p-1 text-gray-400 hover:text-gray-600 rounded"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
         {isOperator() && (
           <Link
             to="/admin"

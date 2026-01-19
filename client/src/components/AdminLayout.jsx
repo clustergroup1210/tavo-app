@@ -1,13 +1,35 @@
-import React from 'react';
+import React, { useState } from 'react';
 import AdminSidebar from './AdminSidebar';
+import { Menu } from 'lucide-react';
 
 export default function AdminLayout({ children }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <AdminSidebar />
-      <main className="flex-1 ml-64 p-8">
-        {children}
-      </main>
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      <div className="flex-1 lg:ml-64 flex flex-col">
+        <header className="h-14 bg-white border-b border-gray-200 flex items-center px-4 lg:hidden sticky top-0 z-30">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <span className="ml-3 font-semibold text-gray-900">システム管理</span>
+        </header>
+        <main className="flex-1 p-4 lg:p-8">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
