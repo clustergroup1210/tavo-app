@@ -22,6 +22,7 @@ export default function MyPage() {
   const [editingGoalId, setEditingGoalId] = useState(null);
   const [editingGoalContent, setEditingGoalContent] = useState('');
   const passportInputRef = useRef(null);
+  const photoInputRef = useRef(null);
 
   useEffect(() => {
     fetchMyData();
@@ -119,6 +120,28 @@ export default function MyPage() {
       previousTeam: playerData?.previousTeam || '',
     });
     setEditing(false);
+  };
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !playerData) return;
+
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    try {
+      const res = await fetch(`/api/players/${playerData.id}/photo`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setPlayerData({ ...playerData, photoUrl: updated.photoUrl });
+      }
+    } catch (error) {
+      console.error('Failed to upload photo:', error);
+    }
   };
 
   const handlePassportUpload = async (e) => {
@@ -237,7 +260,7 @@ export default function MyPage() {
         <div className="bg-gradient-to-r from-primary-500 to-primary-600 p-6">
           <div className="flex items-start gap-6">
             <div className="flex gap-4">
-              <div className="relative group">
+              <div className="relative group flex flex-col items-center">
                 <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-white/20 flex items-center justify-center border-4 border-white/30 shadow-xl overflow-hidden">
                   {playerData.photoUrl ? (
                     <img
@@ -249,33 +272,42 @@ export default function MyPage() {
                     <UserCircle className="w-20 h-20 text-white/60" />
                   )}
                 </div>
+                <span className="mt-1 text-xs text-white/80">プロフィール</span>
+                <label className="absolute bottom-5 -right-1 p-1.5 bg-white rounded-full shadow-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                  <Upload className="w-3.5 h-3.5 text-primary-600" />
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                  />
+                </label>
               </div>
               
-              <div className="relative group">
-                <div className="flex flex-col items-center">
-                  <div className="w-16 h-20 md:w-20 md:h-24 rounded-lg bg-white/20 flex items-center justify-center border-2 border-white/30 shadow-lg overflow-hidden">
-                    {playerData.passportUrl ? (
-                      <img
-                        src={playerData.passportUrl}
-                        alt="選手証"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Camera className="w-6 h-6 text-white/60" />
-                    )}
-                  </div>
-                  <span className="mt-1 text-xs text-white/80">選手証</span>
-                  <label className="absolute -bottom-1 -right-1 p-1.5 bg-white rounded-full shadow-lg cursor-pointer hover:bg-gray-100 transition-colors">
-                    <Upload className="w-3.5 h-3.5 text-primary-600" />
-                    <input
-                      ref={passportInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handlePassportUpload}
-                      className="hidden"
+              <div className="relative group flex flex-col items-center">
+                <div className="w-16 h-20 md:w-20 md:h-24 rounded-lg bg-white/20 flex items-center justify-center border-2 border-white/30 shadow-lg overflow-hidden">
+                  {playerData.passportUrl ? (
+                    <img
+                      src={playerData.passportUrl}
+                      alt="選手証"
+                      className="w-full h-full object-cover"
                     />
-                  </label>
+                  ) : (
+                    <Camera className="w-6 h-6 text-white/60" />
+                  )}
                 </div>
+                <span className="mt-1 text-xs text-white/80">選手証</span>
+                <label className="absolute bottom-5 -right-1 p-1.5 bg-white rounded-full shadow-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                  <Upload className="w-3.5 h-3.5 text-primary-600" />
+                  <input
+                    ref={passportInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePassportUpload}
+                    className="hidden"
+                  />
+                </label>
               </div>
             </div>
 
