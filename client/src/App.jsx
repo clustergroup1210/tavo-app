@@ -69,7 +69,7 @@ function OperatorRoute({ children }) {
 }
 
 function RootRedirect() {
-  const { isOperator, loading } = useAuth();
+  const { isOperator, isPlayer, loading } = useAuth();
 
   if (loading) {
     return (
@@ -79,7 +79,13 @@ function RootRedirect() {
     );
   }
 
-  return isOperator() ? <Navigate to="/admin" replace /> : <Navigate to="/dashboard" replace />;
+  if (isOperator()) {
+    return <Navigate to="/admin" replace />;
+  }
+  if (isPlayer()) {
+    return <Navigate to="/player-dashboard" replace />;
+  }
+  return <Navigate to="/dashboard" replace />;
 }
 
 function AdminLayoutWrapper() {

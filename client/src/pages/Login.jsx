@@ -17,7 +17,13 @@ export default function Login() {
 
     try {
       const result = await login(email, password);
-      navigate(result.roles?.isOperator ? '/admin' : '/dashboard');
+      if (result.roles?.isOperator) {
+        navigate('/admin');
+      } else if (result.roles?.isPlayer) {
+        navigate('/player-dashboard');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
