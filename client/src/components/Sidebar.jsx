@@ -196,9 +196,9 @@ export default function Sidebar({ isOpen, onClose }) {
         <div className="flex items-center gap-3">
           {isPlayer() && playerData ? (
             <>
-              {playerData.passportUrl ? (
+              {playerData.photoUrl ? (
                 <img
-                  src={playerData.passportUrl}
+                  src={playerData.photoUrl}
                   alt=""
                   className="w-10 h-10 rounded-full object-cover"
                 />
