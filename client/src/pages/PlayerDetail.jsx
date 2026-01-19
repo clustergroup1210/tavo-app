@@ -220,6 +220,25 @@ export default function PlayerDetail() {
     }
   };
 
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    try {
+      await fetch(`/api/players/${id}/photo`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      fetchPlayer();
+    } catch (error) {
+      console.error('Failed to upload photo:', error);
+    }
+  };
+
   const handlePassportUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -380,7 +399,7 @@ export default function PlayerDetail() {
       <div className="bg-gradient-to-r from-primary-600 to-primary-800 rounded-2xl shadow-lg p-6 text-white">
         <div className="flex flex-col md:flex-row items-center gap-6">
           <div className="flex gap-4 flex-shrink-0">
-            <div className="relative">
+            <div className="relative flex flex-col items-center">
               {player.photoUrl ? (
                 <img
                   src={player.photoUrl}
@@ -391,6 +410,18 @@ export default function PlayerDetail() {
                 <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-white/20 flex items-center justify-center border-4 border-white/30">
                   <UserCircle className="w-20 h-20 text-white/60" />
                 </div>
+              )}
+              <span className="mt-1 text-xs text-white/80">プロフィール</span>
+              {(isSelf || isCoachOrAdmin) && (
+                <label className="absolute bottom-5 -right-1 p-1.5 bg-white rounded-full shadow-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                  <Upload className="w-3.5 h-3.5 text-primary-600" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                  />
+                </label>
               )}
             </div>
             
