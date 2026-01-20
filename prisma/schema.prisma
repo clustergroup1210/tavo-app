@@ -7,15 +7,38 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// RBAC Role Definitions
+// ============================================
+// Category A: Operations (Global Scope)
+//   - SUPER_ADMIN: Full system access including settings and audit logs
+//   - ADMIN: Team and user management capabilities
+//   - OPERATOR: Most operations allowed, but no dangerous operations (hard delete)
+//   - EXTERNAL: Read-only access to designated areas, limited evaluation
+//
+// Category B: Team (Team Scope)
+//   - TEAM_MANAGER: Full team authority (create players, invite staff, evaluate)
+//   - COACH: Evaluate assigned players, manage tasks/videos
+//   - GUEST_COACH: Evaluate only explicitly assigned players
+//
+// Category C: User (Self Scope)
+//   - PLAYER: View/edit own data only
+//   - PARENT: View child's data only (no edit)
+// ============================================
+
 enum RoleType {
-  OPERATOR_ADMIN
-  OPERATOR_MANAGER
-  OPERATOR_STAFF
-  OPERATOR_EXTERNAL
-  TEAM_ADMIN
-  TEAM_HEAD_COACH
-  TEAM_COACH
-  TEAM_EXTERNAL_COACH
+  // Operations (Global Scope)
+  SUPER_ADMIN
+  ADMIN
+  OPERATOR
+  EXTERNAL
+
+  // Team (Team Scope)
+  TEAM_MANAGER
+  COACH
+  GUEST_COACH
+
+  // User (Self Scope)
   PLAYER
   PARENT
 }
