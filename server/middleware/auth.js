@@ -4,6 +4,18 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
+const RolePermissions = {
+  SUPER_ADMIN: ['*'],
+  ADMIN: ['user:create', 'user:read', 'user:update', 'user:delete', 'team:create', 'team:read', 'team:update', 'team:delete', 'player:create', 'player:read', 'player:update', 'player:delete', 'evaluation:create', 'evaluation:read', 'evaluation:update', 'evaluation:delete', 'video:create', 'video:read', 'video:update', 'video:delete', 'video:comment', 'goal:create', 'goal:read', 'goal:update', 'goal:delete', 'calendar:create', 'calendar:read', 'calendar:update', 'calendar:delete', 'announcement:create', 'announcement:read', 'announcement:update', 'announcement:delete', 'invitation:create', 'invitation:read', 'invitation:delete', 'staff:manage', 'appeal:create', 'appeal:read', 'appeal:update', 'appeal:delete', 'transfer:execute', 'notes:create', 'notes:read', 'notes:update', 'notes:delete'],
+  OPERATOR: ['user:create', 'user:read', 'user:update', 'user:delete', 'team:create', 'team:read', 'team:update', 'team:delete', 'player:create', 'player:read', 'player:update', 'player:delete', 'evaluation:create', 'evaluation:read', 'evaluation:update', 'evaluation:delete', 'video:create', 'video:read', 'video:update', 'video:delete', 'video:comment', 'goal:create', 'goal:read', 'goal:update', 'goal:delete', 'calendar:create', 'calendar:read', 'calendar:update', 'calendar:delete', 'announcement:create', 'announcement:read', 'announcement:update', 'announcement:delete', 'invitation:create', 'invitation:read', 'invitation:delete', 'staff:manage', 'appeal:create', 'appeal:read', 'appeal:update', 'appeal:delete', 'notes:create', 'notes:read', 'notes:update', 'notes:delete'],
+  EXTERNAL: ['team:read', 'player:read', 'evaluation:read', 'evaluation:create', 'video:read', 'calendar:read', 'announcement:read'],
+  TEAM_MANAGER: ['player:create', 'player:read', 'player:update', 'player:delete', 'evaluation:create', 'evaluation:read', 'evaluation:update', 'evaluation:delete', 'video:create', 'video:read', 'video:update', 'video:delete', 'video:comment', 'goal:create', 'goal:read', 'goal:update', 'goal:delete', 'calendar:create', 'calendar:read', 'calendar:update', 'calendar:delete', 'announcement:create', 'announcement:read', 'announcement:update', 'announcement:delete', 'invitation:create', 'invitation:read', 'invitation:delete', 'staff:manage', 'appeal:create', 'appeal:read', 'appeal:update', 'appeal:delete', 'notes:create', 'notes:read', 'notes:update', 'notes:delete'],
+  COACH: ['player:read', 'player:update', 'evaluation:create', 'evaluation:read', 'evaluation:update', 'video:create', 'video:read', 'video:update', 'video:comment', 'goal:read', 'goal:update', 'calendar:create', 'calendar:read', 'calendar:update', 'announcement:read', 'appeal:read', 'appeal:update', 'notes:create', 'notes:read', 'notes:update'],
+  GUEST_COACH: ['player:read', 'evaluation:create', 'evaluation:read', 'video:read', 'video:comment', 'goal:read', 'calendar:read', 'announcement:read'],
+  PLAYER: ['player:read:own', 'player:update:own', 'evaluation:read:own', 'evaluation:self', 'video:read', 'goal:read:own', 'goal:create', 'goal:update', 'calendar:read', 'announcement:read', 'appeal:create', 'appeal:read', 'appeal:update'],
+  PARENT: ['player:read:own', 'evaluation:read:own', 'video:read', 'goal:read:own', 'calendar:read', 'announcement:read']
+};
+
 const authenticate = async (req, res, next) => {
   try {
     const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
@@ -105,6 +117,24 @@ const getUserRoles = (user) => {
     highestRole = 'PARENT';
   }
 
+  const allRoles = [];
+  for (const org of user.organizations || []) {
+    allRoles.push(org.role);
+  }
+  for (const team of user.teams || []) {
+    allRoles.push(team.role);
+  }
+  if (user.players?.length > 0) allRoles.push('PLAYER');
+  if (user.parentPlayers?.length > 0) allRoles.push('PARENT');
+
+  const permissions = new Set();
+  for (const role of allRoles) {
+    const rolePerms = RolePermissions[role] || [];
+    for (const perm of rolePerms) {
+      permissions.add(perm);
+    }
+  }
+
   return {
     ...roles,
     isOperator,
@@ -112,7 +142,8 @@ const getUserRoles = (user) => {
     teamAdminTeams: teamManagerTeams,
     coachTeams,
     guestCoachTeams,
-    highestRole
+    highestRole,
+    permissions: Array.from(permissions)
   };
 };
 

@@ -22,7 +22,21 @@ A SaaS-type player development support system for sports teams, designed with a 
 The system emphasizes a team-centric display and robust role-based access control. Internal IDs are separated from display names to maintain data integrity while providing user-friendly interfaces. The UI/UX prioritizes clear, intuitive navigation and data visualization, particularly for player progress and evaluations.
 
 ### Key Features
--   **Role-Based Access Control**: Granular permissions at organization, team, and individual levels (Operator Admin, Team Head Coach, Player, Parent, etc.).
+-   **Role-Based Access Control (RBAC)**: Comprehensive 9-role system across 3 categories with granular permissions:
+    -   **Operations (Global Scope)**:
+        -   `SUPER_ADMIN`: Full system access including settings and audit logs
+        -   `ADMIN`: Team and user management capabilities
+        -   `OPERATOR`: Most operations allowed, but no dangerous operations (hard delete)
+        -   `EXTERNAL`: Read-only access to designated areas, limited evaluation
+    -   **Team (Team Scope)**:
+        -   `TEAM_MANAGER`: Full team authority (create players, invite staff, evaluate)
+        -   `COACH`: Evaluate assigned players, manage tasks/videos
+        -   `GUEST_COACH`: Evaluate only explicitly assigned players
+    -   **User (Self Scope)**:
+        -   `PLAYER`: View/edit own data only
+        -   `PARENT`: View child's data only (no edit)
+    -   **Permission System**: 40+ granular permissions defined in `server/middleware/permissions.js`
+    -   **Role Hierarchy**: Numeric levels for permission inheritance (SUPER_ADMIN: 100 → PARENT: 15)
 -   **Team Management**: Profile management, player roster, invitation system for onboarding staff and players.
 -   **Evaluation System**: Hierarchical evaluation items, distinct evaluation rounds, coach and self-evaluations with historical data preservation, and comprehensive visualization using Recharts (progress charts, heatmaps).
 -   **Player Management**: Detailed player profiles with personal information, JFA Passport photo upload, role model/play style fields, and coach notes.
