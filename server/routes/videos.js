@@ -131,7 +131,7 @@ router.put('/:id', authenticate, async (req, res) => {
     }
 
     const isUploader = video.uploadedBy === req.user.id;
-    const isCoach = video.player && hasTeamAccess(req.user, video.player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
+    const isCoach = video.player && hasTeamAccess(req.user, video.player.teamId, ['TEAM_MANAGER', 'COACH', 'COACH']);
     const isParent = req.user.parentPlayers?.some(pp => pp.playerId === video.playerId);
 
     if (isParent && !isUploader) {
@@ -169,7 +169,7 @@ router.delete('/:id', authenticate, async (req, res) => {
     }
 
     const isUploader = video.uploadedBy === req.user.id;
-    const isCoach = video.player && hasTeamAccess(req.user, video.player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']);
+    const isCoach = video.player && hasTeamAccess(req.user, video.player.teamId, ['TEAM_MANAGER', 'COACH']);
     const isParent = req.user.parentPlayers?.some(pp => pp.playerId === video.playerId);
 
     if (isParent && !isUploader) {

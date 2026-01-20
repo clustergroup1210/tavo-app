@@ -11,7 +11,7 @@ function hasTeamAccess(user, teamId, roles) {
 
 function isOperator(user) {
   return user.organizations?.some(o => 
-    ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+    ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
   );
 }
 
@@ -86,7 +86,7 @@ router.get('/my', authenticate, async (req, res) => {
     }
     
     if (teamId && !userTeamIds.includes(teamId)) {
-      if (isOperator(user) || hasTeamAccess(user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'])) {
+      if (isOperator(user) || hasTeamAccess(user, teamId, ['TEAM_MANAGER', 'COACH', 'COACH'])) {
         userTeamIds.push(teamId);
       }
     }
@@ -126,7 +126,7 @@ router.get('/my', authenticate, async (req, res) => {
       if (!player || !player.teamCategoryId) {
         if (isOperator(user) || user.teams?.some(ut => 
           ut.teamId === event.teamId && 
-          ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'].includes(ut.role)
+          ['TEAM_MANAGER', 'COACH', 'COACH'].includes(ut.role)
         )) {
           return true;
         }
@@ -150,7 +150,7 @@ router.post('/', authenticate, async (req, res) => {
     const { teamId, organizationId, title, description, startDate, endDate, allDay, eventType, location, categoryIds } = req.body;
     
     const canCreate = teamId 
-      ? hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])
+      ? hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH'])
       : isOperator(req.user);
     
     if (!canCreate) {
@@ -210,7 +210,7 @@ router.put('/:id', authenticate, async (req, res) => {
     }
     
     const canEdit = event.teamId 
-      ? hasTeamAccess(req.user, event.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])
+      ? hasTeamAccess(req.user, event.teamId, ['TEAM_MANAGER', 'COACH'])
       : isOperator(req.user);
     
     if (!canEdit) {
@@ -274,7 +274,7 @@ router.delete('/:id', authenticate, async (req, res) => {
     }
     
     const canDelete = event.teamId 
-      ? hasTeamAccess(req.user, event.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])
+      ? hasTeamAccess(req.user, event.teamId, ['TEAM_MANAGER', 'COACH'])
       : isOperator(req.user);
     
     if (!canDelete) {

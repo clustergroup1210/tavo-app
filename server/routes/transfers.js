@@ -7,7 +7,7 @@ const router = express.Router();
 
 function isOperator(user) {
   return user.organizations?.some(o =>
-    ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+    ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
   );
 }
 
@@ -29,8 +29,8 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     const isOp = isOperator(req.user);
-    const hasFromTeamAccess = hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']);
-    const hasToTeamAccess = hasTeamAccess(req.user, newTeamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']);
+    const hasFromTeamAccess = hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH']);
+    const hasToTeamAccess = hasTeamAccess(req.user, newTeamId, ['TEAM_MANAGER', 'COACH']);
 
     if (!isOp && (!hasFromTeamAccess || !hasToTeamAccess)) {
       return res.status(403).json({ error: 'Transfer requires admin access to both source and destination teams, or operator privileges' });
@@ -65,7 +65,7 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
 
     const isSelf = player.userId === req.user.id;
     const isOp = isOperator(req.user);
-    const hasAccess = hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
+    const hasAccess = hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH', 'COACH']);
 
     if (!isSelf && !isOp && !hasAccess) {
       return res.status(403).json({ error: 'Access denied' });
@@ -86,8 +86,8 @@ router.get('/:transferId', authenticate, async (req, res) => {
     const transfer = await getTeamTransferSnapshot(transferId);
 
     const isOp = isOperator(req.user);
-    const hasFromAccess = hasTeamAccess(req.user, transfer.fromTeamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
-    const hasToAccess = hasTeamAccess(req.user, transfer.toTeamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
+    const hasFromAccess = hasTeamAccess(req.user, transfer.fromTeamId, ['TEAM_MANAGER', 'COACH', 'COACH']);
+    const hasToAccess = hasTeamAccess(req.user, transfer.toTeamId, ['TEAM_MANAGER', 'COACH', 'COACH']);
 
     if (!isOp && !hasFromAccess && !hasToAccess) {
       return res.status(403).json({ error: 'Access denied' });
@@ -118,7 +118,7 @@ router.get('/:transferId/snapshot', authenticate, async (req, res) => {
     }
 
     const isOp = isOperator(req.user);
-    const hasFromAccess = hasTeamAccess(req.user, transfer.fromTeamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
+    const hasFromAccess = hasTeamAccess(req.user, transfer.fromTeamId, ['TEAM_MANAGER', 'COACH', 'COACH']);
 
     if (!isOp && !hasFromAccess) {
       return res.status(403).json({ error: 'Only the original team can view the snapshot' });

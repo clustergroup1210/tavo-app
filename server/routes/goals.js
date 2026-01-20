@@ -14,7 +14,7 @@ function hasTeamAccess(user, teamId, allowedRoles = []) {
 
 function isOperator(user) {
   return user.organizations?.some(o => 
-    ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+    ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
   );
 }
 
@@ -61,7 +61,7 @@ router.post('/categories', authenticate, async (req, res) => {
     const { teamId, name, description } = req.body;
 
     const canManage = isOperator(req.user) || 
-      hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']);
+      hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH']);
     
     if (!canManage) {
       return res.status(403).json({ error: 'Access denied' });
@@ -101,7 +101,7 @@ router.put('/categories/:id', authenticate, async (req, res) => {
     }
 
     const canManage = isOperator(req.user) || 
-      hasTeamAccess(req.user, category.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']);
+      hasTeamAccess(req.user, category.teamId, ['TEAM_MANAGER', 'COACH']);
     
     if (!canManage) {
       return res.status(403).json({ error: 'Access denied' });
@@ -135,7 +135,7 @@ router.delete('/categories/:id', authenticate, async (req, res) => {
     }
 
     const canManage = isOperator(req.user) || 
-      hasTeamAccess(req.user, category.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']);
+      hasTeamAccess(req.user, category.teamId, ['TEAM_MANAGER', 'COACH']);
     
     if (!canManage) {
       return res.status(403).json({ error: 'Access denied' });
@@ -166,7 +166,7 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
     const isSelf = player.userId === req.user.id;
     const hasAccess = isSelf || 
       isOperator(req.user) || 
-      hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
+      hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH', 'COACH']);
     
     if (!hasAccess) {
       return res.status(403).json({ error: 'Access denied' });
@@ -203,7 +203,7 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     const isSelf = player.userId === req.user.id;
-    const isCoachOrAdmin = hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
+    const isCoachOrAdmin = hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH', 'COACH']);
     
     if (!isSelf && !isCoachOrAdmin && !isOperator(req.user)) {
       return res.status(403).json({ error: 'Access denied' });
@@ -239,7 +239,7 @@ router.put('/:id', authenticate, async (req, res) => {
     }
 
     const isSelf = goal.player.userId === req.user.id;
-    const isCoachOrAdmin = hasTeamAccess(req.user, goal.player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
+    const isCoachOrAdmin = hasTeamAccess(req.user, goal.player.teamId, ['TEAM_MANAGER', 'COACH', 'COACH']);
     
     if (!isSelf && !isCoachOrAdmin && !isOperator(req.user)) {
       return res.status(403).json({ error: 'Access denied' });
@@ -274,7 +274,7 @@ router.delete('/:id', authenticate, async (req, res) => {
     }
 
     const isSelf = goal.player.userId === req.user.id;
-    const isCoachOrAdmin = hasTeamAccess(req.user, goal.player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
+    const isCoachOrAdmin = hasTeamAccess(req.user, goal.player.teamId, ['TEAM_MANAGER', 'COACH', 'COACH']);
     
     if (!isSelf && !isCoachOrAdmin && !isOperator(req.user)) {
       return res.status(403).json({ error: 'Access denied' });

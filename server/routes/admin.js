@@ -5,7 +5,7 @@ const { authenticate } = require('../middleware/auth');
 
 const requireOperator = (req, res, next) => {
   const isOperator = req.user.organizations?.some(o => 
-    ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+    ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
   );
   if (!isOperator) {
     return res.status(403).json({ error: 'Operator access required' });
@@ -21,7 +21,7 @@ router.get('/teams', authenticate, requireOperator, async (req, res) => {
         organization: { select: { name: true } },
         children: { select: { id: true } },
         users: {
-          where: { role: 'TEAM_HEAD_COACH' },
+          where: { role: 'COACH' },
           include: { user: { select: { name: true } } },
           take: 1
         },

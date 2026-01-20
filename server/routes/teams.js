@@ -36,7 +36,7 @@ router.get('/public', async (req, res) => {
 router.get('/', authenticate, async (req, res) => {
   try {
     const isOperator = req.user.organizations?.some(o => 
-      ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
     );
 
     let teams;
@@ -138,7 +138,7 @@ router.post('/', authenticate, async (req, res) => {
     });
 
     await prisma.userTeam.create({
-      data: { userId: req.user.id, teamId: team.id, role: 'TEAM_ADMIN' }
+      data: { userId: req.user.id, teamId: team.id, role: 'TEAM_MANAGER' }
     });
 
     res.json(team);
@@ -152,7 +152,7 @@ router.put('/:id', authenticate, async (req, res) => {
   try {
     const { name, description } = req.body;
 
-    if (!hasTeamAccess(req.user, req.params.id, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
+    if (!hasTeamAccess(req.user, req.params.id, ['TEAM_MANAGER', 'COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -169,7 +169,7 @@ router.put('/:id', authenticate, async (req, res) => {
 
 router.post('/:id/logo', authenticate, upload.single('logo'), async (req, res) => {
   try {
-    if (!hasTeamAccess(req.user, req.params.id, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
+    if (!hasTeamAccess(req.user, req.params.id, ['TEAM_MANAGER', 'COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -188,17 +188,17 @@ router.post('/:id/logo', authenticate, upload.single('logo'), async (req, res) =
 router.get('/:id/staff', authenticate, async (req, res) => {
   try {
     const isOperator = req.user.organizations?.some(o => 
-      ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
     );
     
-    if (!isOperator && !hasTeamAccess(req.user, req.params.id, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
+    if (!isOperator && !hasTeamAccess(req.user, req.params.id, ['TEAM_MANAGER', 'COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
     const staff = await prisma.userTeam.findMany({
       where: {
         teamId: req.params.id,
-        role: { in: ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH', 'TEAM_EXTERNAL_COACH'] }
+        role: { in: ['TEAM_MANAGER', 'COACH', 'COACH', 'GUEST_COACH'] }
       },
       include: {
         user: {
@@ -217,7 +217,7 @@ router.get('/:id/staff', authenticate, async (req, res) => {
 
 router.post('/:id/members', authenticate, async (req, res) => {
   try {
-    if (!hasTeamAccess(req.user, req.params.id, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
+    if (!hasTeamAccess(req.user, req.params.id, ['TEAM_MANAGER', 'COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -255,7 +255,7 @@ router.post('/:id/members', authenticate, async (req, res) => {
 
 router.delete('/:id/members/:userId', authenticate, async (req, res) => {
   try {
-    if (!hasTeamAccess(req.user, req.params.id, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
+    if (!hasTeamAccess(req.user, req.params.id, ['TEAM_MANAGER', 'COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
     }
 

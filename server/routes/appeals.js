@@ -14,7 +14,7 @@ function generateSecureToken() {
 
 function isOperator(user) {
   return user.organizations?.some(o => 
-    ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+    ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
   );
 }
 
@@ -29,7 +29,7 @@ router.post('/', authenticate, async (req, res) => {
 
     const isSelf = player.userId === req.user.id;
     const isCoach = hasTeamAccess(req.user, player.teamId, [
-      'TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'
+      'TEAM_MANAGER', 'COACH', 'COACH'
     ]) || isOperator(req.user);
 
     if (type === 'simple' && !isSelf) {
@@ -79,7 +79,7 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
 
     const isSelf = player.userId === req.user.id;
     const isCoachOrAdmin = hasTeamAccess(req.user, player.teamId, [
-      'TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'
+      'TEAM_MANAGER', 'COACH', 'COACH'
     ]);
     const isOp = isOperator(req.user);
 
@@ -124,7 +124,7 @@ router.put('/:id', authenticate, async (req, res) => {
 
     const isSelf = appeal.player.userId === req.user.id;
     const isCoach = hasTeamAccess(req.user, appeal.player.teamId, [
-      'TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'
+      'TEAM_MANAGER', 'COACH', 'COACH'
     ]) || isOperator(req.user);
 
     if (!isSelf && !isCoach) {
@@ -299,7 +299,7 @@ router.put('/:id/deactivate', authenticate, async (req, res) => {
 
     const isSelf = appeal.player.userId === req.user.id;
     const isCoach = hasTeamAccess(req.user, appeal.player.teamId, [
-      'TEAM_ADMIN', 'TEAM_HEAD_COACH'
+      'TEAM_MANAGER', 'COACH'
     ]);
 
     if (!isSelf && !isCoach) {

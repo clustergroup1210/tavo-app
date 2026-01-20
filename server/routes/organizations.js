@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 router.get('/', authenticate, async (req, res) => {
   try {
     const isOperator = req.user.organizations?.some(o => 
-      ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
     );
 
     if (!isOperator) {
@@ -29,7 +29,7 @@ router.get('/', authenticate, async (req, res) => {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const isAdmin = req.user.organizations?.some(o => o.role === 'OPERATOR_ADMIN');
+    const isAdmin = req.user.organizations?.some(o => o.role === 'SUPER_ADMIN');
     if (!isAdmin) {
       return res.status(403).json({ error: 'Access denied' });
     }

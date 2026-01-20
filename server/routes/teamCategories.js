@@ -11,7 +11,7 @@ function hasTeamAccess(user, teamId, roles) {
 
 function isOperator(user) {
   return user.organizations?.some(o => 
-    ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+    ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
   );
 }
 
@@ -64,7 +64,7 @@ router.post('/', authenticate, async (req, res) => {
   try {
     const { teamId, name, sortOrder } = req.body;
     
-    const canCreate = hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']) || isOperator(req.user);
+    const canCreate = hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH']) || isOperator(req.user);
     
     if (!canCreate) {
       return res.status(403).json({ error: 'Access denied' });
@@ -96,7 +96,7 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Category not found' });
     }
     
-    const canEdit = hasTeamAccess(req.user, category.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']) || isOperator(req.user);
+    const canEdit = hasTeamAccess(req.user, category.teamId, ['TEAM_MANAGER', 'COACH']) || isOperator(req.user);
     
     if (!canEdit) {
       return res.status(403).json({ error: 'Access denied' });
@@ -124,7 +124,7 @@ router.delete('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Category not found' });
     }
     
-    const canDelete = hasTeamAccess(req.user, category.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']) || isOperator(req.user);
+    const canDelete = hasTeamAccess(req.user, category.teamId, ['TEAM_MANAGER', 'COACH']) || isOperator(req.user);
     
     if (!canDelete) {
       return res.status(403).json({ error: 'Access denied' });

@@ -35,7 +35,7 @@ router.get('/', authenticate, async (req, res) => {
       }
     } else {
       const isOperator = req.user.organizations?.some(o => 
-        ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+        ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
       );
       
       if (!isOperator) {
@@ -112,7 +112,7 @@ router.post('/', authenticate, async (req, res) => {
   try {
     const { teamId, name, number, position, birthDate, teamCategoryId } = req.body;
 
-    if (!hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH'])) {
+    if (!hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH', 'COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -148,9 +148,9 @@ router.put('/:id', authenticate, async (req, res) => {
     }
 
     const isSelf = player.userId === req.user.id;
-    const isCoachOrAdmin = hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
+    const isCoachOrAdmin = hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH', 'COACH']);
     const isOperator = req.user.organizations?.some(o => 
-      ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
     );
     
     if (!isSelf && !isCoachOrAdmin && !isOperator) {
@@ -233,10 +233,10 @@ router.post('/:id/notes', authenticate, async (req, res) => {
       include: { team: { select: { parentId: true } } }
     });
     
-    const isCoachOrAdmin = hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']) ||
-      (player.team?.parentId && hasTeamAccess(req.user, player.team.parentId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']));
+    const isCoachOrAdmin = hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH', 'COACH']) ||
+      (player.team?.parentId && hasTeamAccess(req.user, player.team.parentId, ['TEAM_MANAGER', 'COACH', 'COACH']));
     const isOperator = req.user.organizations?.some(o => 
-      ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
     );
 
     if (!isCoachOrAdmin && !isOperator) {
@@ -268,7 +268,7 @@ router.delete('/:id/notes/:noteId', authenticate, async (req, res) => {
 
     if (note.authorId !== req.user.id) {
       const isOperator = req.user.organizations?.some(o => 
-        ['OPERATOR_ADMIN', 'OPERATOR_MANAGER'].includes(o.role)
+        ['SUPER_ADMIN', 'ADMIN'].includes(o.role)
       );
       if (!isOperator) {
         return res.status(403).json({ error: 'Access denied' });
@@ -323,12 +323,12 @@ router.post('/:id/photo', authenticate, upload.single('photo'), async (req, res)
     const player = await prisma.player.findUnique({ where: { id: req.params.id } });
     
     const isOperatorUser = req.user.organizations?.some(o => 
-      ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
     );
     const canUpload = 
       player.userId === req.user.id ||
       req.user.parentPlayers?.some(pp => pp.playerId === req.params.id) ||
-      hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']) ||
+      hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH', 'COACH']) ||
       isOperatorUser;
 
     if (!canUpload) {
@@ -355,10 +355,10 @@ router.post('/:id/passport', authenticate, upload.single('passport'), async (req
     }
     
     const isOperatorUser = req.user.organizations?.some(o => 
-      ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
     );
     const isSelf = player.userId === req.user.id;
-    const isCoach = hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH']);
+    const isCoach = hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH', 'COACH']);
     const canUpload = isSelf || isCoach || isOperatorUser;
 
     if (!canUpload) {
@@ -387,9 +387,9 @@ router.post('/:id/link-user', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Player not found' });
     }
     
-    const isCoachOrAdmin = hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']);
+    const isCoachOrAdmin = hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH']);
     const isOperator = req.user.organizations?.some(o => 
-      ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
     );
     
     if (!isCoachOrAdmin && !isOperator) {
@@ -431,9 +431,9 @@ router.delete('/:id/unlink-user', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Player not found' });
     }
     
-    const isCoachOrAdmin = hasTeamAccess(req.user, player.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH']);
+    const isCoachOrAdmin = hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH']);
     const isOperator = req.user.organizations?.some(o => 
-      ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
     );
     
     if (!isCoachOrAdmin && !isOperator) {

@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 
 function isOperatorUser(user) {
   return user.organizations?.some(o => 
-    ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+    ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
   );
 }
 
@@ -36,7 +36,7 @@ router.get('/', authenticate, async (req, res) => {
     }
 
     if (teamId) {
-      if (!hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
+      if (!hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH'])) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -131,7 +131,7 @@ router.put('/:id/approve', authenticate, async (req, res) => {
     }
 
     const isOperator = isOperatorUser(req.user);
-    if (!isOperator && !hasTeamAccess(req.user, request.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
+    if (!isOperator && !hasTeamAccess(req.user, request.teamId, ['TEAM_MANAGER', 'COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -205,7 +205,7 @@ router.put('/:id/reject', authenticate, async (req, res) => {
     }
 
     const isOperator = isOperatorUser(req.user);
-    if (!isOperator && !hasTeamAccess(req.user, request.teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
+    if (!isOperator && !hasTeamAccess(req.user, request.teamId, ['TEAM_MANAGER', 'COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
     }
 

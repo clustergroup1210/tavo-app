@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 
 function isOperatorUser(user) {
   return user.organizations?.some(o => 
-    ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+    ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
   );
 }
 
@@ -51,7 +51,7 @@ router.get('/', authenticate, async (req, res) => {
         }
       });
     } else if (teamId) {
-      if (!hasTeamAccess(req.user, teamId, ['TEAM_ADMIN', 'TEAM_HEAD_COACH'])) {
+      if (!hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH'])) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
@@ -97,7 +97,7 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     const isOperatorRole = role && role.startsWith('OPERATOR_');
-    const isTeamRole = ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH', 'PLAYER'].includes(teamRole);
+    const isTeamRole = ['TEAM_MANAGER', 'COACH', 'COACH', 'PLAYER'].includes(teamRole);
 
     if (!isOperatorRole && isTeamRole && !teamId) {
       return res.status(400).json({ error: 'チーム役割を選択した場合、チームの選択は必須です' });
@@ -118,7 +118,7 @@ router.post('/', authenticate, async (req, res) => {
 
     if (isOperatorRole) {
       const operatorOrg = req.user.organizations?.find(o => 
-        ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF'].includes(o.role)
+        ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
       );
       
       if (operatorOrg) {
@@ -166,7 +166,7 @@ router.put('/:id/role', authenticate, async (req, res) => {
   try {
     const { teamId, role } = req.body;
 
-    if (!hasTeamAccess(req.user, teamId, ['TEAM_ADMIN'])) {
+    if (!hasTeamAccess(req.user, teamId, ['TEAM_MANAGER'])) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
