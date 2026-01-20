@@ -2,6 +2,10 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
 
+const OPERATIONS_ROLES = ['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'EXTERNAL'];
+const TEAM_ROLES = ['TEAM_MANAGER', 'COACH', 'GUEST_COACH'];
+const USER_ROLES = ['PLAYER', 'PARENT'];
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [roles, setRoles] = useState(null);
@@ -25,7 +29,6 @@ export function AuthProvider({ children }) {
         if (data.teams?.length > 0) {
           setCurrentTeam(data.teams[0].team);
         }
-        // Store player data for players
         if (data.players?.length > 0) {
           setPlayerData(data.players[0]);
         }
@@ -88,17 +91,32 @@ export function AuthProvider({ children }) {
     return roles?.isOperator || false;
   };
 
+  const isSuperAdmin = () => roles?.highestRole === 'SUPER_ADMIN';
+  const isAdmin = () => ['SUPER_ADMIN', 'ADMIN'].includes(roles?.highestRole);
+
   const isTeamAdmin = (teamId) => {
-    return roles?.teamAdminTeams?.some(t => t.teamId === teamId) || false;
+    if (isOperator()) return true;
+    return roles?.teamManagerTeams?.some(t => t.teamId === teamId) || false;
   };
 
   const isCoach = (teamId) => {
+    if (isOperator()) return true;
     return roles?.coachTeams?.some(t => t.teamId === teamId) || 
-           roles?.teamAdminTeams?.some(t => t.teamId === teamId) || false;
+           roles?.teamManagerTeams?.some(t => t.teamId === teamId) || false;
+  };
+
+  const isGuestCoach = (teamId) => {
+    return roles?.guestCoachTeams?.some(t => t.teamId === teamId) || false;
   };
 
   const isPlayer = () => roles?.isPlayer || false;
   const isParent = () => roles?.isParent || false;
+
+  const hasPermission = (permission) => {
+    return roles?.permissions?.includes(permission) || false;
+  };
+
+  const getUserRole = () => roles?.highestRole || null;
 
   return (
     <AuthContext.Provider
@@ -115,10 +133,15 @@ export function AuthProvider({ children }) {
         logout,
         checkAuth,
         isOperator,
+        isSuperAdmin,
+        isAdmin,
         isTeamAdmin,
         isCoach,
+        isGuestCoach,
         isPlayer,
         isParent,
+        hasPermission,
+        getUserRole,
       }}
     >
       {children}

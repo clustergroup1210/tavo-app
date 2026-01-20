@@ -36,6 +36,23 @@ const authenticate = async (req, res, next) => {
   }
 };
 
+const OPERATIONS_ROLES = ['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'EXTERNAL'];
+const TEAM_MANAGER_ROLES = ['TEAM_MANAGER'];
+const COACH_ROLES = ['COACH'];
+const GUEST_COACH_ROLES = ['GUEST_COACH'];
+
+const ROLE_HIERARCHY = {
+  SUPER_ADMIN: 100,
+  ADMIN: 90,
+  OPERATOR: 80,
+  EXTERNAL: 10,
+  TEAM_MANAGER: 70,
+  COACH: 60,
+  GUEST_COACH: 50,
+  PLAYER: 20,
+  PARENT: 15
+};
+
 const getUserRoles = (user) => {
   const roles = {
     organizationRoles: user.organizations || [],
@@ -45,28 +62,63 @@ const getUserRoles = (user) => {
   };
 
   const isOperator = user.organizations?.some(o => 
-    ['OPERATOR_ADMIN', 'OPERATOR_MANAGER', 'OPERATOR_STAFF', 'OPERATOR_EXTERNAL'].includes(o.role)
+    OPERATIONS_ROLES.includes(o.role)
   );
 
-  const teamAdminTeams = user.teams?.filter(t => 
-    ['TEAM_ADMIN', 'TEAM_HEAD_COACH'].includes(t.role)
+  const teamManagerTeams = user.teams?.filter(t => 
+    TEAM_MANAGER_ROLES.includes(t.role)
   ) || [];
 
   const coachTeams = user.teams?.filter(t => 
-    ['TEAM_COACH', 'TEAM_EXTERNAL_COACH'].includes(t.role)
+    COACH_ROLES.includes(t.role)
   ) || [];
+
+  const guestCoachTeams = user.teams?.filter(t => 
+    GUEST_COACH_ROLES.includes(t.role)
+  ) || [];
+
+  let highestRole = null;
+  let highestLevel = -1;
+
+  for (const org of user.organizations || []) {
+    const level = ROLE_HIERARCHY[org.role] || 0;
+    if (level > highestLevel) {
+      highestLevel = level;
+      highestRole = org.role;
+    }
+  }
+
+  for (const team of user.teams || []) {
+    const level = ROLE_HIERARCHY[team.role] || 0;
+    if (level > highestLevel) {
+      highestLevel = level;
+      highestRole = team.role;
+    }
+  }
+
+  if (user.players?.length > 0 && ROLE_HIERARCHY['PLAYER'] > highestLevel) {
+    highestLevel = ROLE_HIERARCHY['PLAYER'];
+    highestRole = 'PLAYER';
+  }
+
+  if (user.parentPlayers?.length > 0 && ROLE_HIERARCHY['PARENT'] > highestLevel) {
+    highestRole = 'PARENT';
+  }
 
   return {
     ...roles,
     isOperator,
-    teamAdminTeams,
-    coachTeams
+    teamManagerTeams,
+    teamAdminTeams: teamManagerTeams,
+    coachTeams,
+    guestCoachTeams,
+    highestRole
   };
 };
 
 const hasTeamAccess = (user, teamId, requiredRoles = []) => {
   const isOperator = user.organizations?.some(o => 
-    ['OPERATOR_ADMIN', 'OPERATOR_MANAGER'].includes(o.role)
+    ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
   );
   if (isOperator) return true;
 
