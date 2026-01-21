@@ -22,7 +22,9 @@ export default function AdminUserManagement() {
     role: '',
     teamId: '',
     teamRole: '',
+    playerId: '',
   });
+  const [teamPlayers, setTeamPlayers] = useState([]);
   const [newInvite, setNewInvite] = useState({
     teamId: '',
     role: 'PLAYER',
@@ -43,6 +45,24 @@ export default function AdminUserManagement() {
       fetchPlayers(newInvite.teamId);
     }
   }, [newInvite.teamId, newInvite.role]);
+
+  useEffect(() => {
+    if (newUser.teamId && newUser.teamRole === 'PARENT') {
+      fetchTeamPlayers(newUser.teamId);
+    }
+  }, [newUser.teamId, newUser.teamRole]);
+
+  const fetchTeamPlayers = async (teamId) => {
+    try {
+      const res = await fetch(`/api/players?teamId=${teamId}`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setTeamPlayers(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch players:', error);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -107,7 +127,7 @@ export default function AdminUserManagement() {
       });
       if (res.ok) {
         setShowCreateModal(false);
-        setNewUser({ name: '', email: '', password: '', role: '', teamId: '', teamRole: '' });
+        setNewUser({ name: '', email: '', password: '', role: '', teamId: '', teamRole: '', playerId: '' });
         fetchUsers();
       } else {
         const data = await res.json();
@@ -197,6 +217,9 @@ export default function AdminUserManagement() {
     }
     if (user.players?.length > 0) {
       return { label: '選手', color: 'bg-orange-100 text-orange-700' };
+    }
+    if (user.parentPlayers?.length > 0) {
+      return { label: '保護者', color: 'bg-pink-100 text-pink-700' };
     }
     return { label: '未割当', color: 'bg-gray-100 text-gray-600' };
   };
@@ -599,7 +622,7 @@ export default function AdminUserManagement() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">チーム役割</label>
                       <select
                         value={newUser.teamRole}
-                        onChange={(e) => setNewUser({ ...newUser, teamRole: e.target.value })}
+                        onChange={(e) => setNewUser({ ...newUser, teamRole: e.target.value, playerId: '' })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                       >
                         <option value="">役割を選択</option>
@@ -607,9 +630,31 @@ export default function AdminUserManagement() {
                         <option value="COACH">コーチ</option>
                         <option value="GUEST_COACH">ゲストコーチ</option>
                         <option value="PLAYER">選手</option>
+                        <option value="PARENT">保護者</option>
                       </select>
-                      <p className="text-xs text-gray-500 mt-1">監督・選手の場合はチーム選択が必須です</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {newUser.teamRole === 'PARENT' 
+                          ? '保護者は子供のデータを閲覧可・編集不可'
+                          : '監督・選手の場合はチーム選択が必須です'}
+                      </p>
                     </div>
+                    {newUser.teamRole === 'PARENT' && newUser.teamId && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">対象選手 *</label>
+                        <select
+                          value={newUser.playerId}
+                          onChange={(e) => setNewUser({ ...newUser, playerId: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                          required
+                        >
+                          <option value="">選手を選択</option>
+                          {teamPlayers.map(player => (
+                            <option key={player.id} value={player.id}>{player.name}</option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">保護者として紐づける選手を選択</p>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

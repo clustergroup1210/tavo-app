@@ -23,7 +23,8 @@ router.get('/', authenticate, async (req, res) => {
         include: {
           organizations: true,
           teams: { include: { team: true } },
-          players: { select: { id: true } }
+          players: { select: { id: true } },
+          parentPlayers: { include: { player: true } }
         },
         orderBy: { createdAt: 'desc' }
       });
@@ -35,6 +36,7 @@ router.get('/', authenticate, async (req, res) => {
         organizations: u.organizations,
         teams: u.teams,
         players: u.players,
+        parentPlayers: u.parentPlayers,
         createdAt: u.createdAt
       })));
     }
@@ -86,7 +88,7 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Operator access required' });
     }
 
-    const { name, email, password, role, teamId, teamRole } = req.body;
+    const { name, email, password, role, teamId, teamRole, playerId } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required' });
@@ -96,11 +98,16 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
-    const isOperatorRole = role && role.startsWith('OPERATOR_');
-    const isTeamRole = ['TEAM_MANAGER', 'COACH', 'COACH', 'PLAYER'].includes(teamRole);
+    const isOperatorRole = ['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'EXTERNAL'].includes(role);
+    const isTeamRole = ['TEAM_MANAGER', 'COACH', 'GUEST_COACH', 'PLAYER'].includes(teamRole);
+    const isParentRole = teamRole === 'PARENT';
 
     if (!isOperatorRole && isTeamRole && !teamId) {
       return res.status(400).json({ error: 'チーム役割を選択した場合、チームの選択は必須です' });
+    }
+
+    if (isParentRole && !playerId) {
+      return res.status(400).json({ error: '保護者の場合、対象選手の選択は必須です' });
     }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -131,7 +138,7 @@ router.post('/', authenticate, async (req, res) => {
       }
     }
 
-    if (teamId && teamRole) {
+    if (teamId && teamRole && !isParentRole) {
       userData.teams = {
         create: {
           teamId: teamId,
@@ -140,11 +147,20 @@ router.post('/', authenticate, async (req, res) => {
       };
     }
 
+    if (isParentRole && playerId) {
+      userData.parentPlayers = {
+        create: {
+          playerId: playerId
+        }
+      };
+    }
+
     const user = await prisma.user.create({
       data: userData,
       include: {
         organizations: true,
-        teams: { include: { team: true } }
+        teams: { include: { team: true } },
+        parentPlayers: { include: { player: true } }
       }
     });
 
@@ -154,6 +170,7 @@ router.post('/', authenticate, async (req, res) => {
       email: user.email,
       organizations: user.organizations,
       teams: user.teams,
+      parentPlayers: user.parentPlayers,
       createdAt: user.createdAt
     });
   } catch (error) {
