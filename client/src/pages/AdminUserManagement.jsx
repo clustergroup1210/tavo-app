@@ -184,13 +184,15 @@ export default function AdminUserManagement() {
   );
 
   const getRoleBadge = (user) => {
-    if (user.organizations?.some(o => o.role.startsWith('OPERATOR_'))) {
-      return { label: 'オペレーター', color: 'bg-purple-100 text-purple-700' };
+    if (user.organizations?.some(o => ['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'EXTERNAL'].includes(o.role))) {
+      const orgRole = user.organizations.find(o => ['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'EXTERNAL'].includes(o.role))?.role;
+      const labels = { SUPER_ADMIN: 'スーパー管理者', ADMIN: '管理者', OPERATOR: 'オペレーター', EXTERNAL: '外部ユーザー' };
+      return { label: labels[orgRole] || 'オペレーター', color: 'bg-purple-100 text-purple-700' };
     }
-    if (user.teams?.some(t => ['TEAM_ADMIN', 'TEAM_HEAD_COACH'].includes(t.role))) {
+    if (user.teams?.some(t => t.role === 'TEAM_MANAGER')) {
       return { label: 'チーム管理者', color: 'bg-blue-100 text-blue-700' };
     }
-    if (user.teams?.some(t => t.role.includes('COACH'))) {
+    if (user.teams?.some(t => ['COACH', 'GUEST_COACH'].includes(t.role))) {
       return { label: 'コーチ', color: 'bg-green-100 text-green-700' };
     }
     if (user.players?.length > 0) {
@@ -201,10 +203,9 @@ export default function AdminUserManagement() {
 
   const getInviteRoleLabel = (role) => {
     const labels = {
-      TEAM_ADMIN: '管理者',
-      TEAM_HEAD_COACH: '代表監督・コーチ',
-      TEAM_COACH: '監督・コーチ',
-      TEAM_EXTERNAL_COACH: '外部コーチ',
+      TEAM_MANAGER: 'チーム管理者',
+      COACH: 'コーチ',
+      GUEST_COACH: 'ゲストコーチ',
       PLAYER: '選手',
       PARENT: '保護者',
     };
@@ -569,23 +570,24 @@ export default function AdminUserManagement() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   >
                     <option value="">運営ではない</option>
-                    <option value="OPERATOR_ADMIN">オペレーター管理者</option>
-                    <option value="OPERATOR_MANAGER">オペレーターマネージャー</option>
-                    <option value="OPERATOR_STAFF">オペレータースタッフ</option>
+                    <option value="SUPER_ADMIN">スーパー管理者</option>
+                    <option value="ADMIN">管理者</option>
+                    <option value="OPERATOR">オペレーター</option>
+                    <option value="EXTERNAL">外部ユーザー（読み取り専用）</option>
                   </select>
                 </div>
                 
-                {!newUser.role.startsWith('OPERATOR_') && (
+                {!['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'EXTERNAL'].includes(newUser.role) && (
                   <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        所属チーム {newUser.teamRole && ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH', 'PLAYER'].includes(newUser.teamRole) ? '*' : ''}
+                        所属チーム {newUser.teamRole && ['TEAM_MANAGER', 'COACH', 'GUEST_COACH', 'PLAYER'].includes(newUser.teamRole) ? '*' : ''}
                       </label>
                       <select
                         value={newUser.teamId}
                         onChange={(e) => setNewUser({ ...newUser, teamId: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        required={newUser.teamRole && ['TEAM_ADMIN', 'TEAM_HEAD_COACH', 'TEAM_COACH', 'PLAYER'].includes(newUser.teamRole)}
+                        required={newUser.teamRole && ['TEAM_MANAGER', 'COACH', 'GUEST_COACH', 'PLAYER'].includes(newUser.teamRole)}
                       >
                         <option value="">チームを選択</option>
                         {teams.map(team => (
@@ -601,9 +603,9 @@ export default function AdminUserManagement() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                       >
                         <option value="">役割を選択</option>
-                        <option value="TEAM_ADMIN">チーム管理者</option>
-                        <option value="TEAM_HEAD_COACH">代表監督・コーチ</option>
-                        <option value="TEAM_COACH">監督・コーチ</option>
+                        <option value="TEAM_MANAGER">チーム管理者</option>
+                        <option value="COACH">コーチ</option>
+                        <option value="GUEST_COACH">ゲストコーチ</option>
                         <option value="PLAYER">選手</option>
                       </select>
                       <p className="text-xs text-gray-500 mt-1">監督・選手の場合はチーム選択が必須です</p>
@@ -671,9 +673,9 @@ export default function AdminUserManagement() {
                   >
                     <option value="PLAYER">選手</option>
                     <option value="PARENT">保護者</option>
-                    <option value="TEAM_COACH">監督・コーチ</option>
-                    <option value="TEAM_HEAD_COACH">代表監督・コーチ</option>
-                    <option value="TEAM_ADMIN">チーム管理者</option>
+                    <option value="COACH">コーチ</option>
+                    <option value="GUEST_COACH">ゲストコーチ</option>
+                    <option value="TEAM_MANAGER">チーム管理者</option>
                   </select>
                 </div>
                 {newInvite.role === 'PLAYER' && (
