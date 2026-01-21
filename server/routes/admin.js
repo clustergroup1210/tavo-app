@@ -101,4 +101,60 @@ router.get('/teams/:id', authenticate, requireOperator, async (req, res) => {
   }
 });
 
+router.put('/teams/:id', authenticate, requireOperator, async (req, res) => {
+  try {
+    const { name } = req.body;
+    const team = await prisma.team.update({
+      where: { id: req.params.id },
+      data: { name }
+    });
+    res.json(team);
+  } catch (error) {
+    console.error('Failed to update team:', error);
+    res.status(500).json({ error: 'Failed to update team' });
+  }
+});
+
+router.delete('/teams/:id', authenticate, requireOperator, async (req, res) => {
+  try {
+    const teamId = req.params.id;
+    
+    const team = await prisma.team.findUnique({
+      where: { id: teamId },
+      include: {
+        children: true,
+        _count: { select: { players: true } }
+      }
+    });
+
+    if (!team) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+
+    if (team.children.length > 0) {
+      return res.status(400).json({ error: 'サブカテゴリーを含むチームは削除できません。先にサブカテゴリーを削除してください。' });
+    }
+
+    if (team._count.players > 0) {
+      return res.status(400).json({ error: '選手が所属しているチームは削除できません。先に選手を移動または削除してください。' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.userTeam.deleteMany({ where: { teamId } });
+      await tx.invitation.deleteMany({ where: { teamId } });
+      await tx.evaluationItem.deleteMany({ where: { teamId } });
+      await tx.evaluationRound.deleteMany({ where: { teamId } });
+      await tx.calendarEvent.deleteMany({ where: { teamId } });
+      await tx.announcement.deleteMany({ where: { teamId } });
+      await tx.goalCategory.deleteMany({ where: { teamId } });
+      await tx.team.delete({ where: { id: teamId } });
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete team:', error);
+    res.status(500).json({ error: 'Failed to delete team' });
+  }
+});
+
 module.exports = router;

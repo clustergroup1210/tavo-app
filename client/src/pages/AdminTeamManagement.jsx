@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Users, ExternalLink, Search, Plus, X } from 'lucide-react';
+import { Building2, Users, ExternalLink, Search, Plus, X, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 
 export default function AdminTeamManagement() {
   const navigate = useNavigate();
@@ -11,9 +11,27 @@ export default function AdminTeamManagement() {
   const [newTeamName, setNewTeamName] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState(null);
+  const [editTeamName, setEditTeamName] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const menuRef = useRef(null);
 
   useEffect(() => {
     fetchTeams();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const fetchTeams = async () => {
@@ -58,6 +76,68 @@ export default function AdminTeamManagement() {
 
   const handleViewTeamDashboard = (teamId) => {
     navigate(`/admin/teams/${teamId}/dashboard`);
+  };
+
+  const handleEditClick = (team) => {
+    setSelectedTeam(team);
+    setEditTeamName(team.name);
+    setShowEditModal(true);
+    setOpenMenuId(null);
+  };
+
+  const handleDeleteClick = (team) => {
+    setSelectedTeam(team);
+    setShowDeleteModal(true);
+    setOpenMenuId(null);
+  };
+
+  const handleEditTeam = async (e) => {
+    e.preventDefault();
+    setError('');
+    setEditing(true);
+    try {
+      const res = await fetch(`/api/admin/teams/${selectedTeam.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ name: editTeamName }),
+      });
+      if (res.ok) {
+        setShowEditModal(false);
+        setSelectedTeam(null);
+        fetchTeams();
+      } else {
+        const data = await res.json();
+        setError(data.error || 'チームの更新に失敗しました');
+      }
+    } catch (error) {
+      setError('チームの更新に失敗しました');
+    } finally {
+      setEditing(false);
+    }
+  };
+
+  const handleDeleteTeam = async () => {
+    setError('');
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/teams/${selectedTeam.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        setShowDeleteModal(false);
+        setSelectedTeam(null);
+        fetchTeams();
+      } else {
+        const data = await res.json();
+        setError(data.error || 'チームの削除に失敗しました');
+      }
+    } catch (error) {
+      setError('チームの削除に失敗しました');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const filteredTeams = teams.filter(team => 
@@ -166,13 +246,41 @@ export default function AdminTeamManagement() {
                       {new Date(team.createdAt).toLocaleDateString('ja-JP')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <button
-                        onClick={() => handleViewTeamDashboard(team.id)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors text-sm font-medium"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        管理画面を開く
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleViewTeamDashboard(team.id)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors text-sm font-medium"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          管理画面
+                        </button>
+                        <div className="relative" ref={openMenuId === team.id ? menuRef : null}>
+                          <button
+                            onClick={() => setOpenMenuId(openMenuId === team.id ? null : team.id)}
+                            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                          {openMenuId === team.id && (
+                            <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                              <button
+                                onClick={() => handleEditClick(team)}
+                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                              >
+                                <Pencil className="w-4 h-4" />
+                                編集
+                              </button>
+                              <button
+                                onClick={() => handleDeleteClick(team)}
+                                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                削除
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -230,6 +338,86 @@ export default function AdminTeamManagement() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && selectedTeam && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">チーム名を編集</h2>
+              <button 
+                onClick={() => { setShowEditModal(false); setError(''); setSelectedTeam(null); }}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+            <form onSubmit={handleEditTeam}>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">チーム名 *</label>
+                <input
+                  type="text"
+                  value={editTeamName}
+                  onChange={(e) => setEditTeamName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => { setShowEditModal(false); setError(''); setSelectedTeam(null); }}
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  disabled={editing}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {editing ? '保存中...' : '保存'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && selectedTeam && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">チームを削除</h2>
+              <button 
+                onClick={() => { setShowDeleteModal(false); setError(''); setSelectedTeam(null); }}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+            <p className="text-gray-600 mb-6">
+              <span className="font-medium text-gray-900">{selectedTeam.name}</span> を削除しますか？この操作は取り消せません。
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => { setShowDeleteModal(false); setError(''); setSelectedTeam(null); }}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleDeleteTeam}
+                disabled={deleting}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? '削除中...' : '削除'}
+              </button>
+            </div>
           </div>
         </div>
       )}
