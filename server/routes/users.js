@@ -23,8 +23,8 @@ router.get('/', authenticate, async (req, res) => {
         include: {
           organizations: true,
           teams: { include: { team: true } },
-          players: { select: { id: true } },
-          parentPlayers: { include: { player: true } }
+          players: { select: { id: true, name: true, teamId: true, team: { select: { id: true, name: true } } } },
+          parentPlayers: { include: { player: { include: { team: true } } } }
         },
         orderBy: { createdAt: 'desc' }
       });

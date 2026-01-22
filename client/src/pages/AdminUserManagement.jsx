@@ -380,11 +380,21 @@ export default function AdminUserManagement() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {user.teams?.length > 0 ? (
+                          {user.teams?.length > 0 || user.players?.length > 0 || user.parentPlayers?.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
-                              {user.teams.map((ut) => (
+                              {user.teams?.map((ut) => (
                                 <span key={ut.teamId} className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded">
                                   {ut.team?.name || ut.teamId}
+                                </span>
+                              ))}
+                              {user.players?.map((player) => (
+                                <span key={player.id} className="px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded">
+                                  {player.team?.name || '-'}
+                                </span>
+                              ))}
+                              {user.parentPlayers?.map((pp) => (
+                                <span key={pp.id} className="px-2 py-0.5 text-xs bg-pink-100 text-pink-700 rounded">
+                                  {pp.player?.team?.name || '-'}
                                 </span>
                               ))}
                             </div>
