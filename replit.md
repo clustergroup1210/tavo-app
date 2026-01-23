@@ -75,6 +75,13 @@ The system emphasizes a team-centric display and robust role-based access contro
     -   Evaluation tab: Radar chart (coach vs self by category), gap analysis bar chart, detailed score table
     -   Progress tab: Line chart for score trends over evaluation rounds with category filter
     -   Uses Recharts for all visualizations with responsive design for mobile
+    -   Parent accounts can also access this dashboard to view their child's data
+-   **Coach Assignment System**:
+    -   Head Coach designation: One head coach per team, can evaluate all players in the team
+    -   Coach-Player assignments: COACH and GUEST_COACH roles can only evaluate players they are explicitly assigned to
+    -   `CoachAssignment` model manages many-to-many relationship between coaches and players
+    -   APIs: `/api/coach-assignments` for managing assignments, `/api/teams/:id/head-coach` for head coach designation
+    -   Permission logic: `canEvaluatePlayer` function in auth middleware enforces evaluation permissions
 
 ### UI/UX Decisions
 -   **Sidebar Navigation**: Clevio-style left-fixed sidebar, dynamic based on user role.
