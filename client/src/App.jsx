@@ -69,7 +69,7 @@ function OperatorRoute({ children }) {
 }
 
 function RootRedirect() {
-  const { isOperator, isPlayer, loading } = useAuth();
+  const { isOperator, isPlayer, isParent, loading } = useAuth();
 
   if (loading) {
     return (
@@ -82,7 +82,7 @@ function RootRedirect() {
   if (isOperator()) {
     return <Navigate to="/admin" replace />;
   }
-  if (isPlayer()) {
+  if (isPlayer() || isParent()) {
     return <Navigate to="/player-dashboard" replace />;
   }
   return <Navigate to="/dashboard" replace />;

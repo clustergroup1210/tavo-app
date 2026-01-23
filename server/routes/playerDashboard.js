@@ -12,13 +12,31 @@ function isOperator(user) {
 
 router.get('/my-player', authenticate, async (req, res) => {
   try {
-    const player = await prisma.player.findFirst({
+    let player = await prisma.player.findFirst({
       where: { userId: req.user.id },
       include: { 
         team: { select: { id: true, name: true } },
         teamCategory: { select: { id: true, name: true } }
       }
     });
+    
+    if (!player) {
+      const parentPlayer = await prisma.playerParent.findFirst({
+        where: { userId: req.user.id },
+        include: {
+          player: {
+            include: {
+              team: { select: { id: true, name: true } },
+              teamCategory: { select: { id: true, name: true } }
+            }
+          }
+        }
+      });
+      
+      if (parentPlayer) {
+        player = parentPlayer.player;
+      }
+    }
     
     if (!player) {
       return res.status(204).send();

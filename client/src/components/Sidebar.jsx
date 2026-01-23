@@ -130,9 +130,9 @@ export default function Sidebar({ isOpen, onClose }) {
     if (isParent()) {
       return {
         main: [
+          { path: '/player-dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
           { path: '/mypage', label: 'マイページ', icon: UserCircle },
-          { path: '/dashboard', label: '評価（閲覧）', icon: ClipboardList },
-          { path: '/videos', label: '動画投稿', icon: Video },
+          { path: '/videos', label: '動画', icon: Video },
           { path: '/calendar', label: 'カレンダー', icon: Calendar },
           { path: '/announcements', label: 'お知らせ', icon: Megaphone },
         ],
