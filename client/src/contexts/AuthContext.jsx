@@ -12,6 +12,8 @@ export function AuthProvider({ children }) {
   const [teams, setTeams] = useState([]);
   const [currentTeam, setCurrentTeam] = useState(null);
   const [playerData, setPlayerData] = useState(null);
+  const [parentPlayers, setParentPlayers] = useState([]);
+  const [childPlayerData, setChildPlayerData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,6 +33,16 @@ export function AuthProvider({ children }) {
         }
         if (data.players?.length > 0) {
           setPlayerData(data.players[0]);
+        }
+        if (data.parentPlayers?.length > 0) {
+          setParentPlayers(data.parentPlayers);
+          setChildPlayerData(data.parentPlayers[0].player);
+          if (data.parentPlayers[0].player?.teamId) {
+            const childTeam = { id: data.parentPlayers[0].player.teamId, name: data.parentPlayers[0].player.team?.name };
+            if (!data.teams?.length) {
+              setCurrentTeam(childTeam);
+            }
+          }
         }
       }
     } catch (error) {
@@ -85,6 +97,9 @@ export function AuthProvider({ children }) {
     setRoles(null);
     setTeams([]);
     setCurrentTeam(null);
+    setPlayerData(null);
+    setParentPlayers([]);
+    setChildPlayerData(null);
   };
 
   const isOperator = () => {
@@ -127,6 +142,8 @@ export function AuthProvider({ children }) {
         currentTeam,
         setCurrentTeam,
         playerData,
+        parentPlayers,
+        childPlayerData,
         loading,
         login,
         register,

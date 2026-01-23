@@ -10,7 +10,7 @@ import {
 import clsx from 'clsx';
 
 export default function Sidebar({ isOpen, onClose }) {
-  const { user, currentTeam, teams, setCurrentTeam, logout, isOperator, isTeamAdmin, isCoach, isPlayer, isParent, playerData } = useAuth();
+  const { user, currentTeam, teams, setCurrentTeam, logout, isOperator, isTeamAdmin, isCoach, isPlayer, isParent, playerData, childPlayerData } = useAuth();
   const location = useLocation();
   const [organizations, setOrganizations] = useState([]);
   const [selectedOrg, setSelectedOrg] = useState(null);
@@ -214,6 +214,29 @@ export default function Sidebar({ isOpen, onClose }) {
                 <p className="text-xs text-gray-500 truncate">
                   {currentTeam?.name}
                 </p>
+              </div>
+            </>
+          ) : isParent() && childPlayerData ? (
+            <>
+              {childPlayerData.photoUrl ? (
+                <img
+                  src={childPlayerData.photoUrl}
+                  alt=""
+                  className="w-10 h-10 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-pink-100 flex items-center justify-center">
+                  <UserCircle className="w-6 h-6 text-pink-500" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <h2 className="font-semibold text-gray-900 truncate">
+                  {childPlayerData.name}
+                </h2>
+                <p className="text-xs text-gray-500 truncate">
+                  {childPlayerData.team?.name || currentTeam?.name}
+                </p>
+                <p className="text-xs text-pink-500">保護者</p>
               </div>
             </>
           ) : (

@@ -33,7 +33,7 @@ const authenticate = async (req, res, next) => {
           include: { team: true }
         },
         players: true,
-        parentPlayers: { include: { player: true } }
+        parentPlayers: { include: { player: { include: { team: true } } } }
       }
     });
 

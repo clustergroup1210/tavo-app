@@ -7,7 +7,7 @@ import {
 import EvaluationComparisonTable from '../components/EvaluationComparisonTable';
 
 export default function MyPage() {
-  const { user } = useAuth();
+  const { user, isParent, childPlayerData } = useAuth();
   const [playerData, setPlayerData] = useState(null);
   const [evaluationSummary, setEvaluationSummary] = useState([]);
   const [evaluationComparison, setEvaluationComparison] = useState({ comparison: [], hasData: false });
@@ -23,16 +23,26 @@ export default function MyPage() {
   const [editingGoalContent, setEditingGoalContent] = useState('');
   const passportInputRef = useRef(null);
   const photoInputRef = useRef(null);
+  const isParentView = isParent();
 
   useEffect(() => {
     fetchMyData();
-  }, [user]);
+  }, [user, childPlayerData]);
 
   const fetchMyData = async () => {
     try {
-      const playersRes = await fetch('/api/players', { credentials: 'include' });
-      const players = await playersRes.json();
-      const myPlayer = players.find(p => p.userId === user?.id);
+      let myPlayer = null;
+      
+      if (isParentView && childPlayerData) {
+        const playerRes = await fetch(`/api/players/${childPlayerData.id}`, { credentials: 'include' });
+        if (playerRes.ok) {
+          myPlayer = await playerRes.json();
+        }
+      } else {
+        const playersRes = await fetch('/api/players', { credentials: 'include' });
+        const players = await playersRes.json();
+        myPlayer = players.find(p => p.userId === user?.id);
+      }
 
       if (myPlayer) {
         setPlayerData(myPlayer);
@@ -256,6 +266,15 @@ export default function MyPage() {
 
   return (
     <div className="space-y-6">
+      {isParentView && (
+        <div className="bg-pink-50 border border-pink-200 rounded-lg p-4 flex items-center gap-3">
+          <Users className="w-5 h-5 text-pink-600" />
+          <div>
+            <p className="text-sm font-medium text-pink-800">保護者としてログイン中</p>
+            <p className="text-xs text-pink-600">{playerData?.name}さんのデータを閲覧しています（編集不可）</p>
+          </div>
+        </div>
+      )}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="bg-gradient-to-r from-primary-500 to-primary-600 p-6">
           <div className="flex items-start gap-6">
@@ -273,16 +292,18 @@ export default function MyPage() {
                   )}
                 </div>
                 <span className="mt-1 text-xs text-white/80">プロフィール</span>
-                <label className="absolute bottom-5 -right-1 p-1.5 bg-white rounded-full shadow-lg cursor-pointer hover:bg-gray-100 transition-colors">
-                  <Upload className="w-3.5 h-3.5 text-primary-600" />
-                  <input
-                    ref={photoInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoUpload}
-                    className="hidden"
-                  />
-                </label>
+                {!isParentView && (
+                  <label className="absolute bottom-5 -right-1 p-1.5 bg-white rounded-full shadow-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                    <Upload className="w-3.5 h-3.5 text-primary-600" />
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                  </label>
+                )}
               </div>
               
               <div className="relative group flex flex-col items-center">
@@ -298,16 +319,18 @@ export default function MyPage() {
                   )}
                 </div>
                 <span className="mt-1 text-xs text-white/80">選手証</span>
-                <label className="absolute bottom-5 -right-1 p-1.5 bg-white rounded-full shadow-lg cursor-pointer hover:bg-gray-100 transition-colors">
-                  <Upload className="w-3.5 h-3.5 text-primary-600" />
-                  <input
-                    ref={passportInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePassportUpload}
-                    className="hidden"
-                  />
-                </label>
+                {!isParentView && (
+                  <label className="absolute bottom-5 -right-1 p-1.5 bg-white rounded-full shadow-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                    <Upload className="w-3.5 h-3.5 text-primary-600" />
+                    <input
+                      ref={passportInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePassportUpload}
+                      className="hidden"
+                    />
+                  </label>
+                )}
               </div>
             </div>
 
@@ -331,13 +354,15 @@ export default function MyPage() {
               </div>
             </div>
 
-            <button
-              onClick={() => setEditing(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
-            >
-              <Edit2 className="w-4 h-4" />
-              編集
-            </button>
+            {!isParentView && (
+              <button
+                onClick={() => setEditing(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+              >
+                <Edit2 className="w-4 h-4" />
+                編集
+              </button>
+            )}
           </div>
         </div>
 
@@ -418,7 +443,7 @@ export default function MyPage() {
             <Target className="w-5 h-5 text-primary-600" />
             <h3 className="text-lg font-semibold text-gray-900">目標</h3>
           </div>
-          {goalCategories.length > 0 && (
+          {goalCategories.length > 0 && !isParentView && (
             <button
               onClick={() => setShowGoalModal(true)}
               className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
@@ -465,20 +490,22 @@ export default function MyPage() {
                       ) : (
                         <>
                           <p className="text-sm text-gray-900 flex-1">{goal.content}</p>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => { setEditingGoalId(goal.id); setEditingGoalContent(goal.content); }}
-                              className="text-gray-400 hover:text-primary-600"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteGoal(goal.id)}
-                              className="text-gray-400 hover:text-red-600"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                          {!isParentView && (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => { setEditingGoalId(goal.id); setEditingGoalContent(goal.content); }}
+                                className="text-gray-400 hover:text-primary-600"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteGoal(goal.id)}
+                                className="text-gray-400 hover:text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
