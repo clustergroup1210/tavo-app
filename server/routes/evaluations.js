@@ -1,6 +1,6 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
-const { authenticate, hasTeamAccess } = require('../middleware/auth');
+const { authenticate, hasTeamAccess, canEvaluatePlayer } = require('../middleware/auth');
 const { createNotification } = require('../services/notificationService');
 
 const router = express.Router();
@@ -322,13 +322,12 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Player not found' });
     }
 
-    const isCoach = hasTeamAccess(req.user, player.teamId, [
-      'TEAM_MANAGER', 'COACH', 'COACH', 'GUEST_COACH'
-    ]) || isOperator(req.user);
     const isSelf = player.userId === req.user.id;
+    const canEvaluate = await canEvaluatePlayer(req.user, playerId, player.teamId);
+    const isCoach = canEvaluate;
 
     if (!isCoach && !isSelf) {
-      return res.status(403).json({ error: 'Access denied' });
+      return res.status(403).json({ error: 'この選手を評価する権限がありません' });
     }
 
     const raterType = isSelf && !isCoach ? 'SELF' : 'COACH';

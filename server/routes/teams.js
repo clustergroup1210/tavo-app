@@ -272,4 +272,73 @@ router.delete('/:id/members/:userId', authenticate, async (req, res) => {
   }
 });
 
+router.put('/:id/head-coach', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+
+    const isOperator = req.user.organizations?.some(o => 
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
+    );
+
+    if (!hasTeamAccess(req.user, id, ['TEAM_MANAGER']) && !isOperator) {
+      return res.status(403).json({ error: '代表監督を設定する権限がありません' });
+    }
+
+    const userTeam = await prisma.userTeam.findFirst({
+      where: {
+        userId,
+        teamId: id,
+        role: { in: ['COACH', 'GUEST_COACH', 'TEAM_MANAGER'] },
+        isActive: true
+      },
+      include: { user: { select: { id: true, name: true, email: true } } }
+    });
+
+    if (!userTeam) {
+      return res.status(400).json({ error: '指定されたユーザーはこのチームのスタッフではありません' });
+    }
+
+    const team = await prisma.team.update({
+      where: { id },
+      data: { headCoachId: userId },
+      include: {
+        headCoach: { select: { id: true, name: true, email: true } }
+      }
+    });
+
+    res.json({
+      success: true,
+      headCoach: team.headCoach
+    });
+  } catch (error) {
+    console.error('Set head coach error:', error);
+    res.status(500).json({ error: '代表監督の設定に失敗しました' });
+  }
+});
+
+router.delete('/:id/head-coach', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const isOperator = req.user.organizations?.some(o => 
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
+    );
+
+    if (!hasTeamAccess(req.user, id, ['TEAM_MANAGER']) && !isOperator) {
+      return res.status(403).json({ error: '代表監督を解除する権限がありません' });
+    }
+
+    await prisma.team.update({
+      where: { id },
+      data: { headCoachId: null }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Remove head coach error:', error);
+    res.status(500).json({ error: '代表監督の解除に失敗しました' });
+  }
+});
+
 module.exports = router;

@@ -160,4 +160,46 @@ const hasTeamAccess = (user, teamId, requiredRoles = []) => {
   return requiredRoles.includes(teamRole.role);
 };
 
-module.exports = { authenticate, getUserRoles, hasTeamAccess, JWT_SECRET };
+const canEvaluatePlayer = async (user, playerId, teamId) => {
+  const isOperator = user.organizations?.some(o => 
+    ['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'EXTERNAL'].includes(o.role)
+  );
+  if (isOperator) return true;
+
+  const teamRole = user.teams?.find(t => t.teamId === teamId);
+  if (!teamRole) return false;
+
+  if (teamRole.role === 'TEAM_MANAGER') {
+    return true;
+  }
+
+  if (['COACH', 'GUEST_COACH'].includes(teamRole.role)) {
+    const team = await prisma.team.findUnique({
+      where: { id: teamId },
+      select: { headCoachId: true }
+    });
+    
+    if (team?.headCoachId === user.id) {
+      return true;
+    }
+
+    const assignment = await prisma.coachAssignment.findUnique({
+      where: {
+        coachId_playerId: {
+          coachId: user.id,
+          playerId: playerId
+        }
+      }
+    });
+    
+    return !!assignment;
+  }
+
+  return false;
+};
+
+const canCommentOnVideo = async (user, playerId, teamId) => {
+  return canEvaluatePlayer(user, playerId, teamId);
+};
+
+module.exports = { authenticate, getUserRoles, hasTeamAccess, canEvaluatePlayer, canCommentOnVideo, JWT_SECRET };

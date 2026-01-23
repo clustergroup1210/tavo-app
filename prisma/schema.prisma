@@ -63,24 +63,27 @@ model Team {
   logoUrl        String?
   description    String?
   sortOrder      Int      @default(0)
+  headCoachId    String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization     Organization @relation(fields: [organizationId], references: [id])
-  parent           Team?        @relation("TeamHierarchy", fields: [parentId], references: [id])
-  children         Team[]       @relation("TeamHierarchy")
-  users            UserTeam[]
-  players          Player[]
-  evaluationItems  EvaluationItem[]
-  evaluationRounds EvaluationRound[]
-  invitations      Invitation[]
-  goalCategories   GoalCategory[]
-  teamCategories   TeamCategory[]
-  calendarEvents   CalendarEvent[]
-  announcements    Announcement[]
-  joinRequests     TeamJoinRequest[]
-  transfersFrom    TransferHistory[] @relation("TransferFromTeam")
-  transfersTo      TransferHistory[] @relation("TransferToTeam")
+  organization      Organization       @relation(fields: [organizationId], references: [id])
+  parent            Team?              @relation("TeamHierarchy", fields: [parentId], references: [id])
+  children          Team[]             @relation("TeamHierarchy")
+  headCoach         User?              @relation("TeamHeadCoach", fields: [headCoachId], references: [id])
+  users             UserTeam[]
+  players           Player[]
+  evaluationItems   EvaluationItem[]
+  evaluationRounds  EvaluationRound[]
+  invitations       Invitation[]
+  goalCategories    GoalCategory[]
+  teamCategories    TeamCategory[]
+  calendarEvents    CalendarEvent[]
+  announcements     Announcement[]
+  joinRequests      TeamJoinRequest[]
+  transfersFrom     TransferHistory[]  @relation("TransferFromTeam")
+  transfersTo       TransferHistory[]  @relation("TransferToTeam")
+  coachAssignments  CoachAssignment[]
 }
 
 model User {
@@ -105,6 +108,8 @@ model User {
   reviewedRequests     TeamJoinRequest[] @relation("JoinRequestReviewer")
   notifications        Notification[]
   notificationSetting  NotificationSetting?
+  headCoachTeams       Team[]             @relation("TeamHeadCoach")
+  coachAssignments     CoachAssignment[]  @relation("CoachAssignee")
 }
 
 model UserOrganization {
@@ -157,9 +162,9 @@ model Player {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  user             User?          @relation(fields: [userId], references: [id])
-  team             Team           @relation(fields: [teamId], references: [id])
-  teamCategory     TeamCategory?  @relation(fields: [teamCategoryId], references: [id])
+  user             User?            @relation(fields: [userId], references: [id])
+  team             Team             @relation(fields: [teamId], references: [id])
+  teamCategory     TeamCategory?    @relation(fields: [teamCategoryId], references: [id])
   parents          PlayerParent[]
   evaluations      Evaluation[]
   appealLinks      AppealLink[]
@@ -169,6 +174,7 @@ model Player {
   goals            Goal[]
   invitations      Invitation[]
   transferHistory  TransferHistory[]
+  coachAssignments CoachAssignment[]
 }
 
 model TeamCategory {
@@ -484,4 +490,21 @@ model TransferHistory {
   @@index([playerId])
   @@index([fromTeamId])
   @@index([toTeamId])
+}
+
+model CoachAssignment {
+  id        String   @id @default(uuid())
+  coachId   String
+  playerId  String
+  teamId    String
+  createdAt DateTime @default(now())
+
+  coach  User   @relation("CoachAssignee", fields: [coachId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([coachId, playerId])
+  @@index([teamId])
+  @@index([coachId])
+  @@index([playerId])
 }
