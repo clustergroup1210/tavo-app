@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
 const path = require('path');
 require('dotenv').config();
 
@@ -25,6 +26,12 @@ const transferRoutes = require('./routes/transfers');
 const coachAssignmentRoutes = require('./routes/coachAssignments');
 
 const app = express();
+
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());

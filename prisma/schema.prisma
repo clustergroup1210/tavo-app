@@ -84,6 +84,9 @@ model Team {
   transfersFrom     TransferHistory[]  @relation("TransferFromTeam")
   transfersTo       TransferHistory[]  @relation("TransferToTeam")
   coachAssignments  CoachAssignment[]
+
+  @@index([organizationId])
+  @@index([parentId])
 }
 
 model User {
@@ -123,6 +126,9 @@ model UserOrganization {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([userId, organizationId, role])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([role])
 }
 
 model UserTeam {
@@ -137,6 +143,9 @@ model UserTeam {
   team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@unique([userId, teamId, role])
+  @@index([userId])
+  @@index([teamId])
+  @@index([role])
 }
 
 model Player {
@@ -175,6 +184,11 @@ model Player {
   invitations      Invitation[]
   transferHistory  TransferHistory[]
   coachAssignments CoachAssignment[]
+
+  @@index([teamId])
+  @@index([userId])
+  @@index([teamCategoryId])
+  @@index([name])
 }
 
 model TeamCategory {
@@ -225,6 +239,9 @@ model PlayerNote {
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
   author User   @relation(fields: [authorId], references: [id])
+
+  @@index([playerId])
+  @@index([authorId])
 }
 
 model EvaluationItem {
@@ -243,6 +260,9 @@ model EvaluationItem {
   parent      EvaluationItem?  @relation("ItemHierarchy", fields: [parentId], references: [id])
   children    EvaluationItem[] @relation("ItemHierarchy")
   evaluations Evaluation[]
+
+  @@index([teamId])
+  @@index([parentId])
 }
 
 model EvaluationRound {
@@ -256,6 +276,8 @@ model EvaluationRound {
 
   team        Team         @relation(fields: [teamId], references: [id])
   evaluations Evaluation[]
+
+  @@index([teamId])
 }
 
 model Evaluation {
@@ -272,6 +294,12 @@ model Evaluation {
   item   EvaluationItem  @relation(fields: [itemId], references: [id])
   round  EvaluationRound @relation(fields: [roundId], references: [id])
   rater  User            @relation(fields: [raterUserId], references: [id])
+
+  @@index([playerId])
+  @@index([roundId])
+  @@index([itemId])
+  @@index([raterUserId])
+  @@index([playerId, roundId])
 }
 
 model Invitation {
@@ -289,6 +317,9 @@ model Invitation {
 
   team   Team    @relation(fields: [teamId], references: [id])
   player Player? @relation(fields: [playerId], references: [id])
+
+  @@index([teamId])
+  @@index([expiresAt])
 }
 
 model AppealLink {
@@ -325,6 +356,10 @@ model Video {
   createdAt   DateTime @default(now())
 
   player Player? @relation(fields: [playerId], references: [id])
+
+  @@index([playerId])
+  @@index([uploadedBy])
+  @@index([teamId])
 }
 
 model GoalCategory {
@@ -339,6 +374,8 @@ model GoalCategory {
 
   team  Team   @relation(fields: [teamId], references: [id])
   goals Goal[]
+
+  @@index([teamId])
 }
 
 model Goal {
@@ -353,6 +390,9 @@ model Goal {
 
   player   Player       @relation(fields: [playerId], references: [id])
   category GoalCategory @relation(fields: [categoryId], references: [id])
+
+  @@index([playerId])
+  @@index([categoryId])
 }
 
 model CalendarEvent {
@@ -374,6 +414,10 @@ model CalendarEvent {
   organization    Organization?                @relation(fields: [organizationId], references: [id])
   author          User                         @relation(fields: [createdBy], references: [id])
   categoryTargets CalendarEventCategoryTarget[]
+
+  @@index([teamId])
+  @@index([organizationId])
+  @@index([startDate])
 }
 
 model CalendarEventCategoryTarget {
@@ -405,6 +449,11 @@ model Announcement {
   organization    Organization?                @relation(fields: [organizationId], references: [id])
   author          User                         @relation(fields: [createdBy], references: [id])
   categoryTargets AnnouncementCategoryTarget[]
+
+  @@index([teamId])
+  @@index([organizationId])
+  @@index([isPublished])
+  @@index([expiresAt])
 }
 
 model AnnouncementCategoryTarget {
