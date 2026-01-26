@@ -55,7 +55,14 @@ The system emphasizes a team-centric display and robust role-based access contro
     -   Authorization: Players can view/manage their own appeals; coaches can view/manage team player appeals
 -   **Invitation URL System**: Team-based invitation system for players, parents, and staff with role-specific flows. Parent invitations require player selection and auto-create PlayerParent relationships upon registration. Security validation ensures players belong to the target team.
 -   **System Administration**: Dedicated operator dashboard with system-wide statistics, team management, user management, and team impersonation capabilities.
--   **Data Visibility**: Evaluation data and other records are filtered based on player-team membership periods, ensuring coaches only see relevant historical data.
+-   **Data Visibility**: Comprehensive time-series filtering based on player-team membership periods (bidirectional isolation):
+    -   Player themselves: Full access to all historical data
+    -   Parent accounts: Full access to child's historical data
+    -   Operators: Full access to all data
+    -   Current team coaches: Can only see data from when the player joined their team (joinedAt to now)
+    -   Former team coaches: Can only see data from their tenure period (joinedAt to leftAt)
+    -   Applied to: Evaluations, Videos, Goals, Player Notes
+    -   Service: `dataVisibilityService.js` provides centralized filtering logic
 -   **Parent Team Inheritance**: Evaluation items and rounds can be inherited from parent teams for sub-teams.
 -   **Player Transfer System**: 
     -   Data ownership: All evaluations, goals, videos are tied to player ID (not team), following the player across transfers

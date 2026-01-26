@@ -2,6 +2,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { authenticate, hasTeamAccess, canEvaluatePlayer } = require('../middleware/auth');
 const { createNotification } = require('../services/notificationService');
+const { filterDataByVisibility } = require('../services/dataVisibilityService');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -203,10 +204,19 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
   try {
     const { roundId } = req.query;
     
+    const player = await prisma.player.findUnique({
+      where: { id: req.params.playerId },
+      select: { id: true, userId: true, teamId: true }
+    });
+
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
     const where = { playerId: req.params.playerId };
     if (roundId) where.roundId = roundId;
 
-    const evaluations = await prisma.evaluation.findMany({
+    let evaluations = await prisma.evaluation.findMany({
       where,
       include: {
         item: true,
@@ -216,8 +226,17 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
       orderBy: { evaluatedAt: 'desc' }
     });
 
+    const isSelf = player.userId === req.user.id;
+    const isParent = req.user.parentPlayers?.some(pp => pp.playerId === req.params.playerId);
+    const isOp = isOperator(req.user);
+
+    if (!isSelf && !isParent && !isOp) {
+      evaluations = await filterDataByVisibility(req.user, req.params.playerId, evaluations, 'evaluatedAt');
+    }
+
     res.json(evaluations);
   } catch (error) {
+    console.error('Fetch player evaluations error:', error);
     res.status(500).json({ error: 'Failed to fetch evaluations' });
   }
 });

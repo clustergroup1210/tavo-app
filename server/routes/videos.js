@@ -93,11 +93,23 @@ router.get('/:id', authenticate, async (req, res) => {
   try {
     const video = await prisma.video.findUnique({
       where: { id: req.params.id },
-      include: { player: true }
+      include: { player: { select: { id: true, name: true, teamId: true, userId: true } } }
     });
 
     if (!video) {
       return res.status(404).json({ error: 'Video not found' });
+    }
+
+    if (video.player && !isOperator(req.user)) {
+      const isSelf = video.player.userId === req.user.id;
+      const isParent = req.user.parentPlayers?.some(pp => pp.playerId === video.playerId);
+      
+      if (!isSelf && !isParent) {
+        const filteredVideos = await filterDataByVisibility(req.user, video.playerId, [video], 'createdAt');
+        if (filteredVideos.length === 0) {
+          return res.status(403).json({ error: 'この動画は閲覧期間外のため表示できません' });
+        }
+      }
     }
 
     res.json({
@@ -113,23 +125,35 @@ router.get('/:id/stream', authenticate, async (req, res) => {
   try {
     const video = await prisma.video.findUnique({
       where: { id: req.params.id },
-      include: { player: true }
+      include: { player: { select: { id: true, name: true, teamId: true, userId: true } } }
     });
 
     if (!video) {
       return res.status(404).json({ error: 'Video not found' });
     }
 
-    const canView = 
-      video.uploadedBy === req.user.id ||
-      (video.player && (
-        video.player.userId === req.user.id ||
-        hasTeamAccess(req.user, video.player.teamId)
-      )) ||
-      (video.teamId && hasTeamAccess(req.user, video.teamId));
+    const isUploader = video.uploadedBy === req.user.id;
+    const isSelf = video.player?.userId === req.user.id;
+    const isParent = req.user.parentPlayers?.some(pp => pp.playerId === video.playerId);
+    const isOp = isOperator(req.user);
 
-    if (!canView) {
+    if (isUploader || isSelf || isParent || isOp) {
+      const filePath = path.join(__dirname, '../../uploads', video.storageKey);
+      return res.sendFile(filePath);
+    }
+
+    const hasAccess = (video.player && hasTeamAccess(req.user, video.player.teamId)) ||
+                      (video.teamId && hasTeamAccess(req.user, video.teamId));
+
+    if (!hasAccess) {
       return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (video.player) {
+      const filteredVideos = await filterDataByVisibility(req.user, video.playerId, [video], 'createdAt');
+      if (filteredVideos.length === 0) {
+        return res.status(403).json({ error: 'この動画は閲覧期間外のため表示できません' });
+      }
     }
 
     const filePath = path.join(__dirname, '../../uploads', video.storageKey);
