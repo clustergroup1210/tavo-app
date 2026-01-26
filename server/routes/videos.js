@@ -4,9 +4,16 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { PrismaClient } = require('@prisma/client');
 const { authenticate, hasTeamAccess } = require('../middleware/auth');
+const { filterDataByVisibility, getVisibleDataWhereClause } = require('../services/dataVisibilityService');
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+function isOperator(user) {
+  return user.organizations?.some(o => 
+    ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
+  );
+}
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/'),
@@ -22,14 +29,29 @@ router.get('/', authenticate, async (req, res) => {
     if (playerId) where.playerId = playerId;
     if (teamId) where.teamId = teamId;
 
-    const videos = await prisma.video.findMany({
+    let videos = await prisma.video.findMany({
       where,
-      include: { player: { select: { id: true, name: true } } },
+      include: { player: { select: { id: true, name: true, teamId: true, userId: true } } },
       orderBy: { createdAt: 'desc' }
     });
 
+    if (playerId && !isOperator(req.user)) {
+      const player = await prisma.player.findUnique({
+        where: { id: playerId },
+        select: { id: true, userId: true }
+      });
+      
+      const isOwnData = player?.userId === req.user.id;
+      const isParent = req.user.parentPlayers?.some(pp => pp.playerId === playerId);
+      
+      if (!isOwnData && !isParent) {
+        videos = await filterDataByVisibility(req.user, playerId, videos, 'createdAt');
+      }
+    }
+
     res.json(videos);
   } catch (error) {
+    console.error('Fetch videos error:', error);
     res.status(500).json({ error: 'Failed to fetch videos' });
   }
 });

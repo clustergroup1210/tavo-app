@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const prisma = require('../lib/prisma');
 const { authenticate, hasTeamAccess } = require('../middleware/auth');
 const { transferPlayer } = require('../services/transferService');
+const { filterDataByVisibility } = require('../services/dataVisibilityService');
 
 const router = express.Router();
 
@@ -213,11 +214,31 @@ router.put('/:id', authenticate, async (req, res) => {
 
 router.get('/:id/notes', authenticate, async (req, res) => {
   try {
-    const notes = await prisma.playerNote.findMany({
+    const player = await prisma.player.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, userId: true, teamId: true }
+    });
+
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
+    let notes = await prisma.playerNote.findMany({
       where: { playerId: req.params.id },
       include: { author: { select: { id: true, name: true, avatarUrl: true } } },
       orderBy: { createdAt: 'desc' }
     });
+
+    const isSelf = player.userId === req.user.id;
+    const isParent = req.user.parentPlayers?.some(pp => pp.playerId === req.params.id);
+    const isOp = req.user.organizations?.some(o => 
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
+    );
+
+    if (!isSelf && !isParent && !isOp) {
+      notes = await filterDataByVisibility(req.user, req.params.id, notes, 'createdAt');
+    }
+
     res.json(notes);
   } catch (error) {
     console.error('Get notes error:', error);

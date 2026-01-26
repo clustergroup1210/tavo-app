@@ -1,6 +1,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { authenticate } = require('../middleware/auth');
+const { filterDataByVisibility } = require('../services/dataVisibilityService');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -164,7 +165,8 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
     }
 
     const isSelf = player.userId === req.user.id;
-    const hasAccess = isSelf || 
+    const isParent = req.user.parentPlayers?.some(pp => pp.playerId === req.params.playerId);
+    const hasAccess = isSelf || isParent ||
       isOperator(req.user) || 
       hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH', 'COACH']);
     
@@ -172,7 +174,7 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    const goals = await prisma.goal.findMany({
+    let goals = await prisma.goal.findMany({
       where: { playerId: req.params.playerId },
       include: { 
         category: { select: { id: true, name: true, teamId: true } }
@@ -182,6 +184,10 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
         { createdAt: 'desc' }
       ]
     });
+
+    if (!isSelf && !isParent && !isOperator(req.user)) {
+      goals = await filterDataByVisibility(req.user, req.params.playerId, goals, 'createdAt');
+    }
 
     res.json(goals);
   } catch (error) {
