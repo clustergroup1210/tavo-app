@@ -129,6 +129,7 @@ model UserOrganization {
   @@index([userId])
   @@index([organizationId])
   @@index([role])
+  @@index([organizationId, role])
 }
 
 model UserTeam {
@@ -146,6 +147,8 @@ model UserTeam {
   @@index([userId])
   @@index([teamId])
   @@index([role])
+  @@index([teamId, role])
+  @@index([teamId, userId])
 }
 
 model Player {

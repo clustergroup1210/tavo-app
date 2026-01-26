@@ -17,14 +17,20 @@
 # Cron Setup (for automated daily backups):
 #   1. Open crontab: crontab -e
 #   2. Add the following line for daily backup at 2:00 AM:
-#      0 2 * * * cd /home/user/player-development-system && ./scripts/backup-db.sh >> /var/log/db-backup.log 2>&1
+#      0 2 * * * cd "$(pwd)" && ./scripts/backup-db.sh >> logs/db-backup.log 2>&1
+#
+#   Note: Replace $(pwd) with your actual project path when setting up cron.
+#   Example for Replit:
+#      0 2 * * * cd /home/runner/workspace && ./scripts/backup-db.sh >> logs/db-backup.log 2>&1
 #
 #   Alternative: Use node-cron in your application for in-process scheduling
 # =============================================================================
 
 set -e
 
-BACKUP_DIR="$(dirname "$0")/../backups"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+BACKUP_DIR="$PROJECT_DIR/backups"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_FILE="$BACKUP_DIR/backup_$TIMESTAMP.sql"
 

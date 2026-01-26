@@ -89,7 +89,13 @@ The system emphasizes a team-centric display and robust role-based access contro
 -   **Data Visualization**: Extensive use of Recharts for evaluation progress, category trends, and gap analysis with intuitive coloring (e.g., heatmap cells, blue/red bars for positive/negative gaps).
 -   **Admin Interface**: Separate, dedicated interface for operators with distinct navigation and management tools.
 
+## Infrastructure & Non-Functional Features
+-   **Database Indexing**: Comprehensive indexes on frequently queried columns (teamId, userId, playerId, roundId, etc.) for optimized query performance.
+-   **Security Headers**: Helmet middleware with environment-aware CSP (strict in production, relaxed in development).
+-   **Backup System**: PostgreSQL backup script (`scripts/backup-db.sh`) with automatic retention (7 days) and cron setup instructions.
+
 ## External Dependencies
 -   **Prisma ORM**: For database interactions with PostgreSQL.
 -   **JWT (JSON Web Tokens)**: For authentication.
 -   **Recharts**: For data visualization and charting in the UI.
+-   **Helmet**: For HTTP security headers.
