@@ -16,12 +16,38 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const { playerId, teamId, status } = req.query;
 
+    if (!isOperator(req.user) && !teamId && !playerId) {
+      return res.status(400).json({ error: 'teamId or playerId is required' });
+    }
+
     const where = {};
     if (playerId) where.playerId = playerId;
     if (status) where.status = status;
 
     if (teamId) {
+      if (!isOperator(req.user) && !hasTeamAccess(req.user, teamId)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
       where.player = { teamId };
+    }
+
+    if (playerId && !isOperator(req.user)) {
+      const player = await prisma.player.findUnique({
+        where: { id: playerId },
+        select: { userId: true, teamId: true }
+      });
+
+      if (!player) {
+        return res.status(404).json({ error: 'Player not found' });
+      }
+
+      const isSelf = player.userId === req.user.id;
+      const isParent = req.user.parentPlayers?.some(pp => pp.playerId === playerId);
+      const hasAccess = hasTeamAccess(req.user, player.teamId);
+
+      if (!isSelf && !isParent && !hasAccess) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
     }
 
     const tasks = await prisma.task.findMany({
@@ -75,8 +101,28 @@ router.get('/my-tasks', authenticate, async (req, res) => {
 router.get('/player/:playerId', authenticate, async (req, res) => {
   try {
     const { status } = req.query;
+    const { playerId } = req.params;
+
+    const player = await prisma.player.findUnique({
+      where: { id: playerId },
+      select: { userId: true, teamId: true }
+    });
+
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
+    if (!isOperator(req.user)) {
+      const isSelf = player.userId === req.user.id;
+      const isParent = req.user.parentPlayers?.some(pp => pp.playerId === playerId);
+      const hasAccess = hasTeamAccess(req.user, player.teamId);
+
+      if (!isSelf && !isParent && !hasAccess) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+    }
     
-    const where = { playerId: req.params.playerId };
+    const where = { playerId };
     if (status) where.status = status;
 
     const tasks = await prisma.task.findMany({

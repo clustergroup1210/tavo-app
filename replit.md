@@ -76,6 +76,17 @@ The system emphasizes a team-centric display and robust role-based access contro
     -   Per-user notification settings (enable/disable each type)
     -   Email notification option (mock implementation, console output)
     -   Notification settings page at /notification-settings
+-   **Task Management System**:
+    -   Coaches can assign tasks to players with title, description, and due date
+    -   Task statuses: PENDING, IN_PROGRESS, COMPLETED, CANCELLED
+    -   Players receive notifications when new tasks are assigned
+    -   Task list visible on player detail page (課題 tab)
+    -   Players can mark tasks as in-progress or completed
+-   **Video Comment System**:
+    -   Users can comment on uploaded videos
+    -   Comments support create, edit, and delete operations
+    -   Video uploader and player receive notifications when comments are added
+    -   Comment section accessible via video modal with playback
 -   **Player Dashboard** (`/player-dashboard`):
     -   Three-tab dashboard: Summary, Evaluation Analysis, Progress Tracking
     -   Summary tab: Total score, achievement rate (progress bar), latest round, unread notifications, next actions

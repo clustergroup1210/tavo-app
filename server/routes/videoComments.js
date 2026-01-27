@@ -6,8 +6,37 @@ const { createNotification } = require('../services/notificationService');
 const router = express.Router();
 const prisma = new PrismaClient();
 
+function isOperator(user) {
+  return user.organizations?.some(o => 
+    ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
+  );
+}
+
+async function canAccessVideo(user, video) {
+  if (isOperator(user)) return true;
+  if (video.uploadedBy === user.id) return true;
+  if (video.player?.userId === user.id) return true;
+  if (user.parentPlayers?.some(pp => pp.playerId === video.playerId)) return true;
+  if (video.player && hasTeamAccess(user, video.player.teamId)) return true;
+  if (video.teamId && hasTeamAccess(user, video.teamId)) return true;
+  return false;
+}
+
 router.get('/:videoId', authenticate, async (req, res) => {
   try {
+    const video = await prisma.video.findUnique({
+      where: { id: req.params.videoId },
+      include: { player: { select: { id: true, userId: true, teamId: true } } }
+    });
+
+    if (!video) {
+      return res.status(404).json({ error: 'Video not found' });
+    }
+
+    if (!await canAccessVideo(req.user, video)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     const comments = await prisma.videoComment.findMany({
       where: { videoId: req.params.videoId },
       include: {
@@ -43,6 +72,10 @@ router.post('/:videoId', authenticate, async (req, res) => {
 
     if (!video) {
       return res.status(404).json({ error: 'Video not found' });
+    }
+
+    if (!await canAccessVideo(req.user, video)) {
+      return res.status(403).json({ error: 'Access denied' });
     }
 
     const comment = await prisma.videoComment.create({
@@ -87,16 +120,25 @@ router.put('/:commentId', authenticate, async (req, res) => {
   try {
     const { content } = req.body;
 
+    if (!content?.trim()) {
+      return res.status(400).json({ error: 'Content is required' });
+    }
+
     const comment = await prisma.videoComment.findUnique({
-      where: { id: req.params.commentId }
+      where: { id: req.params.commentId },
+      include: { video: { include: { player: { select: { id: true, userId: true, teamId: true } } } } }
     });
 
     if (!comment) {
       return res.status(404).json({ error: 'Comment not found' });
     }
 
-    if (comment.userId !== req.user.id) {
+    if (!await canAccessVideo(req.user, comment.video)) {
       return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (comment.userId !== req.user.id && !isOperator(req.user)) {
+      return res.status(403).json({ error: '自分のコメントのみ編集できます' });
     }
 
     const updated = await prisma.videoComment.update({
@@ -118,19 +160,24 @@ router.delete('/:commentId', authenticate, async (req, res) => {
   try {
     const comment = await prisma.videoComment.findUnique({
       where: { id: req.params.commentId },
-      include: { video: { include: { player: true } } }
+      include: { video: { include: { player: { select: { id: true, userId: true, teamId: true } } } } }
     });
 
     if (!comment) {
       return res.status(404).json({ error: 'Comment not found' });
     }
 
+    if (!await canAccessVideo(req.user, comment.video)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     const isOwner = comment.userId === req.user.id;
     const isVideoUploader = comment.video.uploadedBy === req.user.id;
     const isTeamCoach = comment.video.player && 
       hasTeamAccess(req.user, comment.video.player.teamId, ['TEAM_MANAGER', 'COACH']);
+    const isOp = isOperator(req.user);
 
-    if (!isOwner && !isVideoUploader && !isTeamCoach) {
+    if (!isOwner && !isVideoUploader && !isTeamCoach && !isOp) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
