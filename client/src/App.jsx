@@ -36,6 +36,7 @@ import JoinRequests from './pages/JoinRequests';
 import AppealManagement from './pages/AppealManagement';
 import NotificationSettings from './pages/NotificationSettings';
 import PlayerDashboard from './pages/PlayerDashboard';
+import AccountSettings from './pages/AccountSettings';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -155,6 +156,7 @@ export default function App() {
           <Route path="/appeal-management" element={<AppealManagement />} />
           <Route path="/notification-settings" element={<NotificationSettings />} />
           <Route path="/player-dashboard" element={<PlayerDashboard />} />
+          <Route path="/account-settings" element={<AccountSettings />} />
         </Route>
       </Route>
     </Routes>

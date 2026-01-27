@@ -122,6 +122,7 @@ export default function Sidebar({ isOpen, onClose }) {
           { path: '/calendar', label: 'カレンダー', icon: Calendar },
           { path: '/announcements', label: 'お知らせ', icon: Megaphone },
           { path: '/appeal-management', label: 'アピールページ', icon: Link2 },
+          { path: '/account-settings', label: 'アカウント設定', icon: Settings },
         ],
         admin: [],
       };
@@ -135,6 +136,7 @@ export default function Sidebar({ isOpen, onClose }) {
           { path: '/videos', label: '動画', icon: Video },
           { path: '/calendar', label: 'カレンダー', icon: Calendar },
           { path: '/announcements', label: 'お知らせ', icon: Megaphone },
+          { path: '/account-settings', label: 'アカウント設定', icon: Settings },
         ],
         admin: [],
       };

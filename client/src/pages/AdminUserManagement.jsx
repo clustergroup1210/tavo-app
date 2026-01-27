@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, UserPlus, MoreVertical, Mail, Shield, X, Link2, Copy, Trash2, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Search, UserPlus, MoreVertical, Mail, Shield, X, Link2, Copy, Trash2, Clock, CheckCircle, XCircle, Edit2 } from 'lucide-react';
 
 export default function AdminUserManagement() {
   const [activeTab, setActiveTab] = useState('users');
@@ -12,6 +12,8 @@ export default function AdminUserManagement() {
   const [teamFilter, setTeamFilter] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   const [copiedUrl, setCopiedUrl] = useState(null);
@@ -23,6 +25,11 @@ export default function AdminUserManagement() {
     teamId: '',
     teamRole: '',
     playerId: '',
+  });
+  const [editForm, setEditForm] = useState({
+    name: '',
+    email: '',
+    password: '',
   });
   const [teamPlayers, setTeamPlayers] = useState([]);
   const [newInvite, setNewInvite] = useState({
@@ -186,6 +193,44 @@ export default function AdminUserManagement() {
     await navigator.clipboard.writeText(fullUrl);
     setCopiedUrl(id);
     setTimeout(() => setCopiedUrl(null), 2000);
+  };
+
+  const handleEditUser = (user) => {
+    setEditingUser(user);
+    setEditForm({
+      name: user.name || '',
+      email: user.email || '',
+      password: '',
+    });
+    setError('');
+    setShowEditModal(true);
+  };
+
+  const handleUpdateUser = async (e) => {
+    e.preventDefault();
+    setError('');
+    setCreating(true);
+    try {
+      const res = await fetch(`/api/users/${editingUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(editForm),
+      });
+      if (res.ok) {
+        setShowEditModal(false);
+        setEditingUser(null);
+        setEditForm({ name: '', email: '', password: '' });
+        fetchUsers();
+      } else {
+        const data = await res.json();
+        setError(data.error || 'ユーザーの更新に失敗しました');
+      }
+    } catch (error) {
+      setError('ユーザーの更新に失敗しました');
+    } finally {
+      setCreating(false);
+    }
   };
 
   const filteredUsers = users.filter(user => {
@@ -411,8 +456,12 @@ export default function AdminUserManagement() {
                           {new Date(user.createdAt).toLocaleDateString('ja-JP')}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
-                            <MoreVertical className="w-4 h-4" />
+                          <button 
+                            onClick={() => handleEditUser(user)}
+                            className="p-2 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-100"
+                            title="編集"
+                          >
+                            <Edit2 className="w-4 h-4" />
                           </button>
                         </td>
                       </tr>
@@ -801,6 +850,77 @@ export default function AdminUserManagement() {
                   className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
                 >
                   {creating ? '発行中...' : '発行'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && editingUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">ユーザー編集</h2>
+              <button 
+                onClick={() => { setShowEditModal(false); setError(''); setEditingUser(null); }}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+            <form onSubmit={handleUpdateUser} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">名前</label>
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
+                <input
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">新しいパスワード（変更する場合のみ）</label>
+                <input
+                  type="password"
+                  value={editForm.password}
+                  onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="変更しない場合は空欄"
+                  minLength={6}
+                />
+                <p className="text-xs text-gray-500 mt-1">6文字以上で入力してください</p>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => { setShowEditModal(false); setError(''); setEditingUser(null); }}
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {creating ? '更新中...' : '更新'}
                 </button>
               </div>
             </form>

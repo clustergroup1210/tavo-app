@@ -240,4 +240,68 @@ router.put('/profile', authenticate, async (req, res) => {
   }
 });
 
+router.put('/:id', authenticate, async (req, res) => {
+  try {
+    if (!isOperatorUser(req.user)) {
+      return res.status(403).json({ error: 'Operator access required' });
+    }
+
+    const { name, email, password } = req.body;
+    const userId = req.params.id;
+
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (email && email !== existingUser.email) {
+      const emailExists = await prisma.user.findUnique({
+        where: { email }
+      });
+      if (emailExists) {
+        return res.status(400).json({ error: 'このメールアドレスは既に使用されています' });
+      }
+    }
+
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
+    if (password) {
+      if (password.length < 6) {
+        return res.status(400).json({ error: 'パスワードは6文字以上である必要があります' });
+      }
+      updateData.password = await bcrypt.hash(password, 10);
+    }
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      include: {
+        organizations: true,
+        teams: { include: { team: true } },
+        players: { select: { id: true, name: true, teamId: true, team: { select: { id: true, name: true } } } },
+        parentPlayers: { include: { player: { include: { team: true } } } }
+      }
+    });
+
+    res.json({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      avatarUrl: user.avatarUrl,
+      organizations: user.organizations,
+      teams: user.teams,
+      players: user.players,
+      parentPlayers: user.parentPlayers,
+      createdAt: user.createdAt
+    });
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
 module.exports = router;
