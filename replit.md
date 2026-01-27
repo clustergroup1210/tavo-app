@@ -76,6 +76,10 @@ The system emphasizes a team-centric display and robust role-based access contro
     -   Per-user notification settings (enable/disable each type)
     -   Email notification option (mock implementation, console output)
     -   Notification settings page at /notification-settings
+-   **Account Management**:
+    -   Admin user editing: Operators can edit any user's name, email, and password from the user management page
+    -   Self-service account settings: Players and parents can edit their own email and password at /account-settings
+    -   Password change requires current password verification for self-service updates
 -   **Task Management System**:
     -   Coaches can assign tasks to players with title, description, and due date
     -   Task statuses: PENDING, IN_PROGRESS, COMPLETED, CANCELLED
