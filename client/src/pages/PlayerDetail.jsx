@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   UserCircle, Upload, Link2, TrendingUp, Video, ClipboardList, Edit2, Save, X,
   Calendar, Ruler, Weight, MapPin, GraduationCap, Users, Footprints, MessageSquare, Send, Trash2,
-  Star, Zap
+  Star, Zap, Target
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import EvaluationComparisonTable from '../components/EvaluationComparisonTable';
 import AppealTab from '../components/AppealTab';
+import TaskList from '../components/TaskList';
 
 export default function PlayerDetail() {
   const { id } = useParams();
@@ -388,6 +389,7 @@ export default function PlayerDetail() {
 
   const tabs = [
     { id: 'evaluation', label: '評価データ', icon: ClipboardList },
+    { id: 'tasks', label: '課題', icon: Target },
     { id: 'videos', label: '動画', icon: Video },
     { id: 'notes', label: 'コメント/ノート', icon: MessageSquare },
     { id: 'progress', label: '上達状況', icon: TrendingUp },
@@ -887,6 +889,16 @@ export default function PlayerDetail() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {activeTab === 'tasks' && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <TaskList 
+            playerId={player.id} 
+            canAssign={isCoach || isOperator}
+            showAssigner={true}
+          />
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Upload, Play, Trash2 } from 'lucide-react';
+import { Upload, Play, Trash2, MessageSquare, X } from 'lucide-react';
+import VideoCommentSection from '../components/VideoCommentSection';
 
 export default function Videos() {
   const { currentTeam, user } = useAuth();
@@ -9,6 +10,7 @@ export default function Videos() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadData, setUploadData] = useState({ title: '', description: '', file: null });
+  const [selectedVideo, setSelectedVideo] = useState(null);
 
   useEffect(() => {
     if (currentTeam) {
@@ -112,14 +114,23 @@ export default function Videos() {
                 <span className="text-xs text-gray-400">
                   {new Date(video.createdAt).toLocaleDateString('ja-JP')}
                 </span>
-                {video.uploadedBy === user?.id && (
+                <div className="flex items-center gap-1">
                   <button
-                    onClick={() => handleDelete(video.id)}
-                    className="p-2 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+                    onClick={() => setSelectedVideo(video)}
+                    className="p-2 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-50"
+                    title="コメント"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <MessageSquare className="w-4 h-4" />
                   </button>
-                )}
+                  {video.uploadedBy === user?.id && (
+                    <button
+                      onClick={() => handleDelete(video.id)}
+                      className="p-2 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -183,6 +194,33 @@ export default function Videos() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {selectedVideo && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-lg">
+            <div className="mb-4 bg-white rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-gray-900">{selectedVideo.title}</h3>
+                <button 
+                  onClick={() => setSelectedVideo(null)}
+                  className="p-1 hover:bg-gray-100 rounded"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              <video
+                src={`/api/videos/${selectedVideo.id}/stream`}
+                controls
+                className="w-full rounded-lg bg-black"
+              />
+            </div>
+            <VideoCommentSection 
+              videoId={selectedVideo.id} 
+              onClose={() => setSelectedVideo(null)}
+            />
           </div>
         </div>
       )}

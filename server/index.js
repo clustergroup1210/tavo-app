@@ -24,6 +24,8 @@ const notificationRoutes = require('./routes/notifications');
 const playerDashboardRoutes = require('./routes/playerDashboard');
 const transferRoutes = require('./routes/transfers');
 const coachAssignmentRoutes = require('./routes/coachAssignments');
+const videoCommentRoutes = require('./routes/videoComments');
+const taskRoutes = require('./routes/tasks');
 
 const app = express();
 
@@ -70,6 +72,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/player-dashboard', playerDashboardRoutes);
 app.use('/api/transfers', transferRoutes);
 app.use('/api/coach-assignments', coachAssignmentRoutes);
+app.use('/api/video-comments', videoCommentRoutes);
+app.use('/api/tasks', taskRoutes);
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));
