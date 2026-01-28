@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Mail, ClipboardCheck, Target, MessageSquare, Calendar, Save, ArrowLeft } from 'lucide-react';
+import { Bell, Mail, ClipboardCheck, Target, MessageSquare, Calendar, Megaphone, Save, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 
@@ -38,6 +38,13 @@ const settingItems = [
     description: 'カレンダーに予定が追加・更新された時に通知',
     icon: Calendar,
     color: 'text-teal-600 bg-teal-100'
+  },
+  {
+    key: 'notifyAnnouncement',
+    label: 'お知らせ',
+    description: '新しいお知らせが配信された時に通知',
+    icon: Megaphone,
+    color: 'text-red-600 bg-red-100'
   }
 ];
 
@@ -48,6 +55,7 @@ export default function NotificationSettings() {
     notifyTask: true,
     notifyComment: true,
     notifyCalendar: true,
+    notifyAnnouncement: true,
     enableEmail: true
   });
   const [loading, setLoading] = useState(true);

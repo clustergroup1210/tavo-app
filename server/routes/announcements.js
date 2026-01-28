@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const { authenticate } = require('../middleware/auth');
+const { createNotification } = require('../services/notificationService');
 
 const prisma = new PrismaClient();
 
@@ -235,12 +236,70 @@ router.post('/', authenticate, async (req, res) => {
       }
     });
     
+    if (isPublished !== false && teamId) {
+      sendAnnouncementNotifications(teamId, announcement, req.user, categoryIds);
+    }
+    
     res.status(201).json(announcement);
   } catch (error) {
     console.error('Create announcement error:', error);
     res.status(500).json({ error: 'Failed to create announcement' });
   }
 });
+
+async function sendAnnouncementNotifications(teamId, announcement, author, categoryIds) {
+  try {
+    const players = await prisma.player.findMany({
+      where: { 
+        teamId,
+        userId: { not: null }
+      },
+      include: { category: true }
+    });
+    
+    const coaches = await prisma.userTeam.findMany({
+      where: {
+        teamId,
+        role: { in: ['TEAM_MANAGER', 'COACH', 'GUEST_COACH'] },
+        userId: { not: author.id }
+      },
+      select: { userId: true }
+    });
+    
+    const title = '新しいお知らせ';
+    const message = `${author.name}さんから「${announcement.title}」が配信されました`;
+    
+    for (const player of players) {
+      if (!player.userId) continue;
+      
+      if (categoryIds && categoryIds.length > 0) {
+        if (!player.categoryId || !categoryIds.includes(player.categoryId)) {
+          continue;
+        }
+      }
+      
+      createNotification({
+        userId: player.userId,
+        type: 'ANNOUNCEMENT',
+        title,
+        message,
+        linkUrl: '/announcements'
+      });
+    }
+    
+    for (const coach of coaches) {
+      createNotification({
+        userId: coach.userId,
+        type: 'ANNOUNCEMENT',
+        title,
+        message,
+        linkUrl: '/announcements'
+      });
+    }
+  } catch (error) {
+    console.error('Failed to send announcement notifications:', error);
+  }
+}
 
 router.put('/:id', authenticate, async (req, res) => {
   try {
