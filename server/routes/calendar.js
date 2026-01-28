@@ -219,19 +219,30 @@ router.put('/:id', authenticate, async (req, res) => {
     
     const { title, description, startDate, endDate, allDay, eventType, location, categoryIds } = req.body;
     
-    if (categoryIds && categoryIds.length > 0 && event.teamId) {
-      const categories = await prisma.teamCategory.findMany({
-        where: { id: { in: categoryIds } }
+    if (categoryIds !== undefined && event.teamId) {
+      if (Array.isArray(categoryIds) && categoryIds.length > 0) {
+        const categories = await prisma.teamCategory.findMany({
+          where: { id: { in: categoryIds } }
+        });
+        const invalidCategories = categories.filter(c => c.teamId !== event.teamId);
+        if (invalidCategories.length > 0) {
+          return res.status(400).json({ error: 'Categories must belong to the same team' });
+        }
+      }
+      
+      await prisma.calendarEventCategoryTarget.deleteMany({
+        where: { calendarEventId: req.params.id }
       });
-      const invalidCategories = categories.filter(c => c.teamId !== event.teamId);
-      if (invalidCategories.length > 0) {
-        return res.status(400).json({ error: 'Categories must belong to the same team' });
+      
+      if (Array.isArray(categoryIds) && categoryIds.length > 0) {
+        await prisma.calendarEventCategoryTarget.createMany({
+          data: categoryIds.map(categoryId => ({
+            calendarEventId: req.params.id,
+            teamCategoryId: categoryId
+          }))
+        });
       }
     }
-    
-    await prisma.calendarEventCategoryTarget.deleteMany({
-      where: { calendarEventId: req.params.id }
-    });
     
     const updated = await prisma.calendarEvent.update({
       where: { id: req.params.id },
@@ -242,10 +253,7 @@ router.put('/:id', authenticate, async (req, res) => {
         endDate: endDate ? new Date(endDate) : null,
         allDay,
         eventType,
-        location,
-        categoryTargets: categoryIds && categoryIds.length > 0 ? {
-          create: categoryIds.map(categoryId => ({ teamCategoryId: categoryId }))
-        } : undefined
+        location
       },
       include: {
         team: { select: { id: true, name: true } },

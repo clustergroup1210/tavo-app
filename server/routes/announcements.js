@@ -264,7 +264,7 @@ router.put('/:id', authenticate, async (req, res) => {
     const { title, content, priority, isPublished, expiresAt, categoryIds } = req.body;
     
     if (categoryIds !== undefined && announcement.teamId) {
-      if (categoryIds.length > 0) {
+      if (Array.isArray(categoryIds) && categoryIds.length > 0) {
         const categories = await prisma.teamCategory.findMany({
           where: { id: { in: categoryIds } }
         });
@@ -278,7 +278,7 @@ router.put('/:id', authenticate, async (req, res) => {
         where: { announcementId: req.params.id }
       });
       
-      if (categoryIds.length > 0) {
+      if (Array.isArray(categoryIds) && categoryIds.length > 0) {
         await prisma.announcementCategoryTarget.createMany({
           data: categoryIds.map(categoryId => ({
             announcementId: req.params.id,
