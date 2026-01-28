@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Mail, ClipboardCheck, Target, MessageSquare, Save, ArrowLeft } from 'lucide-react';
+import { Bell, Mail, ClipboardCheck, Target, MessageSquare, Calendar, Save, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 
@@ -31,6 +31,13 @@ const settingItems = [
     description: '動画にコメントがついた時に通知',
     icon: MessageSquare,
     color: 'text-purple-600 bg-purple-100'
+  },
+  {
+    key: 'notifyCalendar',
+    label: 'カレンダー更新',
+    description: 'カレンダーに予定が追加・更新された時に通知',
+    icon: Calendar,
+    color: 'text-teal-600 bg-teal-100'
   }
 ];
 
@@ -40,6 +47,7 @@ export default function NotificationSettings() {
     notifySelfEvaluation: true,
     notifyTask: true,
     notifyComment: true,
+    notifyCalendar: true,
     enableEmail: true
   });
   const [loading, setLoading] = useState(true);

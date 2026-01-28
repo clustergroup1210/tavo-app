@@ -565,6 +565,7 @@ model NotificationSetting {
   notifySelfEvaluation  Boolean  @default(true)
   notifyTask            Boolean  @default(true)
   notifyComment         Boolean  @default(true)
+  notifyCalendar        Boolean  @default(true)
   enableEmail           Boolean  @default(true)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt

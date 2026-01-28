@@ -5,7 +5,8 @@ const typeToSettingMap = {
   EVALUATION: 'notifyEvaluation',
   SELF_EVALUATION: 'notifySelfEvaluation',
   TASK: 'notifyTask',
-  VIDEO_COMMENT: 'notifyComment'
+  VIDEO_COMMENT: 'notifyComment',
+  CALENDAR: 'notifyCalendar'
 };
 
 async function getOrCreateSettings(userId) {

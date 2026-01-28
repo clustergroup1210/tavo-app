@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const { authenticate } = require('../middleware/auth');
+const { createNotification } = require('../services/notificationService');
 
 const prisma = new PrismaClient();
 
@@ -194,12 +195,75 @@ router.post('/', authenticate, async (req, res) => {
       }
     });
     
+    if (teamId) {
+      sendCalendarNotifications(teamId, event, req.user, categoryIds, 'created');
+    }
+    
     res.status(201).json(event);
   } catch (error) {
     console.error('Create calendar event error:', error);
     res.status(500).json({ error: 'Failed to create calendar event' });
   }
 });
+
+async function sendCalendarNotifications(teamId, event, author, categoryIds, action) {
+  try {
+    const players = await prisma.player.findMany({
+      where: { 
+        teamId,
+        userId: { not: null }
+      },
+      include: { category: true }
+    });
+    
+    const coaches = await prisma.userTeam.findMany({
+      where: {
+        teamId,
+        role: { in: ['TEAM_MANAGER', 'COACH', 'GUEST_COACH'] },
+        userId: { not: author.id }
+      },
+      select: { userId: true }
+    });
+    
+    const startDateStr = new Date(event.startDate).toLocaleDateString('ja-JP', {
+      year: 'numeric', month: 'long', day: 'numeric'
+    });
+    
+    const actionText = action === 'created' ? '追加' : '更新';
+    const title = `カレンダーが${actionText}されました`;
+    const message = `${author.name}さんが「${event.title}」（${startDateStr}）を${actionText}しました`;
+    
+    for (const player of players) {
+      if (!player.userId) continue;
+      
+      if (categoryIds && categoryIds.length > 0) {
+        if (!player.categoryId || !categoryIds.includes(player.categoryId)) {
+          continue;
+        }
+      }
+      
+      createNotification({
+        userId: player.userId,
+        type: 'CALENDAR',
+        title,
+        message,
+        linkUrl: '/calendar'
+      });
+    }
+    
+    for (const coach of coaches) {
+      createNotification({
+        userId: coach.userId,
+        type: 'CALENDAR',
+        title,
+        message,
+        linkUrl: '/calendar'
+      });
+    }
+  } catch (error) {
+    console.error('Failed to send calendar notifications:', error);
+  }
+}
 
 router.put('/:id', authenticate, async (req, res) => {
   try {
@@ -265,6 +329,11 @@ router.put('/:id', authenticate, async (req, res) => {
         }
       }
     });
+    
+    if (event.teamId) {
+      const targetCategoryIds = updated.categoryTargets?.map(ct => ct.teamCategoryId) || [];
+      sendCalendarNotifications(event.teamId, updated, req.user, targetCategoryIds, 'updated');
+    }
     
     res.json(updated);
   } catch (error) {
