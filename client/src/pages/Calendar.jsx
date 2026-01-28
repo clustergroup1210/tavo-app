@@ -166,6 +166,11 @@ export default function Calendar() {
   };
 
   const handleSubmit = async () => {
+    if (!currentTeamId && !isOperator()) {
+      alert('チームが選択されていません。サイドバーからチームを選択してください。');
+      return;
+    }
+    
     try {
       const startDateTime = form.allDay 
         ? new Date(form.startDate)
@@ -186,25 +191,34 @@ export default function Calendar() {
         categoryIds: form.categoryIds
       };
 
+      let res;
       if (editingEvent) {
-        await fetch(`/api/calendar/${editingEvent.id}`, {
+        res = await fetch(`/api/calendar/${editingEvent.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify(payload)
         });
       } else {
-        await fetch('/api/calendar', {
+        res = await fetch('/api/calendar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify(payload)
         });
       }
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        alert(errorData.error || '予定の保存に失敗しました');
+        return;
+      }
+      
       setShowModal(false);
       fetchEvents();
     } catch (error) {
       console.error('Failed to save event:', error);
+      alert('予定の保存に失敗しました');
     }
   };
 

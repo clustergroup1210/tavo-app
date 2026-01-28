@@ -52,15 +52,25 @@ export default function Announcements() {
   };
 
   const fetchManageAnnouncements = async () => {
+    if (!currentTeamId && !isOperator()) {
+      setManageAnnouncements([]);
+      return;
+    }
     try {
       const url = currentTeamId 
         ? `/api/announcements/manage?teamId=${currentTeamId}`
         : '/api/announcements/manage';
       const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) {
+        console.error('Failed to fetch manage announcements:', res.status);
+        setManageAnnouncements([]);
+        return;
+      }
       const data = await res.json();
       setManageAnnouncements(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch manage announcements:', error);
+      setManageAnnouncements([]);
     }
   };
 
@@ -110,6 +120,11 @@ export default function Announcements() {
   };
 
   const handleSubmit = async () => {
+    if (!currentTeamId && !isOperator()) {
+      alert('チームが選択されていません。サイドバーからチームを選択してください。');
+      return;
+    }
+    
     try {
       const payload = {
         teamId: currentTeamId,
@@ -121,26 +136,35 @@ export default function Announcements() {
         categoryIds: form.categoryIds
       };
 
+      let res;
       if (editingAnnouncement) {
-        await fetch(`/api/announcements/${editingAnnouncement.id}`, {
+        res = await fetch(`/api/announcements/${editingAnnouncement.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify(payload)
         });
       } else {
-        await fetch('/api/announcements', {
+        res = await fetch('/api/announcements', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify(payload)
         });
       }
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        alert(errorData.error || 'お知らせの保存に失敗しました');
+        return;
+      }
+      
       setShowModal(false);
       fetchAnnouncements();
       fetchManageAnnouncements();
     } catch (error) {
       console.error('Failed to save announcement:', error);
+      alert('お知らせの保存に失敗しました');
     }
   };
 
