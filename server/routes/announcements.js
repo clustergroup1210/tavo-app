@@ -192,7 +192,7 @@ router.post('/', authenticate, async (req, res) => {
     const { teamId, organizationId, title, content, priority, isPublished, publishedAt, expiresAt, categoryIds } = req.body;
     
     const canCreate = teamId 
-      ? hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH'])
+      ? (hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH']) || isOperator(req.user))
       : isOperator(req.user);
     
     if (!canCreate) {
@@ -254,7 +254,7 @@ router.put('/:id', authenticate, async (req, res) => {
     }
     
     const canEdit = announcement.teamId 
-      ? hasTeamAccess(req.user, announcement.teamId, ['TEAM_MANAGER', 'COACH'])
+      ? (hasTeamAccess(req.user, announcement.teamId, ['TEAM_MANAGER', 'COACH']) || isOperator(req.user))
       : isOperator(req.user);
     
     if (!canEdit) {
@@ -324,7 +324,7 @@ router.delete('/:id', authenticate, async (req, res) => {
     }
     
     const canDelete = announcement.teamId 
-      ? hasTeamAccess(req.user, announcement.teamId, ['TEAM_MANAGER', 'COACH'])
+      ? (hasTeamAccess(req.user, announcement.teamId, ['TEAM_MANAGER', 'COACH']) || isOperator(req.user))
       : isOperator(req.user);
     
     if (!canDelete) {
