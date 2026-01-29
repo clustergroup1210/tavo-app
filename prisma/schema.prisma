@@ -540,6 +540,8 @@ enum NotificationType {
   SELF_EVALUATION
   TASK
   VIDEO_COMMENT
+  CALENDAR
+  ANNOUNCEMENT
 }
 
 model Notification {
