@@ -254,7 +254,7 @@ async function sendAnnouncementNotifications(teamId, announcement, author, categ
         teamId,
         userId: { not: null }
       },
-      include: { category: true }
+      select: { userId: true, teamCategoryId: true }
     });
     
     const coaches = await prisma.userTeam.findMany({
@@ -273,7 +273,7 @@ async function sendAnnouncementNotifications(teamId, announcement, author, categ
       if (!player.userId) continue;
       
       if (categoryIds && categoryIds.length > 0) {
-        if (!player.categoryId || !categoryIds.includes(player.categoryId)) {
+        if (!player.teamCategoryId || !categoryIds.includes(player.teamCategoryId)) {
           continue;
         }
       }

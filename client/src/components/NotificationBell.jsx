@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Check, CheckCheck, X, ClipboardCheck, MessageSquare, Target } from 'lucide-react';
+import { Bell, Check, CheckCheck, X, ClipboardCheck, MessageSquare, Target, Calendar, Megaphone } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 
@@ -7,14 +7,18 @@ const typeIcons = {
   EVALUATION: ClipboardCheck,
   SELF_EVALUATION: ClipboardCheck,
   TASK: Target,
-  VIDEO_COMMENT: MessageSquare
+  VIDEO_COMMENT: MessageSquare,
+  CALENDAR: Calendar,
+  ANNOUNCEMENT: Megaphone
 };
 
 const typeColors = {
   EVALUATION: 'text-blue-600 bg-blue-100',
   SELF_EVALUATION: 'text-green-600 bg-green-100',
   TASK: 'text-orange-600 bg-orange-100',
-  VIDEO_COMMENT: 'text-purple-600 bg-purple-100'
+  VIDEO_COMMENT: 'text-purple-600 bg-purple-100',
+  CALENDAR: 'text-teal-600 bg-teal-100',
+  ANNOUNCEMENT: 'text-red-600 bg-red-100'
 };
 
 export default function NotificationBell() {
