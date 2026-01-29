@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Save, Plus, Copy, X, Calendar } from 'lucide-react';
+import { Save, Plus, Copy, X, Calendar, CheckCircle } from 'lucide-react';
 
 export default function EvaluationEntry() {
   const { currentTeam, user, isCoach, isPlayer, playerData } = useAuth();
@@ -18,6 +18,8 @@ export default function EvaluationEntry() {
   const [addingRound, setAddingRound] = useState(false);
   const [copyingPrevious, setCopyingPrevious] = useState(false);
   const [copyMessage, setCopyMessage] = useState('');
+  const [existingEvaluations, setExistingEvaluations] = useState([]);
+  const [hasExistingEvaluations, setHasExistingEvaluations] = useState(false);
 
   useEffect(() => {
     // For players, use playerData from context to set selectedPlayer immediately
@@ -31,6 +33,40 @@ export default function EvaluationEntry() {
       fetchData();
     }
   }, [currentTeam, playerData]);
+
+  useEffect(() => {
+    if (selectedPlayer && selectedRound) {
+      fetchExistingEvaluations();
+    } else {
+      setScores({});
+      setExistingEvaluations([]);
+      setHasExistingEvaluations(false);
+    }
+  }, [selectedPlayer, selectedRound]);
+
+  const fetchExistingEvaluations = async () => {
+    try {
+      const evaluatorType = isPlayer() ? 'SELF' : 'COACH';
+      const res = await fetch(
+        `/api/evaluations?playerId=${selectedPlayer}&roundId=${selectedRound}&evaluatorType=${evaluatorType}`,
+        { credentials: 'include' }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const evaluations = Array.isArray(data) ? data : [];
+        setExistingEvaluations(evaluations);
+        setHasExistingEvaluations(evaluations.length > 0);
+        
+        const existingScores = {};
+        evaluations.forEach(ev => {
+          existingScores[ev.itemId] = ev.score;
+        });
+        setScores(existingScores);
+      }
+    } catch (error) {
+      console.error('Failed to fetch existing evaluations:', error);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -301,6 +337,13 @@ export default function EvaluationEntry() {
           </div>
         )}
 
+        {hasExistingEvaluations && selectedPlayer && selectedRound && (
+          <div className="mb-4 p-3 rounded-lg text-sm bg-green-50 text-green-700 border border-green-200 flex items-center gap-2">
+            <CheckCircle className="w-4 h-4" />
+            この期間の評価は入力済みです。点数を変更して再保存できます。
+          </div>
+        )}
+
         {showAddRound && (
           <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
             <div className="flex items-center justify-between mb-4">
@@ -373,7 +416,7 @@ export default function EvaluationEntry() {
             className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
-            {loading ? '保存中...' : '保存'}
+            {loading ? '保存中...' : hasExistingEvaluations ? '更新' : '保存'}
           </button>
         </div>
       </div>
