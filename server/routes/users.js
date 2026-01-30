@@ -246,11 +246,15 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Operator access required' });
     }
 
-    const { name, email, password } = req.body;
+    const { name, email, password, organizationRole, teamRoles } = req.body;
     const userId = req.params.id;
 
     const existingUser = await prisma.user.findUnique({
-      where: { id: userId }
+      where: { id: userId },
+      include: {
+        organizations: true,
+        teams: true
+      }
     });
 
     if (!existingUser) {
@@ -276,9 +280,78 @@ router.put('/:id', authenticate, async (req, res) => {
       updateData.password = await bcrypt.hash(password, 10);
     }
 
-    const user = await prisma.user.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: updateData
+      });
+
+      if (organizationRole !== undefined) {
+        const org = await tx.organization.findFirst();
+        if (org) {
+          await tx.userOrganization.deleteMany({
+            where: { userId }
+          });
+
+          if (organizationRole && ['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'EXTERNAL'].includes(organizationRole)) {
+            await tx.userOrganization.create({
+              data: {
+                userId,
+                organizationId: org.id,
+                role: organizationRole
+              }
+            });
+          }
+        }
+      }
+
+      if (teamRoles && Array.isArray(teamRoles)) {
+        for (const tr of teamRoles) {
+          if (!tr.teamId) continue;
+          
+          const existingTeamRole = await tx.userTeam.findFirst({
+            where: { userId, teamId: tr.teamId }
+          });
+
+          if (tr.role === null || tr.role === '') {
+            if (existingTeamRole) {
+              await tx.userTeam.delete({ where: { id: existingTeamRole.id } });
+            }
+          } else {
+            if (existingTeamRole) {
+              await tx.userTeam.update({
+                where: { id: existingTeamRole.id },
+                data: { role: tr.role }
+              });
+            } else {
+              await tx.userTeam.create({
+                data: { userId, teamId: tr.teamId, role: tr.role }
+              });
+            }
+          }
+
+          if (tr.isHeadCoach !== undefined) {
+            const team = await tx.team.findUnique({ where: { id: tr.teamId } });
+            if (team) {
+              if (tr.isHeadCoach) {
+                await tx.team.update({
+                  where: { id: tr.teamId },
+                  data: { headCoachId: userId }
+                });
+              } else if (team.headCoachId === userId) {
+                await tx.team.update({
+                  where: { id: tr.teamId },
+                  data: { headCoachId: null }
+                });
+              }
+            }
+          }
+        }
+      }
+    });
+
+    const user = await prisma.user.findUnique({
       where: { id: userId },
-      data: updateData,
       include: {
         organizations: true,
         teams: { include: { team: true } },

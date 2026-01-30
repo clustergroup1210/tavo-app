@@ -30,7 +30,10 @@ export default function AdminUserManagement() {
     name: '',
     email: '',
     password: '',
+    organizationRole: '',
+    teamRoles: [],
   });
+  const [editTeamData, setEditTeamData] = useState([]);
   const [teamPlayers, setTeamPlayers] = useState([]);
   const [newInvite, setNewInvite] = useState({
     teamId: '',
@@ -195,12 +198,38 @@ export default function AdminUserManagement() {
     setTimeout(() => setCopiedUrl(null), 2000);
   };
 
-  const handleEditUser = (user) => {
+  const handleEditUser = async (user) => {
     setEditingUser(user);
+    
+    const orgRole = user.organizations?.find(o => 
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'EXTERNAL'].includes(o.role)
+    )?.role || '';
+    
+    const teamRolesData = user.teams?.map(t => ({
+      teamId: t.teamId,
+      teamName: t.team?.name || '',
+      role: t.role,
+      isHeadCoach: false,
+    })) || [];
+
+    for (const tr of teamRolesData) {
+      try {
+        const res = await fetch(`/api/teams/${tr.teamId}`, { credentials: 'include' });
+        if (res.ok) {
+          const teamData = await res.json();
+          tr.isHeadCoach = teamData.headCoachId === user.id;
+        }
+      } catch (e) {
+        console.error('Failed to fetch team data:', e);
+      }
+    }
+
     setEditForm({
       name: user.name || '',
       email: user.email || '',
       password: '',
+      organizationRole: orgRole,
+      teamRoles: teamRolesData,
     });
     setError('');
     setShowEditModal(true);
@@ -211,16 +240,28 @@ export default function AdminUserManagement() {
     setError('');
     setCreating(true);
     try {
+      const payload = {
+        name: editForm.name,
+        email: editForm.email,
+        password: editForm.password || undefined,
+        organizationRole: editForm.organizationRole || null,
+        teamRoles: editForm.teamRoles.map(tr => ({
+          teamId: tr.teamId,
+          role: tr.role,
+          isHeadCoach: tr.isHeadCoach,
+        })),
+      };
+      
       const res = await fetch(`/api/users/${editingUser.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(editForm),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         setShowEditModal(false);
         setEditingUser(null);
-        setEditForm({ name: '', email: '', password: '' });
+        setEditForm({ name: '', email: '', password: '', organizationRole: '', teamRoles: [] });
         fetchUsers();
       } else {
         const data = await res.json();
@@ -231,6 +272,29 @@ export default function AdminUserManagement() {
     } finally {
       setCreating(false);
     }
+  };
+
+  const handleAddTeamRole = () => {
+    setEditForm({
+      ...editForm,
+      teamRoles: [...editForm.teamRoles, { teamId: '', teamName: '', role: 'COACH', isHeadCoach: false }],
+    });
+  };
+
+  const handleRemoveTeamRole = (index) => {
+    const newRoles = [...editForm.teamRoles];
+    newRoles.splice(index, 1);
+    setEditForm({ ...editForm, teamRoles: newRoles });
+  };
+
+  const handleTeamRoleChange = (index, field, value) => {
+    const newRoles = [...editForm.teamRoles];
+    newRoles[index] = { ...newRoles[index], [field]: value };
+    if (field === 'teamId') {
+      const team = teams.find(t => t.id === value);
+      newRoles[index].teamName = team?.name || '';
+    }
+    setEditForm({ ...editForm, teamRoles: newRoles });
   };
 
   const filteredUsers = users.filter(user => {
@@ -858,8 +922,8 @@ export default function AdminUserManagement() {
       )}
 
       {showEditModal && editingUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto py-8">
+          <div className="bg-white rounded-xl p-6 w-full max-w-lg mx-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900">ユーザー編集</h2>
               <button 
@@ -874,7 +938,7 @@ export default function AdminUserManagement() {
                 {error}
               </div>
             )}
-            <form onSubmit={handleUpdateUser} className="space-y-4">
+            <form onSubmit={handleUpdateUser} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">名前</label>
                 <input
@@ -907,7 +971,91 @@ export default function AdminUserManagement() {
                 />
                 <p className="text-xs text-gray-500 mt-1">6文字以上で入力してください</p>
               </div>
-              <div className="flex justify-end gap-3 mt-6">
+
+              <div className="border-t border-gray-200 pt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">運営役割</label>
+                <select
+                  value={editForm.organizationRole}
+                  onChange={(e) => setEditForm({ ...editForm, organizationRole: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                >
+                  <option value="">運営ではない</option>
+                  <option value="SUPER_ADMIN">スーパー管理者</option>
+                  <option value="ADMIN">管理者</option>
+                  <option value="OPERATOR">オペレーター</option>
+                  <option value="EXTERNAL">外部ユーザー（読み取り専用）</option>
+                </select>
+              </div>
+
+              <div className="border-t border-gray-200 pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">チーム役割</label>
+                  <button
+                    type="button"
+                    onClick={handleAddTeamRole}
+                    className="text-sm text-primary-600 hover:text-primary-700"
+                  >
+                    + チームを追加
+                  </button>
+                </div>
+                
+                {editForm.teamRoles.length === 0 ? (
+                  <p className="text-sm text-gray-500">チームに所属していません</p>
+                ) : (
+                  <div className="space-y-3">
+                    {editForm.teamRoles.map((tr, index) => (
+                      <div key={index} className="p-3 bg-gray-50 rounded-lg space-y-2">
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={tr.teamId}
+                            onChange={(e) => handleTeamRoleChange(index, 'teamId', e.target.value)}
+                            className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                          >
+                            <option value="">チームを選択</option>
+                            {teams.map(team => (
+                              <option key={team.id} value={team.id}>{team.name}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTeamRole(index)}
+                            className="p-1 text-gray-400 hover:text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={tr.role}
+                            onChange={(e) => handleTeamRoleChange(index, 'role', e.target.value)}
+                            className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                          >
+                            <option value="TEAM_MANAGER">チーム管理者</option>
+                            <option value="COACH">コーチ</option>
+                            <option value="GUEST_COACH">ゲストコーチ</option>
+                          </select>
+                          {['COACH', 'GUEST_COACH', 'TEAM_MANAGER'].includes(tr.role) && (
+                            <label className="flex items-center gap-1.5 text-sm whitespace-nowrap">
+                              <input
+                                type="checkbox"
+                                checked={tr.isHeadCoach}
+                                onChange={(e) => handleTeamRoleChange(index, 'isHeadCoach', e.target.checked)}
+                                className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                              />
+                              代表監督
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 mt-2">
+                  代表監督はチーム内の全選手を評価できます。1チームにつき1名のみ設定可能です。
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
                 <button
                   type="button"
                   onClick={() => { setShowEditModal(false); setError(''); setEditingUser(null); }}
