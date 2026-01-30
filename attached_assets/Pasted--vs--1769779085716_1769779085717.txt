@@ -1,0 +1,109 @@
+画像の「指導者役割付与」に関する要件は、チーム内の**ヒエラルキー（代表監督 vs 担当コーチ）と、それに伴う「誰が誰を評価できるか」という権限ロジック**を定義するものです。
+
+これを実装するには、データベースに「誰が代表か」という情報と、「どのコーチがどの選手を担当しているか」という紐づけテーブルが必要です。
+
+以下のプロンプトをReplitに貼り付けてください。
+
+---
+
+### Replit用プロンプト（指導者役割・担当割り当て機能の実装）
+
+```text
+あなたは権限管理とデータモデリングに強いバックエンドエンジニアです。
+現在開発中のシステムに、添付の要件定義に基づいた「チーム内指導者の役割割り当て機能」と、それに連動する「評価権限ロジック」を実装してください。
+
+## 1. 要件定義 (仕様画像に基づく)
+チーム管理者（Admin）が、所属するコーチに対して以下の役割を設定できる機能です。
+
+1.  **代表監督 (Head Coach):** チームにつき**1名のみ**指定可能。チーム内の全選手を評価できる権限を持つ。
+2.  **担当コーチ (Assigned Coach):** チームに複数名設定可能。**「担当として割り当てられた選手のみ」**を評価できる。
+3.  **権限の自動反映:** 上記の設定に基づき、評価画面や動画コメント欄での書き込み権限を自動的に制御する。
+
+## 2. 依頼内容
+
+### Step 1: schema.prisma の拡張
+既存の `Team` モデルと、コーチ・選手の紐づけを管理するモデルを拡張・作成してください。
+
+```prisma
+// 変更案のイメージ
+
+model Team {
+  id            String @id @default(cuid())
+  // ...既存フィールド
+  
+  // 代表監督 (1チーム1名)
+  headCoachId   String? @unique // Unique制約で1名に限定する
+  headCoach     User?   @relation("TeamHeadCoach", fields: [headCoachId], references: [id])
+  
+  // ...
+}
+
+// コーチと選手の担当関係 (多対多)
+model CoachAssignment {
+  id        String   @id @default(cuid())
+  coachId   String
+  playerId  String
+  teamId    String
+  createdAt DateTime @default(now())
+
+  coach     User     @relation("CoachAsAssignee", fields: [coachId], references: [id])
+  player    User     @relation("PlayerAsTarget", fields: [playerId], references: [id])
+  team      Team     @relation(fields: [teamId], references: [id])
+
+  @@unique([coachId, playerId]) // 重複登録防止
+}
+
+```
+
+### Step 2: 割り当て管理ロジック (Server Actions)
+
+チーム管理者が操作するための以下の関数を作成してください。
+
+1. **`setHeadCoach(teamId, userId)`**
+* 指定されたユーザーをチームの代表監督に設定する。既存の代表がいる場合は上書きする。
+
+
+2. **`assignCoachToPlayers(coachId, playerIds[])`**
+* コーチに対し、担当する選手（複数可）を紐づける。
+
+
+3. **`removeCoachAssignment(coachId, playerId)`**
+* 担当を解除する。
+
+
+
+### Step 3: 権限チェック関数 (Permission Logic)
+
+評価機能やコメント機能から呼び出される、共通の権限チェック関数を実装してください。
+
+* **関数名:** `canEvaluate(raterUserId, targetPlayerId)`
+* **ロジック:**
+1. `rater` が `targetPlayer` と同じチームに所属しているか確認。
+2. `rater` がそのチームの `headCoach` (代表監督) であれば **True**。
+3. `rater` が `CoachAssignment` テーブルで `targetPlayer` に紐づいているなら **True**。
+4. それ以外は **False**。
+
+
+
+### Step 4: UI実装 (管理画面)
+
+チーム管理画面（Admin Dashboard）に「指導者体制」タブを追加してください。
+
+* **代表監督設定エリア:** 現在の代表を表示し、プルダウンで変更できるUI。
+* **担当割り当てエリア:** 左側にコーチ一覧、選択すると右側に「担当選手リスト（チェックボックス付き）」が表示され、一括で担当登録・解除ができるUI。
+
+## 技術スタック
+
+* Next.js, Prisma
+* UIは既存のコンポーネントライブラリを使用
+
+```
+
+***
+
+### 💡 実装のポイント
+このプロンプトでは、**`headCoachId` を `Team` テーブルに持たせる**ことで、「1チームに代表は1人だけ」というルールをデータベースレベルで強制しています。これが最もバグの出にくい設計です。
+
+Replitがコードを生成した後、Step 3の `canEvaluate` 関数が正しく作られているか（特に代表監督なら無条件でOKになるロジックが入っているか）を確認すると安心です。
+
+```

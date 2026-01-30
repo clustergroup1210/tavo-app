@@ -102,6 +102,7 @@ export default function Sidebar({ isOpen, onClose }) {
         items.admin = [
           { path: '/users', label: 'ユーザー管理', icon: UserCog },
           { path: '/staff', label: 'スタッフ管理', icon: Shield },
+          { path: '/coach-assignments', label: '指導者体制', icon: Users },
           { path: '/invitations', label: '招待URL管理', icon: Link2 },
           { path: '/join-requests', label: '参加申請', icon: UserPlus },
           { path: '/team-categories', label: 'カテゴリー管理', icon: Users },

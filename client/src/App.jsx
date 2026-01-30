@@ -27,6 +27,7 @@ import Placeholder from './pages/Placeholder';
 import Ranking from './pages/Ranking';
 import GoalCategoryManagement from './pages/GoalCategoryManagement';
 import StaffManagement from './pages/StaffManagement';
+import CoachAssignmentManagement from './pages/CoachAssignmentManagement';
 import Calendar from './pages/Calendar';
 import Announcements from './pages/Announcements';
 import TeamCategoryManagement from './pages/TeamCategoryManagement';
@@ -150,6 +151,7 @@ export default function App() {
           <Route path="/settings" element={<Placeholder />} />
           <Route path="/goal-categories" element={<GoalCategoryManagement />} />
           <Route path="/staff" element={<StaffManagement />} />
+          <Route path="/coach-assignments" element={<CoachAssignmentManagement />} />
           <Route path="/team-categories" element={<TeamCategoryManagement />} />
           <Route path="/progress" element={<PlayerProgress />} />
           <Route path="/join-requests" element={<JoinRequests />} />
