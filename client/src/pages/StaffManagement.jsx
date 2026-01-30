@@ -7,15 +7,14 @@ export default function StaffManagement() {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newMember, setNewMember] = useState({ email: '', role: 'TEAM_COACH' });
+  const [newMember, setNewMember] = useState({ email: '', role: 'COACH' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const staffRoles = [
-    { value: 'TEAM_ADMIN', label: '管理者', icon: Shield, color: 'bg-purple-100 text-purple-800' },
-    { value: 'TEAM_HEAD_COACH', label: '代表監督', icon: User, color: 'bg-blue-100 text-blue-800' },
-    { value: 'TEAM_COACH', label: 'コーチ', icon: User, color: 'bg-green-100 text-green-800' },
-    { value: 'TEAM_EXTERNAL_COACH', label: '外部コーチ', icon: User, color: 'bg-gray-100 text-gray-800' },
+    { value: 'TEAM_MANAGER', label: 'チーム管理者', icon: Shield, color: 'bg-purple-100 text-purple-800' },
+    { value: 'COACH', label: 'コーチ', icon: User, color: 'bg-green-100 text-green-800' },
+    { value: 'GUEST_COACH', label: '外部コーチ', icon: User, color: 'bg-gray-100 text-gray-800' },
   ];
 
   useEffect(() => {
@@ -71,7 +70,7 @@ export default function StaffManagement() {
 
       if (res.ok) {
         setShowAddModal(false);
-        setNewMember({ email: '', role: 'TEAM_COACH' });
+        setNewMember({ email: '', role: 'COACH' });
         fetchStaff();
       } else {
         const data = await res.json();

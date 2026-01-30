@@ -56,10 +56,9 @@ export default function InvitePage() {
   }
 
   const roleLabels = {
-    TEAM_ADMIN: '管理者',
-    TEAM_HEAD_COACH: '代表監督・コーチ',
-    TEAM_COACH: '監督・コーチ',
-    TEAM_EXTERNAL_COACH: '外部コーチ',
+    TEAM_MANAGER: 'チーム管理者',
+    COACH: 'コーチ',
+    GUEST_COACH: '外部コーチ',
     PLAYER: '選手',
     PARENT: '保護者',
   };

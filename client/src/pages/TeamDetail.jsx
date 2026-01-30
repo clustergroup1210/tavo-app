@@ -4,15 +4,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { Building2, Upload, Save, Users, Plus, X, Trash2, Edit2, UserCircle } from 'lucide-react';
 
 const ROLE_LABELS = {
-  TEAM_ADMIN: 'チーム管理者',
-  TEAM_HEAD_COACH: '監督',
-  TEAM_COACH: 'コーチ',
-  TEAM_EXTERNAL_COACH: '外部コーチ',
+  TEAM_MANAGER: 'チーム管理者',
+  COACH: 'コーチ',
+  GUEST_COACH: '外部コーチ',
   PLAYER: '選手',
   PARENT: '保護者'
 };
 
-const COACH_ROLES = ['TEAM_HEAD_COACH', 'TEAM_COACH', 'TEAM_EXTERNAL_COACH'];
+const COACH_ROLES = ['TEAM_MANAGER', 'COACH', 'GUEST_COACH'];
 
 export default function TeamDetail() {
   const { id } = useParams();
@@ -29,7 +28,7 @@ export default function TeamDetail() {
   
   const [showCoachModal, setShowCoachModal] = useState(false);
   const [coachEmail, setCoachEmail] = useState('');
-  const [coachRole, setCoachRole] = useState('TEAM_COACH');
+  const [coachRole, setCoachRole] = useState('COACH');
   
   const [showPlayerModal, setShowPlayerModal] = useState(false);
   const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: '', teamId: '' });
@@ -134,7 +133,7 @@ export default function TeamDetail() {
       });
       if (res.ok) {
         setCoachEmail('');
-        setCoachRole('TEAM_COACH');
+        setCoachRole('COACH');
         setShowCoachModal(false);
         fetchTeam();
       } else {
@@ -511,9 +510,9 @@ export default function TeamDetail() {
                   onChange={(e) => setCoachRole(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 >
-                  <option value="TEAM_HEAD_COACH">監督</option>
-                  <option value="TEAM_COACH">コーチ</option>
-                  <option value="TEAM_EXTERNAL_COACH">外部コーチ</option>
+                  <option value="TEAM_MANAGER">チーム管理者</option>
+                  <option value="COACH">コーチ</option>
+                  <option value="GUEST_COACH">外部コーチ</option>
                 </select>
               </div>
               <div className="flex justify-end gap-3">

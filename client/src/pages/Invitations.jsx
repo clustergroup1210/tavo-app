@@ -110,19 +110,17 @@ export default function Invitations() {
   };
 
   const roleLabels = {
-    TEAM_ADMIN: '管理者',
-    TEAM_HEAD_COACH: '代表監督',
-    TEAM_COACH: '担当コーチ',
-    TEAM_EXTERNAL_COACH: '外部コーチ',
+    TEAM_MANAGER: 'チーム管理者',
+    COACH: 'コーチ',
+    GUEST_COACH: '外部コーチ',
     PLAYER: '選手',
     PARENT: '保護者',
   };
 
   const roleDescriptions = {
-    TEAM_ADMIN: 'チームの全権限',
-    TEAM_HEAD_COACH: 'チーム全体の評価・管理',
-    TEAM_COACH: '担当選手の評価・管理',
-    TEAM_EXTERNAL_COACH: '限定的な評価権限',
+    TEAM_MANAGER: 'チームの全権限',
+    COACH: '担当選手の評価・管理',
+    GUEST_COACH: '限定的な評価権限',
     PLAYER: '自己評価・閲覧',
     PARENT: '子供の評価閲覧のみ',
   };
