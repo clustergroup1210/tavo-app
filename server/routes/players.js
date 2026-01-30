@@ -342,18 +342,49 @@ router.get('/:id/transfers', authenticate, async (req, res) => {
 router.post('/:id/photo', authenticate, upload.single('photo'), async (req, res) => {
   try {
     const player = await prisma.player.findUnique({ where: { id: req.params.id } });
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
     
     const isOperatorUser = req.user.organizations?.some(o => 
       ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
     );
-    const canUpload = 
-      player.userId === req.user.id ||
-      req.user.parentPlayers?.some(pp => pp.playerId === req.params.id) ||
-      hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH', 'COACH']) ||
-      isOperatorUser;
+    const isSelf = player.userId === req.user.id;
+    const isParent = req.user.parentPlayers?.some(pp => pp.playerId === player.id);
+    
+    let canUpload = isSelf || isParent || isOperatorUser;
+    
+    if (!canUpload) {
+      const isTeamManager = hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER']);
+      if (isTeamManager) {
+        canUpload = true;
+      } else {
+        const isCoachRole = hasTeamAccess(req.user, player.teamId, ['COACH', 'GUEST_COACH']);
+        if (isCoachRole) {
+          const team = await prisma.team.findUnique({
+            where: { id: player.teamId },
+            select: { headCoachId: true }
+          });
+          
+          if (team?.headCoachId === req.user.id) {
+            canUpload = true;
+          } else {
+            const assignment = await prisma.coachAssignment.findUnique({
+              where: {
+                coachId_playerId: {
+                  coachId: req.user.id,
+                  playerId: player.id
+                }
+              }
+            });
+            canUpload = !!assignment;
+          }
+        }
+      }
+    }
 
     if (!canUpload) {
-      return res.status(403).json({ error: 'Access denied' });
+      return res.status(403).json({ error: '写真の更新権限がありません。担当選手のみ更新できます。' });
     }
 
     const photoUrl = `/uploads/logos/${req.file.filename}`;
@@ -379,11 +410,40 @@ router.post('/:id/passport', authenticate, upload.single('passport'), async (req
       ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
     );
     const isSelf = player.userId === req.user.id;
-    const isCoach = hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH', 'COACH']);
-    const canUpload = isSelf || isCoach || isOperatorUser;
+    
+    let canUpload = isSelf || isOperatorUser;
+    
+    if (!canUpload) {
+      const isTeamManager = hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER']);
+      if (isTeamManager) {
+        canUpload = true;
+      } else {
+        const isCoachRole = hasTeamAccess(req.user, player.teamId, ['COACH', 'GUEST_COACH']);
+        if (isCoachRole) {
+          const team = await prisma.team.findUnique({
+            where: { id: player.teamId },
+            select: { headCoachId: true }
+          });
+          
+          if (team?.headCoachId === req.user.id) {
+            canUpload = true;
+          } else {
+            const assignment = await prisma.coachAssignment.findUnique({
+              where: {
+                coachId_playerId: {
+                  coachId: req.user.id,
+                  playerId: player.id
+                }
+              }
+            });
+            canUpload = !!assignment;
+          }
+        }
+      }
+    }
 
     if (!canUpload) {
-      return res.status(403).json({ error: '選手証写真の更新権限がありません' });
+      return res.status(403).json({ error: '選手証写真の更新権限がありません。担当選手のみ更新できます。' });
     }
 
     const passportUrl = `/uploads/${req.file.filename}`;
