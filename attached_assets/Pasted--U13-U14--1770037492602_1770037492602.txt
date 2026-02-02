@@ -1,0 +1,99 @@
+画像の「目標管理（カスタム目標カテゴリ）」機能は、以前の「U13/U14」のように年齢で固定されていた目標欄を、**「短期目標」「長期目標」のようにチームごとに自由にカスタマイズできるようにする**ための重要な改修です。
+
+データベースの構造を「固定カラム（`goalU13`など）」から「動的な行データ」に変更する必要があります。
+
+これをReplitに実装させるためのプロンプトを作成しました。
+
+---
+
+### Replit用プロンプト（カスタム目標管理機能の実装）
+
+```text
+あなたはデータモデリングとUI実装に強いフルスタックエンジニアです。
+現在開発中のシステムにおいて、添付要件に基づく「カスタム目標管理機能」を実装してください。
+
+## 1. 要件定義 (現状からの変更点)
+- **現状:** `PlayerProfile` モデルに `goalU13`, `goalU14` などの固定フィールドが存在している。
+- **変更後:** 年齢カテゴリによる固定を廃止し、**チーム管理者が自由に「目標のカテゴリ（項目名）」を作成・編集できる**ようにする。
+- **例:** あるチームは「今月の目標」「年間目標」を設定し、別のチームは「フィジカル目標」「メンタル目標」を設定する、といった運用を可能にする。
+
+## 2. 依頼内容
+
+### Step 1: schema.prisma のリファクタリング
+固定フィールドを廃止し、動的な管理ができる正規化されたモデル構成に変更してください。
+
+```prisma
+// 変更案イメージ
+
+// チームごとの目標定義（マスター）
+model GoalDefinition {
+  id        String   @id @default(cuid())
+  teamId    String
+  title     String   // 例: "短期目標", "今シーズンの誓い"
+  order     Int      // 表示順序
+  createdAt DateTime @default(now())
+
+  team      Team     @relation(fields: [teamId], references: [id])
+  goals     PlayerGoal[]
+  
+  @@index([teamId])
+}
+
+// 選手が入力した実際の目標データ
+model PlayerGoal {
+  id           String   @id @default(cuid())
+  playerId     String
+  definitionId String   // どの目標定義に対する回答か
+  content      String   // 目標の内容（テキスト）
+  updatedAt    DateTime @updatedAt
+
+  player       User           @relation(fields: [playerId], references: [id])
+  definition   GoalDefinition @relation(fields: [definitionId], references: [id])
+
+  @@unique([playerId, definitionId]) // 1つの定義に対し1つの回答
+}
+
+```
+
+### Step 2: 管理機能の実装 (Server Actions)
+
+チーム管理者が目標カテゴリを管理するためのアクションを作成してください。
+
+1. **`createGoalDefinition(teamId, title)`**
+2. **`updateGoalDefinition(id, title)`**
+3. **`deleteGoalDefinition(id)`**
+* ※既に選手が目標を入力している場合の挙動（削除禁止にするか、データも消すか）について、安全な方針（例: 警告を出す、または論理削除）を提案・実装してください。
+
+
+4. **初期データ生成:**
+* 新規チーム作成時に、デフォルトで「U13目標」「U14目標」などの標準テンプレートを `GoalDefinition` に自動登録するロジックを入れてください。
+
+
+
+### Step 3: UIの実装
+
+1. **チーム設定画面:**
+* 管理者が目標カテゴリを追加・並び替えできる設定UI。
+
+
+2. **選手マイページ:**
+* 所属チームの `GoalDefinition` を取得し、動的にテキストエリアを生成して表示する。
+* 既存の `goalU13` 等のデータがある場合、マイグレーション（データ移行）スクリプトが必要であれば提案してください。
+
+
+
+## 技術スタック
+
+* Next.js, Prisma, Tailwind CSS
+
+```
+
+***
+
+### 💡 実装のポイント
+この変更はデータベースの構造を大きく変えるため、もし既に本番運用中でデータが入っている場合は注意が必要です。
+
+* **開発段階なら:** 上記プロンプトで `prisma db push` して作り直すのが一番早いです。
+* **運用中なら:** 「既存の `goalU13` に入っている文字を、新しい `PlayerGoal` テーブルに移し替える」という移行作業が必要になります。今回は開発中と想定してプロンプトを作成していますが、もしデータ移行が必要なら教えてください。
+
+```
