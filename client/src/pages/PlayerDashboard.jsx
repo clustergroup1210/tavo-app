@@ -743,7 +743,7 @@ function ProgressTab({ data, selectedCategory, setSelectedCategory }) {
         </div>
         <div className="w-full" style={{ height: '320px' }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={overallChartData} margin={{ top: 20, right: 30, left: 10, bottom: 20 }}>
+            <LineChart data={overallChartData} margin={{ top: 20, right: 30, left: 10, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis 
                 dataKey="name" 
@@ -763,10 +763,10 @@ function ProgressTab({ data, selectedCategory, setSelectedCategory }) {
                   return [value ?? '-', labels[name] || name];
                 }}
               />
-              <Bar dataKey="maxScore" fill="#d1d5db" name="maxScore" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="coachTotal" fill={COLORS.coach} name="coachTotal" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="selfTotal" fill={COLORS.self} name="selfTotal" radius={[2, 2, 0, 0]} />
-            </BarChart>
+              <Line type="monotone" dataKey="maxScore" stroke="#9ca3af" strokeWidth={2} strokeDasharray="6 3" dot={{ fill: '#9ca3af', r: 3 }} connectNulls />
+              <Line type="monotone" dataKey="coachTotal" stroke={COLORS.coach} strokeWidth={2} dot={{ fill: COLORS.coach, strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} connectNulls />
+              <Line type="monotone" dataKey="selfTotal" stroke={COLORS.self} strokeWidth={2} dot={{ fill: COLORS.self, strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} connectNulls />
+            </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
@@ -802,7 +802,7 @@ function ProgressTab({ data, selectedCategory, setSelectedCategory }) {
             </div>
             <div className="w-full" style={{ height: '260px' }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={catChartData} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
+                <LineChart data={catChartData} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis 
                     dataKey="name" 
@@ -822,10 +822,10 @@ function ProgressTab({ data, selectedCategory, setSelectedCategory }) {
                       return [value ?? '-', labels[name] || name];
                     }}
                   />
-                  <Bar dataKey="maxScore" fill="#d1d5db" name="maxScore" radius={[2, 2, 0, 0]} />
-                  <Bar dataKey="coachTotal" fill={COLORS.coach} name="coachTotal" radius={[2, 2, 0, 0]} />
-                  <Bar dataKey="selfTotal" fill={COLORS.self} name="selfTotal" radius={[2, 2, 0, 0]} />
-                </BarChart>
+                  <Line type="monotone" dataKey="maxScore" stroke="#9ca3af" strokeWidth={2} strokeDasharray="6 3" dot={{ fill: '#9ca3af', r: 3 }} connectNulls />
+                  <Line type="monotone" dataKey="coachTotal" stroke={COLORS.coach} strokeWidth={2} dot={{ fill: COLORS.coach, strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} connectNulls />
+                  <Line type="monotone" dataKey="selfTotal" stroke={COLORS.self} strokeWidth={2} dot={{ fill: COLORS.self, strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} connectNulls />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
