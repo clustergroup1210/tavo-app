@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, UserCircle, ClipboardList, Video, 
   Bell, Settings, Building2, UserCog, ListChecks, Database,
   Link2, FileText, TrendingUp, LogOut, Megaphone, ArrowLeft, Shield, Trophy, Target,
-  Calendar, UserPlus, X
+  Calendar, UserPlus, X, Grid3X3
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -69,6 +69,7 @@ export default function Sidebar({ isOpen, onClose }) {
           { path: '/dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
           { path: '/players', label: '選手一覧', icon: Users },
           { path: '/evaluations/entry', label: '評価入力', icon: ClipboardList },
+          { path: '/evaluations/matrix', label: '評価マトリクス', icon: Grid3X3 },
           { path: '/ranking', label: 'ランキング', icon: Trophy },
           { path: '/videos', label: '動画・資料', icon: Video },
           { path: '/calendar', label: 'カレンダー', icon: Calendar },
@@ -90,6 +91,7 @@ export default function Sidebar({ isOpen, onClose }) {
           { path: '/dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
           { path: '/players', label: '選手一覧', icon: Users },
           { path: '/evaluations/entry', label: '評価入力', icon: ClipboardList },
+          { path: '/evaluations/matrix', label: '評価マトリクス', icon: Grid3X3 },
           { path: '/ranking', label: 'ランキング', icon: Trophy },
           { path: '/videos', label: '動画・資料', icon: Video },
           { path: '/calendar', label: 'カレンダー', icon: Calendar },

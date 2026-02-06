@@ -38,6 +38,7 @@ import AppealManagement from './pages/AppealManagement';
 import NotificationSettings from './pages/NotificationSettings';
 import PlayerDashboard from './pages/PlayerDashboard';
 import AccountSettings from './pages/AccountSettings';
+import EvaluationMatrix from './pages/EvaluationMatrix';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -138,6 +139,7 @@ export default function App() {
           <Route path="/players/:id" element={<PlayerDetail />} />
           <Route path="/evaluations/entry" element={<EvaluationEntry />} />
           <Route path="/evaluations/items" element={<EvaluationItems />} />
+          <Route path="/evaluations/matrix" element={<EvaluationMatrix />} />
           <Route path="/ranking" element={<Ranking />} />
           <Route path="/users" element={<UserManagement />} />
           <Route path="/invitations" element={<Invitations />} />
