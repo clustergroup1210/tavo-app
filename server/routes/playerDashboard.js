@@ -163,6 +163,15 @@ router.get('/:playerId', authenticate, async (req, res) => {
       .filter(item => item.gap !== null)
       .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
 
+    const totalMaxScore = leafItems.reduce((sum, item) => sum + (item.maxScore || 5), 0);
+
+    const categoryMaxScores = {};
+    leafItems.forEach(item => {
+      const catName = items.find(i => i.id === item.parentId)?.name || item.name;
+      if (!categoryMaxScores[catName]) categoryMaxScores[catName] = 0;
+      categoryMaxScores[catName] += (item.maxScore || 5);
+    });
+
     const roundProgress = {};
     evaluations.forEach(e => {
       if (!roundProgress[e.roundId]) {
@@ -181,7 +190,10 @@ router.get('/:playerId', authenticate, async (req, res) => {
       const categoryName = e.item.parent?.name || e.item.name;
       
       if (!rp.categories[categoryName]) {
-        rp.categories[categoryName] = { coach: { total: 0, count: 0 }, self: { total: 0, count: 0 } };
+        rp.categories[categoryName] = { 
+          coach: { total: 0, count: 0 }, 
+          self: { total: 0, count: 0 }
+        };
       }
       
       if (e.raterType === 'COACH') {
@@ -205,9 +217,13 @@ router.get('/:playerId', authenticate, async (req, res) => {
         
         const categoryData = {};
         Object.entries(r.categories).forEach(([cat, scores]) => {
+          const catMax = categoryMaxScores[cat] || 0;
           categoryData[cat] = {
             coach: scores.coach.count > 0 ? Math.round((scores.coach.total / scores.coach.count) * 10) / 10 : null,
-            self: scores.self.count > 0 ? Math.round((scores.self.total / scores.self.count) * 10) / 10 : null
+            self: scores.self.count > 0 ? Math.round((scores.self.total / scores.self.count) * 10) / 10 : null,
+            coachTotal: scores.coach.total > 0 ? scores.coach.total : null,
+            selfTotal: scores.self.total > 0 ? scores.self.total : null,
+            maxScore: catMax
           };
         });
         
@@ -216,6 +232,7 @@ router.get('/:playerId', authenticate, async (req, res) => {
           date: r.date,
           coachTotal: r.coachTotal > 0 ? r.coachTotal : null,
           selfTotal: r.selfTotal > 0 ? r.selfTotal : null,
+          maxScore: totalMaxScore,
           coachAvg,
           selfAvg,
           categories: categoryData

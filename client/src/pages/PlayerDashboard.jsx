@@ -714,53 +714,36 @@ function ProgressTab({ data, selectedCategory, setSelectedCategory }) {
 
   const { progressData, categories } = data.progress;
 
-  const chartData = progressData.map(d => {
-    if (selectedCategory === 'all') {
-      return {
-        name: d.roundName,
-        coach: d.coachAvg,
-        self: d.selfAvg
-      };
-    } else {
-      return {
-        name: d.roundName,
-        coach: d.categories[selectedCategory]?.coach || null,
-        self: d.categories[selectedCategory]?.self || null
-      };
-    }
-  });
+  const overallChartData = progressData.map(d => ({
+    name: d.roundName,
+    maxScore: d.maxScore,
+    coachTotal: d.coachTotal,
+    selfTotal: d.selfTotal
+  }));
+
+  const maxYOverall = progressData.length > 0 ? (progressData[0].maxScore || 50) : 50;
 
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">評価推移</h3>
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          >
-            <option value="all">総合平均</option>
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-        </div>
-
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">総合スコア推移（MAX vs 実績）</h3>
         <div className="flex flex-wrap gap-4 mb-4 text-sm">
           <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-gray-300" />
+            <span className="text-gray-600">満点（MAX）</span>
+          </div>
+          <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-blue-500" />
-            <span className="text-gray-600">指導者評価</span>
+            <span className="text-gray-600">指導者評価 実績</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-green-500" />
-            <span className="text-gray-600">自己評価</span>
+            <span className="text-gray-600">自己評価 実績</span>
           </div>
         </div>
-
-        <div className="w-full" style={{ height: '300px' }}>
+        <div className="w-full" style={{ height: '320px' }}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 20 }}>
+            <BarChart data={overallChartData} margin={{ top: 20, right: 30, left: 10, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis 
                 dataKey="name" 
@@ -770,73 +753,127 @@ function ProgressTab({ data, selectedCategory, setSelectedCategory }) {
                 height={60}
               />
               <YAxis 
-                domain={[0, 5]} 
-                ticks={[0, 1, 2, 3, 4, 5]}
+                domain={[0, maxYOverall]}
                 tick={{ fill: '#6b7280', fontSize: 12 }}
               />
               <Tooltip 
                 contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
                 formatter={(value, name) => {
-                  const label = name === 'coach' ? '指導者評価' : '自己評価';
-                  return [value, label];
+                  const labels = { maxScore: '満点（MAX）', coachTotal: '指導者評価', selfTotal: '自己評価' };
+                  return [value ?? '-', labels[name] || name];
                 }}
               />
-              <Line
-                type="monotone"
-                dataKey="coach"
-                stroke={COLORS.coach}
-                strokeWidth={2}
-                dot={{ fill: COLORS.coach, strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6 }}
-                connectNulls
-              />
-              <Line
-                type="monotone"
-                dataKey="self"
-                stroke={COLORS.self}
-                strokeWidth={2}
-                dot={{ fill: COLORS.self, strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6 }}
-                connectNulls
-              />
-            </LineChart>
+              <Bar dataKey="maxScore" fill="#d1d5db" name="maxScore" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="coachTotal" fill={COLORS.coach} name="coachTotal" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="selfTotal" fill={COLORS.self} name="selfTotal" radius={[2, 2, 0, 0]} />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
+      {categories.map((cat, catIdx) => {
+        const catChartData = progressData.map(d => ({
+          name: d.roundName,
+          maxScore: d.categories[cat]?.maxScore || 0,
+          coachTotal: d.categories[cat]?.coachTotal || null,
+          selfTotal: d.categories[cat]?.selfTotal || null
+        }));
+        const catMax = catChartData.length > 0 ? Math.max(...catChartData.map(d => d.maxScore || 0), 1) : 10;
+
+        return (
+          <div key={cat} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <span className="inline-block w-3 h-3 rounded-full mr-2" style={{ backgroundColor: categoryColors[catIdx % categoryColors.length] }} />
+              {cat}
+            </h3>
+            <div className="flex flex-wrap gap-4 mb-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-gray-300" />
+                <span className="text-gray-600">満点（MAX）</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-blue-500" />
+                <span className="text-gray-600">指導者評価</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-green-500" />
+                <span className="text-gray-600">自己評価</span>
+              </div>
+            </div>
+            <div className="w-full" style={{ height: '260px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={catChartData} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis 
+                    dataKey="name" 
+                    tick={{ fill: '#6b7280', fontSize: 11 }}
+                    angle={-20}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis 
+                    domain={[0, catMax]}
+                    tick={{ fill: '#6b7280', fontSize: 12 }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                    formatter={(value, name) => {
+                      const labels = { maxScore: '満点（MAX）', coachTotal: '指導者評価', selfTotal: '自己評価' };
+                      return [value ?? '-', labels[name] || name];
+                    }}
+                  />
+                  <Bar dataKey="maxScore" fill="#d1d5db" name="maxScore" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="coachTotal" fill={COLORS.coach} name="coachTotal" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="selfTotal" fill={COLORS.self} name="selfTotal" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        );
+      })}
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">ラウンド別スコア</h3>
+          <h3 className="text-lg font-semibold text-gray-900">ラウンド別スコア詳細</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ラウンド</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">満点</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">指導者合計</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">自己合計</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">指導者平均</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">自己平均</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">達成率</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {progressData.map((round, idx) => (
-                <tr key={idx} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{round.roundName}</td>
-                  <td className="px-4 py-3 text-center text-sm text-blue-600 font-medium">
-                    {round.coachTotal ?? '-'}
-                  </td>
-                  <td className="px-4 py-3 text-center text-sm text-green-600 font-medium">
-                    {round.selfTotal ?? '-'}
-                  </td>
-                  <td className="px-4 py-3 text-center text-sm text-blue-600">
-                    {round.coachAvg ?? '-'}
-                  </td>
-                  <td className="px-4 py-3 text-center text-sm text-green-600">
-                    {round.selfAvg ?? '-'}
-                  </td>
-                </tr>
-              ))}
+              {progressData.map((round, idx) => {
+                const rate = round.maxScore > 0 && round.coachTotal
+                  ? Math.round((round.coachTotal / round.maxScore) * 100) 
+                  : null;
+                return (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{round.roundName}</td>
+                    <td className="px-4 py-3 text-center text-sm text-gray-500 font-medium">
+                      {round.maxScore}
+                    </td>
+                    <td className="px-4 py-3 text-center text-sm text-blue-600 font-medium">
+                      {round.coachTotal ?? '-'}
+                    </td>
+                    <td className="px-4 py-3 text-center text-sm text-green-600 font-medium">
+                      {round.selfTotal ?? '-'}
+                    </td>
+                    <td className="px-4 py-3 text-center text-sm font-bold">
+                      {rate !== null ? (
+                        <span className={rate >= 60 ? 'text-blue-600' : rate >= 40 ? 'text-orange-500' : 'text-red-500'}>
+                          {rate}%
+                        </span>
+                      ) : '-'}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
