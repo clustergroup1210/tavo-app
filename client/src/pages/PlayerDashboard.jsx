@@ -152,7 +152,7 @@ function SummaryTab({ data, achievementData, navigate }) {
   if (!data) return null;
   
   const { summary, notifications, nextActions } = data;
-  const overallRate = achievementData?.overall?.coachRate ?? summary.achievementRate;
+  const overallRate = achievementData?.overall?.coachRate != null ? achievementData.overall.coachRate : summary.achievementRate;
   
   return (
     <div className="space-y-6">
@@ -296,24 +296,26 @@ function SummaryTab({ data, achievementData, navigate }) {
   );
 }
 
-function getRateColor(rate) {
-  if (rate >= 80) return 'bg-blue-500 text-white';
-  if (rate >= 60) return 'bg-blue-400 text-white';
-  if (rate >= 40) return 'bg-amber-400 text-white';
-  if (rate >= 20) return 'bg-orange-500 text-white';
+function getRateCellColor(rate) {
+  if (rate >= 60) return 'bg-blue-500 text-white';
+  if (rate >= 40) return 'bg-orange-400 text-white';
   return 'bg-red-500 text-white';
 }
 
 function getRateBarColor(rate) {
-  if (rate >= 80) return 'from-blue-400 to-blue-600';
-  if (rate >= 60) return 'from-blue-300 to-blue-500';
-  if (rate >= 40) return 'from-amber-300 to-amber-500';
-  if (rate >= 20) return 'from-orange-400 to-orange-600';
+  if (rate >= 60) return 'from-blue-400 to-blue-600';
+  if (rate >= 40) return 'from-orange-300 to-orange-500';
   return 'from-red-400 to-red-600';
 }
 
+function formatPeriodDate(dateStr) {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 function AchievementTab({ data }) {
-  if (!data || (!data.categories?.length && !data.roundProgress?.length)) {
+  if (!data || !data.categories?.length) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
         <Zap className="w-12 h-12 text-gray-400 mx-auto mb-3" />
@@ -325,96 +327,87 @@ function AchievementTab({ data }) {
     );
   }
 
-  const { overall, categories, roundProgress } = data;
+  const { overall, categories, monthlyProgress, period } = data;
+
+  const totalElements = categories.reduce((sum, c) => sum + c.elementCount, 0);
+  const totalMonthlyMax = categories.reduce((sum, c) => sum + c.monthlyMaxScore, 0);
+  const totalStepsMax = categories.reduce((sum, c) => sum + c.stepsMax, 0);
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-lg p-6 text-white">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-yellow-400/20 rounded-lg flex items-center justify-center">
-            <Zap className="w-6 h-6 text-yellow-400" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold">ACHIEVEMENT STATUS</h3>
-            <p className="text-sm text-slate-400">入団からの累積達成率</p>
-          </div>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-bold text-gray-900">一流選手になるために求められる要素の獲得状況</h3>
         </div>
-
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="bg-white/10 rounded-xl p-4">
-            <p className="text-xs text-slate-400 mb-1">指導者評価 達成率</p>
-            <div className="flex items-end gap-2">
-              <span className="text-4xl font-bold text-yellow-400">{overall.coachRate}</span>
-              <span className="text-lg text-slate-400 mb-1">%</span>
-            </div>
-            <div className="mt-2 h-2 bg-white/10 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full transition-all duration-700"
-                style={{ width: `${overall.coachRate}%` }}
-              />
-            </div>
-            <p className="text-xs text-slate-500 mt-1">{overall.coachActual} / {overall.coachMax} pts</p>
+        {period && (
+          <div className="flex flex-wrap gap-4 mb-4 text-sm text-gray-500">
+            <span>入団: {formatPeriodDate(period.joinDate)}</span>
+            <span>卒業予定: {formatPeriodDate(period.graduationDate)}</span>
+            <span>在籍: {period.totalMonths}ヶ月</span>
+            <span>経過: {period.elapsedMonths}ヶ月</span>
           </div>
-          <div className="bg-white/10 rounded-xl p-4">
-            <p className="text-xs text-slate-400 mb-1">自己評価 達成率</p>
-            <div className="flex items-end gap-2">
-              <span className="text-4xl font-bold text-cyan-400">{overall.selfRate}</span>
-              <span className="text-lg text-slate-400 mb-1">%</span>
-            </div>
-            <div className="mt-2 h-2 bg-white/10 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-cyan-400 to-teal-500 rounded-full transition-all duration-700"
-                style={{ width: `${overall.selfRate}%` }}
-              />
-            </div>
-            <p className="text-xs text-slate-500 mt-1">{overall.selfActual} / {overall.selfMax} pts</p>
-          </div>
-        </div>
+        )}
 
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full border-collapse">
             <thead>
-              <tr className="border-b border-white/10">
-                <th className="text-left py-2 px-3 text-xs font-medium text-slate-400 uppercase tracking-wider">カテゴリ</th>
-                <th className="text-center py-2 px-3 text-xs font-medium text-slate-400 uppercase tracking-wider">MAX</th>
-                <th className="text-center py-2 px-3 text-xs font-medium text-slate-400 uppercase tracking-wider">獲得</th>
-                <th className="text-center py-2 px-3 text-xs font-medium text-slate-400 uppercase tracking-wider min-w-[120px]">達成率</th>
+              <tr className="bg-gray-800 text-white text-xs">
+                <th className="py-2.5 px-3 text-left font-medium" rowSpan={2}>大カテゴリ</th>
+                <th className="py-1.5 px-3 text-center font-medium border-l border-gray-600" colSpan={2}>体得数 (Elements)</th>
+                <th className="py-1.5 px-3 text-center font-medium border-l border-gray-600" colSpan={2}>獲得ステップ (Steps)</th>
+                <th className="py-1.5 px-3 text-center font-medium border-l border-gray-600" rowSpan={2}>達成率</th>
+              </tr>
+              <tr className="bg-gray-700 text-white text-xs">
+                <th className="py-1.5 px-3 text-center font-medium border-l border-gray-600">MAX</th>
+                <th className="py-1.5 px-3 text-center font-medium">現在値</th>
+                <th className="py-1.5 px-3 text-center font-medium border-l border-gray-600">MAX</th>
+                <th className="py-1.5 px-3 text-center font-medium">現在値</th>
               </tr>
             </thead>
             <tbody>
               {categories.map((cat, idx) => (
-                <tr key={cat.category} className="border-b border-white/5 hover:bg-white/5">
-                  <td className="py-3 px-3">
+                <tr key={cat.category} className={`border-b border-gray-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                  <td className="py-2.5 px-3 text-sm font-medium text-gray-900">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: categoryColors[idx % categoryColors.length] }} />
-                      <span className="text-sm font-medium">{cat.category}</span>
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: categoryColors[idx % categoryColors.length] }} />
+                      {cat.category}
                     </div>
                   </td>
-                  <td className="py-3 px-3 text-center text-sm text-slate-400">{cat.coachMax}</td>
-                  <td className="py-3 px-3 text-center text-sm font-medium text-yellow-400">{cat.coachActual}</td>
-                  <td className="py-3 px-3">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full bg-gradient-to-r ${getRateBarColor(cat.coachRate)} rounded-full transition-all duration-500`}
-                          style={{ width: `${cat.coachRate}%` }}
-                        />
-                      </div>
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${getRateColor(cat.coachRate)}`}>
-                        {cat.coachRate}%
-                      </span>
-                    </div>
+                  <td className="py-2.5 px-3 text-center text-sm text-gray-600 border-l border-gray-200">{cat.elementCount}</td>
+                  <td className="py-2.5 px-3 text-center text-sm text-gray-400">-</td>
+                  <td className="py-2.5 px-3 text-center text-sm text-gray-600 border-l border-gray-200">{cat.stepsMax.toLocaleString()}</td>
+                  <td className="py-2.5 px-3 text-center text-sm font-semibold text-gray-900">{cat.coachActual.toLocaleString()}</td>
+                  <td className="py-2.5 px-3 text-center border-l border-gray-200">
+                    <span className={`inline-block min-w-[52px] px-2 py-1 rounded text-xs font-bold ${getRateCellColor(cat.coachRate)}`}>
+                      {cat.coachRate}%
+                    </span>
                   </td>
                 </tr>
               ))}
+              <tr className="bg-gray-800 text-white font-semibold">
+                <td className="py-2.5 px-3 text-sm">合計</td>
+                <td className="py-2.5 px-3 text-center text-sm border-l border-gray-600">{totalElements}</td>
+                <td className="py-2.5 px-3 text-center text-sm">-</td>
+                <td className="py-2.5 px-3 text-center text-sm border-l border-gray-600">{totalStepsMax.toLocaleString()}</td>
+                <td className="py-2.5 px-3 text-center text-sm">{overall.coachActual.toLocaleString()}</td>
+                <td className="py-2.5 px-3 text-center border-l border-gray-600">
+                  <span className={`inline-block min-w-[52px] px-2 py-1 rounded text-xs font-bold ${getRateCellColor(overall.coachRate)}`}>
+                    {overall.coachRate}%
+                  </span>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
+
+        <p className="text-xs text-gray-400 mt-3">
+          ※ 達成率 = 累積獲得スコア ÷ (在籍総月数 × 月あたり満点) × 100
+        </p>
       </div>
 
-      {roundProgress.length > 0 && (
+      {monthlyProgress && monthlyProgress.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">累積達成率の推移</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">キャリア達成率の推移</h3>
           <div className="flex flex-wrap gap-4 mb-4 text-sm">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-blue-500" />
@@ -425,30 +418,29 @@ function AchievementTab({ data }) {
               <span className="text-gray-600">自己評価</span>
             </div>
           </div>
-          <div className="w-full" style={{ height: '300px' }}>
+          <div className="w-full" style={{ height: '350px' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={roundProgress} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
+              <AreaChart data={monthlyProgress} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
                 <defs>
-                  <linearGradient id="colorCoach" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="colorCoachAch" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
                     <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
                   </linearGradient>
-                  <linearGradient id="colorSelf" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="colorSelfAch" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
                     <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis 
-                  dataKey="roundName" 
+                  dataKey="label" 
                   tick={{ fill: '#6b7280', fontSize: 11 }}
-                  angle={-20}
+                  angle={-30}
                   textAnchor="end"
                   height={60}
                 />
                 <YAxis 
-                  domain={[0, 100]} 
-                  ticks={[0, 20, 40, 60, 80, 100]}
+                  domain={[0, 'auto']} 
                   tick={{ fill: '#6b7280', fontSize: 12 }}
                   tickFormatter={(v) => `${v}%`}
                 />
@@ -458,13 +450,14 @@ function AchievementTab({ data }) {
                     const label = name === 'overallCoachRate' ? '指導者達成率' : '自己達成率';
                     return [`${value}%`, label];
                   }}
+                  labelFormatter={(label) => label}
                 />
                 <Area
                   type="monotone"
                   dataKey="overallCoachRate"
                   stroke="#3B82F6"
                   strokeWidth={2}
-                  fill="url(#colorCoach)"
+                  fill="url(#colorCoachAch)"
                   dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
                   activeDot={{ r: 6 }}
                   connectNulls
@@ -474,7 +467,7 @@ function AchievementTab({ data }) {
                   dataKey="overallSelfRate"
                   stroke="#10B981"
                   strokeWidth={2}
-                  fill="url(#colorSelf)"
+                  fill="url(#colorSelfAch)"
                   dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
                   activeDot={{ r: 6 }}
                   connectNulls
@@ -482,35 +475,42 @@ function AchievementTab({ data }) {
               </AreaChart>
             </ResponsiveContainer>
           </div>
+          {period && (
+            <div className="flex justify-between text-xs text-gray-400 mt-2 px-2">
+              <span>入団 {formatPeriodDate(period.joinDate)}</span>
+              <span>卒業予定 {formatPeriodDate(period.graduationDate)}</span>
+            </div>
+          )}
         </div>
       )}
 
-      {roundProgress.length > 0 && categories.length > 0 && (
+      {monthlyProgress && monthlyProgress.length > 0 && categories.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">カテゴリ別達成率の推移</h3>
           <div className="w-full" style={{ height: '300px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart 
-                data={roundProgress.map(r => {
-                  const d = { roundName: r.roundName };
-                  Object.entries(r.categories).forEach(([cat, rates]) => {
-                    d[cat] = rates.coachRate;
-                  });
+                data={monthlyProgress.map(r => {
+                  const d = { label: r.label };
+                  if (r.categories) {
+                    Object.entries(r.categories).forEach(([cat, rates]) => {
+                      d[cat] = rates.coachRate;
+                    });
+                  }
                   return d;
                 })} 
                 margin={{ top: 10, right: 30, left: 10, bottom: 20 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis 
-                  dataKey="roundName" 
+                  dataKey="label" 
                   tick={{ fill: '#6b7280', fontSize: 11 }}
-                  angle={-20}
+                  angle={-30}
                   textAnchor="end"
                   height={60}
                 />
                 <YAxis 
-                  domain={[0, 100]} 
-                  ticks={[0, 20, 40, 60, 80, 100]}
+                  domain={[0, 'auto']} 
                   tick={{ fill: '#6b7280', fontSize: 12 }}
                   tickFormatter={(v) => `${v}%`}
                 />

@@ -92,12 +92,20 @@ The system emphasizes a team-centric display and robust role-based access contro
     -   Video uploader and player receive notifications when comments are added
     -   Comment section accessible via video modal with playback
 -   **Player Dashboard** (`/player-dashboard`):
-    -   Three-tab dashboard: Summary, Evaluation Analysis, Progress Tracking
-    -   Summary tab: Total score, achievement rate (progress bar), latest round, unread notifications, next actions
+    -   Four-tab dashboard: Summary, Career Achievement, Evaluation Analysis, Progress Tracking
+    -   Summary tab: Total score, cumulative achievement rate (progress bar), latest round, unread notifications, next actions
+    -   Career Achievement tab: XP-style cumulative achievement rate system
+        -   Formula: Numerator = sum of all evaluation scores since join; Denominator = totalMonths (joinDate→graduationDate) × monthlyMaxScore
+        -   Table showing: Category / Elements MAX+Current / Steps MAX+Current / Achievement Rate%
+        -   Color-coded achievement cells: Red (<40%), Orange (40-59%), Blue (60%+)
+        -   Period info display: join date, graduation date, total months, elapsed months
+        -   Career progress area chart (cumulative rate over time)
+        -   Category-specific line chart
     -   Evaluation tab: Radar chart (coach vs self by category), gap analysis bar chart, detailed score table
     -   Progress tab: Line chart for score trends over evaluation rounds with category filter
     -   Uses Recharts for all visualizations with responsive design for mobile
     -   Parent accounts can also access this dashboard to view their child's data
+    -   Player model includes `joinedAt` and `graduationDate` fields for career period definition (default 36 months if not set)
 -   **Coach Assignment System**:
     -   Head Coach designation: One head coach per team, can evaluate all players in the team
     -   Coach-Player assignments: COACH and GUEST_COACH roles can only evaluate players they are explicitly assigned to

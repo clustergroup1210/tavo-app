@@ -111,7 +111,7 @@ router.get('/:id', authenticate, async (req, res) => {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { teamId, name, number, position, birthDate, joinedAt, teamCategoryId } = req.body;
+    const { teamId, name, number, position, birthDate, joinedAt, graduationDate, teamCategoryId } = req.body;
 
     if (!hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH', 'COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
@@ -127,6 +127,7 @@ router.post('/', authenticate, async (req, res) => {
         position,
         birthDate: birthDate ? new Date(birthDate) : null,
         joinedAt: playerJoinedAt,
+        graduationDate: graduationDate ? new Date(graduationDate) : null,
         teamCategoryId: teamCategoryId || null
       }
     });
@@ -144,7 +145,7 @@ router.post('/', authenticate, async (req, res) => {
 
 router.put('/:id', authenticate, async (req, res) => {
   try {
-    const { name, nameRomaji, number, position, birthDate, joinedAt, height, weight, dominantFoot, hometown, school, previousTeam, teamId, roleModel, playStyle, teamCategoryId } = req.body;
+    const { name, nameRomaji, number, position, birthDate, joinedAt, graduationDate, height, weight, dominantFoot, hometown, school, previousTeam, teamId, roleModel, playStyle, teamCategoryId } = req.body;
 
     const player = await prisma.player.findUnique({ where: { id: req.params.id } });
     if (!player) {
@@ -170,6 +171,7 @@ router.put('/:id', authenticate, async (req, res) => {
     if (position !== undefined) updateData.position = position;
     if (birthDate !== undefined) updateData.birthDate = birthDate ? new Date(birthDate) : null;
     if (joinedAt !== undefined) updateData.joinedAt = joinedAt ? new Date(joinedAt) : null;
+    if (graduationDate !== undefined) updateData.graduationDate = graduationDate ? new Date(graduationDate) : null;
     if (height !== undefined) updateData.height = height ? parseInt(height) : null;
     if (weight !== undefined) updateData.weight = weight ? parseInt(weight) : null;
     if (dominantFoot !== undefined) updateData.dominantFoot = dominantFoot;
