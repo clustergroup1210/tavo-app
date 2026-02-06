@@ -714,19 +714,25 @@ function ProgressTab({ data, selectedCategory, setSelectedCategory }) {
 
   const { progressData, categories } = data.progress;
 
-  const overallChartData = progressData.map(d => ({
-    name: d.roundName,
-    maxScore: d.maxScore,
-    coachTotal: d.coachTotal,
-    selfTotal: d.selfTotal
-  }));
+  let cumCoach = 0, cumSelf = 0, cumMax = 0;
+  const overallChartData = progressData.map(d => {
+    cumMax += (d.maxScore || 0);
+    cumCoach += (d.coachTotal || 0);
+    cumSelf += (d.selfTotal || 0);
+    return {
+      name: d.roundName,
+      maxScore: cumMax,
+      coachTotal: d.coachTotal != null ? cumCoach : null,
+      selfTotal: d.selfTotal != null ? cumSelf : null
+    };
+  });
 
-  const maxYOverall = progressData.length > 0 ? (progressData[0].maxScore || 50) : 50;
+  const maxYOverall = overallChartData.length > 0 ? overallChartData[overallChartData.length - 1].maxScore : 50;
 
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">総合スコア推移（MAX vs 実績）</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">累計スコア推移（MAX vs 実績）</h3>
         <div className="flex flex-wrap gap-4 mb-4 text-sm">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-gray-300" />
@@ -772,13 +778,20 @@ function ProgressTab({ data, selectedCategory, setSelectedCategory }) {
       </div>
 
       {categories.map((cat, catIdx) => {
-        const catChartData = progressData.map(d => ({
-          name: d.roundName,
-          maxScore: d.categories[cat]?.maxScore || 0,
-          coachTotal: d.categories[cat]?.coachTotal || null,
-          selfTotal: d.categories[cat]?.selfTotal || null
-        }));
-        const catMax = catChartData.length > 0 ? Math.max(...catChartData.map(d => d.maxScore || 0), 1) : 10;
+        let catCumCoach = 0, catCumSelf = 0, catCumMax = 0;
+        const catChartData = progressData.map(d => {
+          const catData = d.categories[cat];
+          catCumMax += (catData?.maxScore || 0);
+          catCumCoach += (catData?.coachTotal || 0);
+          catCumSelf += (catData?.selfTotal || 0);
+          return {
+            name: d.roundName,
+            maxScore: catCumMax,
+            coachTotal: catData?.coachTotal != null ? catCumCoach : null,
+            selfTotal: catData?.selfTotal != null ? catCumSelf : null
+          };
+        });
+        const catMax = catChartData.length > 0 ? catChartData[catChartData.length - 1].maxScore || 10 : 10;
 
         return (
           <div key={cat} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -834,27 +847,27 @@ function ProgressTab({ data, selectedCategory, setSelectedCategory }) {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">ラウンド別スコア詳細</h3>
+          <h3 className="text-lg font-semibold text-gray-900">累計スコア詳細</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ラウンド</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">満点</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">指導者合計</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">自己合計</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">累計MAX</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">指導者累計</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">自己累計</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">達成率</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {progressData.map((round, idx) => {
+              {overallChartData.map((round, idx) => {
                 const rate = round.maxScore > 0 && round.coachTotal
                   ? Math.round((round.coachTotal / round.maxScore) * 100) 
                   : null;
                 return (
                   <tr key={idx} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{round.roundName}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{round.name}</td>
                     <td className="px-4 py-3 text-center text-sm text-gray-500 font-medium">
                       {round.maxScore}
                     </td>
