@@ -141,8 +141,8 @@ router.get('/:playerId', authenticate, async (req, res) => {
       }
     });
 
-    const totalItems = items.filter(item => item.parentId !== null).length;
-    const maxScore = totalItems * 5;
+    const leafItems = items.filter(item => item.parentId !== null);
+    const maxScore = leafItems.reduce((sum, item) => sum + (item.maxScore || 5), 0);
     const currentScore = coachTotal || selfTotal;
     const achievementRate = maxScore > 0 ? Math.round((currentScore / maxScore) * 100) : 0;
 
@@ -271,6 +271,199 @@ router.get('/:playerId', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Player dashboard error:', error);
     res.status(500).json({ error: 'Failed to fetch player dashboard data' });
+  }
+});
+
+router.get('/:playerId/achievement', authenticate, async (req, res) => {
+  try {
+    const { playerId } = req.params;
+    
+    const player = await prisma.player.findUnique({
+      where: { id: playerId },
+      include: { 
+        team: { include: { parent: true } },
+        teamCategory: true
+      }
+    });
+    
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
+    const isSelf = player.userId === req.user.id;
+    const isOp = isOperator(req.user);
+    const isParentOfPlayer = req.user.parentPlayers?.some(pp => pp.playerId === player.id);
+    const isTeamStaff = req.user.teams?.some(t => 
+      [player.teamId, player.team?.parentId].filter(Boolean).includes(t.teamId)
+    );
+    
+    if (!isSelf && !isOp && !isParentOfPlayer && !isTeamStaff) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const joinDate = player.joinedAt || player.createdAt;
+
+    const teamIds = [player.teamId];
+    if (player.team?.parentId) {
+      teamIds.push(player.team.parentId);
+    }
+
+    const [evaluations, items, rounds] = await Promise.all([
+      prisma.evaluation.findMany({
+        where: { 
+          playerId,
+          evaluatedAt: { gte: joinDate }
+        },
+        include: { 
+          item: { include: { parent: true } }, 
+          round: true 
+        },
+        orderBy: { evaluatedAt: 'asc' }
+      }),
+      prisma.evaluationItem.findMany({
+        where: { teamId: { in: teamIds }, isActive: true, parentId: { not: null } },
+        include: { parent: true },
+        orderBy: { sortOrder: 'asc' }
+      }),
+      prisma.evaluationRound.findMany({
+        where: { teamId: { in: teamIds } },
+        orderBy: { startDate: 'asc' }
+      })
+    ]);
+
+    const categoryItems = {};
+    items.forEach(item => {
+      const catName = item.parent?.name || 'その他';
+      if (!categoryItems[catName]) {
+        categoryItems[catName] = [];
+      }
+      categoryItems[catName].push(item);
+    });
+
+    const coachEvals = evaluations.filter(e => e.raterType === 'COACH');
+    const selfEvals = evaluations.filter(e => e.raterType === 'SELF');
+
+    const categoryCumulative = {};
+    let grandTotalMax = 0;
+    let grandTotalActual = 0;
+    let grandSelfTotalMax = 0;
+    let grandSelfTotalActual = 0;
+
+    Object.entries(categoryItems).forEach(([catName, catItems]) => {
+      let coachActual = 0;
+      let coachMax = 0;
+      let selfActual = 0;
+      let selfMax = 0;
+
+      catItems.forEach(item => {
+        const itemCoachEvals = coachEvals.filter(e => e.itemId === item.id);
+        const itemSelfEvals = selfEvals.filter(e => e.itemId === item.id);
+        
+        itemCoachEvals.forEach(e => {
+          coachActual += e.score;
+          coachMax += item.maxScore;
+        });
+        
+        itemSelfEvals.forEach(e => {
+          selfActual += e.score;
+          selfMax += item.maxScore;
+        });
+      });
+
+      const coachRate = coachMax > 0 ? Math.round((coachActual / coachMax) * 100) : 0;
+      const selfRate = selfMax > 0 ? Math.round((selfActual / selfMax) * 100) : 0;
+
+      categoryCumulative[catName] = {
+        category: catName,
+        coachMax,
+        coachActual,
+        coachRate,
+        selfMax,
+        selfActual,
+        selfRate,
+        itemCount: catItems.length
+      };
+
+      grandTotalMax += coachMax;
+      grandTotalActual += coachActual;
+      grandSelfTotalMax += selfMax;
+      grandSelfTotalActual += selfActual;
+    });
+
+    const overallCoachRate = grandTotalMax > 0 ? Math.round((grandTotalActual / grandTotalMax) * 100) : 0;
+    const overallSelfRate = grandSelfTotalMax > 0 ? Math.round((grandSelfTotalActual / grandSelfTotalMax) * 100) : 0;
+
+    const roundProgress = [];
+    const filteredRounds = rounds.filter(r => new Date(r.startDate) >= joinDate);
+
+    let cumulativeCoachScores = {};
+    let cumulativeCoachMaxes = {};
+    let cumulativeSelfScores = {};
+    let cumulativeSelfMaxes = {};
+
+    filteredRounds.forEach(round => {
+      const roundEvals = evaluations.filter(e => e.roundId === round.id);
+      
+      roundEvals.forEach(e => {
+        const catName = e.item.parent?.name || e.item.name;
+        if (e.raterType === 'COACH') {
+          cumulativeCoachScores[catName] = (cumulativeCoachScores[catName] || 0) + e.score;
+          cumulativeCoachMaxes[catName] = (cumulativeCoachMaxes[catName] || 0) + (e.item.maxScore || 5);
+        } else {
+          cumulativeSelfScores[catName] = (cumulativeSelfScores[catName] || 0) + e.score;
+          cumulativeSelfMaxes[catName] = (cumulativeSelfMaxes[catName] || 0) + (e.item.maxScore || 5);
+        }
+      });
+
+      if (roundEvals.length === 0) return;
+
+      const totalCoachMax = Object.values(cumulativeCoachMaxes).reduce((a, b) => a + b, 0);
+      const totalCoachActual = Object.values(cumulativeCoachScores).reduce((a, b) => a + b, 0);
+      const totalSelfMax = Object.values(cumulativeSelfMaxes).reduce((a, b) => a + b, 0);
+      const totalSelfActual = Object.values(cumulativeSelfScores).reduce((a, b) => a + b, 0);
+
+      const categoryRates = {};
+      const allCats = new Set([...Object.keys(cumulativeCoachScores), ...Object.keys(cumulativeSelfScores)]);
+      allCats.forEach(cat => {
+        const cMax = cumulativeCoachMaxes[cat] || 0;
+        const cActual = cumulativeCoachScores[cat] || 0;
+        const sMax = cumulativeSelfMaxes[cat] || 0;
+        const sActual = cumulativeSelfScores[cat] || 0;
+        categoryRates[cat] = {
+          coachRate: cMax > 0 ? Math.round((cActual / cMax) * 100) : null,
+          selfRate: sMax > 0 ? Math.round((sActual / sMax) * 100) : null
+        };
+      });
+
+      roundProgress.push({
+        roundName: round.name,
+        date: round.startDate,
+        overallCoachRate: totalCoachMax > 0 ? Math.round((totalCoachActual / totalCoachMax) * 100) : null,
+        overallSelfRate: totalSelfMax > 0 ? Math.round((totalSelfActual / totalSelfMax) * 100) : null,
+        categories: categoryRates
+      });
+    });
+
+    res.json({
+      player: {
+        id: player.id,
+        name: player.name,
+        joinedAt: joinDate
+      },
+      overall: {
+        coachMax: grandTotalMax,
+        coachActual: grandTotalActual,
+        coachRate: overallCoachRate,
+        selfMax: grandSelfTotalMax,
+        selfActual: grandSelfTotalActual,
+        selfRate: overallSelfRate
+      },
+      categories: Object.values(categoryCumulative),
+      roundProgress
+    });
+  } catch (error) {
+    console.error('Achievement calculation error:', error);
+    res.status(500).json({ error: 'Failed to calculate achievement data' });
   }
 });
 

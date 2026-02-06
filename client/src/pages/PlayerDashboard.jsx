@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { 
-  BarChart3, TrendingUp, Target, Bell, ChevronRight, User, Award
+  BarChart3, TrendingUp, Target, Bell, ChevronRight, User, Award, Zap
 } from 'lucide-react';
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, BarChart, Bar, Cell
+  ResponsiveContainer, BarChart, Bar, Cell, Area, AreaChart
 } from 'recharts';
 
 const COLORS = {
@@ -17,11 +17,14 @@ const COLORS = {
   negative: '#ef4444'
 };
 
+const categoryColors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
+
 export default function PlayerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('summary');
   const [data, setData] = useState(null);
+  const [achievementData, setAchievementData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [playerId, setPlayerId] = useState(null);
@@ -37,6 +40,7 @@ export default function PlayerDashboard() {
         const myPlayer = await res.json();
         setPlayerId(myPlayer.id);
         fetchDashboardData(myPlayer.id);
+        fetchAchievementData(myPlayer.id);
       } else {
         setLoading(false);
       }
@@ -60,6 +64,21 @@ export default function PlayerDashboard() {
     }
   };
 
+  const fetchAchievementData = async (pid) => {
+    try {
+      const res = await fetch(`/api/player-dashboard/${pid}/achievement`, { credentials: 'include' });
+      if (res.ok) {
+        const adata = await res.json();
+        setAchievementData(adata);
+      } else {
+        setAchievementData(null);
+      }
+    } catch (error) {
+      console.error('Failed to fetch achievement data:', error);
+      setAchievementData(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -80,6 +99,7 @@ export default function PlayerDashboard() {
 
   const tabs = [
     { id: 'summary', label: 'ダッシュボード', icon: BarChart3 },
+    { id: 'achievement', label: '累積達成率', icon: Zap },
     { id: 'evaluation', label: '評価分析', icon: Target },
     { id: 'progress', label: '上達状況', icon: TrendingUp }
   ];
@@ -114,7 +134,8 @@ export default function PlayerDashboard() {
         </nav>
       </div>
 
-      {activeTab === 'summary' && <SummaryTab data={data} navigate={navigate} />}
+      {activeTab === 'summary' && <SummaryTab data={data} achievementData={achievementData} navigate={navigate} />}
+      {activeTab === 'achievement' && <AchievementTab data={achievementData} />}
       {activeTab === 'evaluation' && <EvaluationTab data={data} />}
       {activeTab === 'progress' && (
         <ProgressTab 
@@ -127,14 +148,15 @@ export default function PlayerDashboard() {
   );
 }
 
-function SummaryTab({ data, navigate }) {
+function SummaryTab({ data, achievementData, navigate }) {
   if (!data) return null;
   
   const { summary, notifications, nextActions } = data;
+  const overallRate = achievementData?.overall?.coachRate ?? summary.achievementRate;
   
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-medium text-gray-500">総合スコア</h3>
@@ -151,9 +173,30 @@ function SummaryTab({ data, navigate }) {
           )}
         </div>
 
+        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-sm p-6 text-white">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-indigo-100">累積達成率</h3>
+            <Zap className="w-5 h-5 text-yellow-300" />
+          </div>
+          <div className="flex items-end gap-3">
+            <div className="text-3xl font-bold">
+              {overallRate}%
+            </div>
+            <div className="flex-1 mb-2">
+              <div className="h-3 bg-white/20 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-yellow-300 to-yellow-400 rounded-full transition-all duration-500"
+                  style={{ width: `${overallRate}%` }}
+                />
+              </div>
+            </div>
+          </div>
+          <p className="text-xs text-indigo-200 mt-1">入団からの経験値</p>
+        </div>
+
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-gray-500">達成率</h3>
+            <h3 className="text-sm font-medium text-gray-500">最新達成率</h3>
             <Target className="w-5 h-5 text-green-500" />
           </div>
           <div className="flex items-end gap-3">
@@ -247,6 +290,249 @@ function SummaryTab({ data, navigate }) {
           <p className="text-gray-500 mt-1">
             評価が入力されると、ここにデータが表示されます。
           </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function getRateColor(rate) {
+  if (rate >= 80) return 'bg-blue-500 text-white';
+  if (rate >= 60) return 'bg-blue-400 text-white';
+  if (rate >= 40) return 'bg-amber-400 text-white';
+  if (rate >= 20) return 'bg-orange-500 text-white';
+  return 'bg-red-500 text-white';
+}
+
+function getRateBarColor(rate) {
+  if (rate >= 80) return 'from-blue-400 to-blue-600';
+  if (rate >= 60) return 'from-blue-300 to-blue-500';
+  if (rate >= 40) return 'from-amber-300 to-amber-500';
+  if (rate >= 20) return 'from-orange-400 to-orange-600';
+  return 'from-red-400 to-red-600';
+}
+
+function AchievementTab({ data }) {
+  if (!data || (!data.categories?.length && !data.roundProgress?.length)) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+        <Zap className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+        <h3 className="text-lg font-medium text-gray-700">達成率データがありません</h3>
+        <p className="text-gray-500 mt-1">
+          評価が蓄積されると、累積達成率が表示されます。
+        </p>
+      </div>
+    );
+  }
+
+  const { overall, categories, roundProgress } = data;
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl shadow-lg p-6 text-white">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-yellow-400/20 rounded-lg flex items-center justify-center">
+            <Zap className="w-6 h-6 text-yellow-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold">ACHIEVEMENT STATUS</h3>
+            <p className="text-sm text-slate-400">入団からの累積達成率</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="bg-white/10 rounded-xl p-4">
+            <p className="text-xs text-slate-400 mb-1">指導者評価 達成率</p>
+            <div className="flex items-end gap-2">
+              <span className="text-4xl font-bold text-yellow-400">{overall.coachRate}</span>
+              <span className="text-lg text-slate-400 mb-1">%</span>
+            </div>
+            <div className="mt-2 h-2 bg-white/10 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full transition-all duration-700"
+                style={{ width: `${overall.coachRate}%` }}
+              />
+            </div>
+            <p className="text-xs text-slate-500 mt-1">{overall.coachActual} / {overall.coachMax} pts</p>
+          </div>
+          <div className="bg-white/10 rounded-xl p-4">
+            <p className="text-xs text-slate-400 mb-1">自己評価 達成率</p>
+            <div className="flex items-end gap-2">
+              <span className="text-4xl font-bold text-cyan-400">{overall.selfRate}</span>
+              <span className="text-lg text-slate-400 mb-1">%</span>
+            </div>
+            <div className="mt-2 h-2 bg-white/10 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-cyan-400 to-teal-500 rounded-full transition-all duration-700"
+                style={{ width: `${overall.selfRate}%` }}
+              />
+            </div>
+            <p className="text-xs text-slate-500 mt-1">{overall.selfActual} / {overall.selfMax} pts</p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-white/10">
+                <th className="text-left py-2 px-3 text-xs font-medium text-slate-400 uppercase tracking-wider">カテゴリ</th>
+                <th className="text-center py-2 px-3 text-xs font-medium text-slate-400 uppercase tracking-wider">MAX</th>
+                <th className="text-center py-2 px-3 text-xs font-medium text-slate-400 uppercase tracking-wider">獲得</th>
+                <th className="text-center py-2 px-3 text-xs font-medium text-slate-400 uppercase tracking-wider min-w-[120px]">達成率</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categories.map((cat, idx) => (
+                <tr key={cat.category} className="border-b border-white/5 hover:bg-white/5">
+                  <td className="py-3 px-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: categoryColors[idx % categoryColors.length] }} />
+                      <span className="text-sm font-medium">{cat.category}</span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-3 text-center text-sm text-slate-400">{cat.coachMax}</td>
+                  <td className="py-3 px-3 text-center text-sm font-medium text-yellow-400">{cat.coachActual}</td>
+                  <td className="py-3 px-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full bg-gradient-to-r ${getRateBarColor(cat.coachRate)} rounded-full transition-all duration-500`}
+                          style={{ width: `${cat.coachRate}%` }}
+                        />
+                      </div>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${getRateColor(cat.coachRate)}`}>
+                        {cat.coachRate}%
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {roundProgress.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">累積達成率の推移</h3>
+          <div className="flex flex-wrap gap-4 mb-4 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-blue-500" />
+              <span className="text-gray-600">指導者評価</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-emerald-500" />
+              <span className="text-gray-600">自己評価</span>
+            </div>
+          </div>
+          <div className="w-full" style={{ height: '300px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={roundProgress} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
+                <defs>
+                  <linearGradient id="colorCoach" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorSelf" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis 
+                  dataKey="roundName" 
+                  tick={{ fill: '#6b7280', fontSize: 11 }}
+                  angle={-20}
+                  textAnchor="end"
+                  height={60}
+                />
+                <YAxis 
+                  domain={[0, 100]} 
+                  ticks={[0, 20, 40, 60, 80, 100]}
+                  tick={{ fill: '#6b7280', fontSize: 12 }}
+                  tickFormatter={(v) => `${v}%`}
+                />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                  formatter={(value, name) => {
+                    const label = name === 'overallCoachRate' ? '指導者達成率' : '自己達成率';
+                    return [`${value}%`, label];
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="overallCoachRate"
+                  stroke="#3B82F6"
+                  strokeWidth={2}
+                  fill="url(#colorCoach)"
+                  dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6 }}
+                  connectNulls
+                />
+                <Area
+                  type="monotone"
+                  dataKey="overallSelfRate"
+                  stroke="#10B981"
+                  strokeWidth={2}
+                  fill="url(#colorSelf)"
+                  dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6 }}
+                  connectNulls
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {roundProgress.length > 0 && categories.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">カテゴリ別達成率の推移</h3>
+          <div className="w-full" style={{ height: '300px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart 
+                data={roundProgress.map(r => {
+                  const d = { roundName: r.roundName };
+                  Object.entries(r.categories).forEach(([cat, rates]) => {
+                    d[cat] = rates.coachRate;
+                  });
+                  return d;
+                })} 
+                margin={{ top: 10, right: 30, left: 10, bottom: 20 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis 
+                  dataKey="roundName" 
+                  tick={{ fill: '#6b7280', fontSize: 11 }}
+                  angle={-20}
+                  textAnchor="end"
+                  height={60}
+                />
+                <YAxis 
+                  domain={[0, 100]} 
+                  ticks={[0, 20, 40, 60, 80, 100]}
+                  tick={{ fill: '#6b7280', fontSize: 12 }}
+                  tickFormatter={(v) => `${v}%`}
+                />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                  formatter={(value, name) => [`${value}%`, name]}
+                />
+                <Legend />
+                {categories.map((cat, idx) => (
+                  <Line
+                    key={cat.category}
+                    type="monotone"
+                    dataKey={cat.category}
+                    stroke={categoryColors[idx % categoryColors.length]}
+                    strokeWidth={2}
+                    dot={{ fill: categoryColors[idx % categoryColors.length], strokeWidth: 2, r: 3 }}
+                    connectNulls
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       )}
     </div>

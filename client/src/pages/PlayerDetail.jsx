@@ -282,6 +282,7 @@ export default function PlayerDetail() {
       number: player.number || '',
       position: player.position || '',
       birthDate: player.birthDate ? player.birthDate.split('T')[0] : '',
+      joinedAt: player.joinedAt ? player.joinedAt.split('T')[0] : '',
       height: player.height || '',
       weight: player.weight || '',
       dominantFoot: player.dominantFoot || '',
@@ -551,6 +552,15 @@ export default function PlayerDetail() {
               />
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">入団日</label>
+              <input
+                type="date"
+                value={editForm.joinedAt}
+                onChange={(e) => setEditForm({ ...editForm, joinedAt: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">身長 (cm)</label>
               <input
                 type="number"
@@ -742,6 +752,15 @@ export default function PlayerDetail() {
                 {player.birthDate && (
                   <span className="ml-1 text-sm text-gray-500">({calculateAge(player.birthDate)}歳)</span>
                 )}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+            <Calendar className="w-5 h-5 text-green-500 mt-0.5" />
+            <div>
+              <p className="text-xs text-gray-500">入団日</p>
+              <p className="font-medium text-gray-900">
+                {player.joinedAt ? formatDate(player.joinedAt) : '-'}
               </p>
             </div>
           </div>

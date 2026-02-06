@@ -111,11 +111,13 @@ router.get('/:id', authenticate, async (req, res) => {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { teamId, name, number, position, birthDate, teamCategoryId } = req.body;
+    const { teamId, name, number, position, birthDate, joinedAt, teamCategoryId } = req.body;
 
     if (!hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH', 'COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
     }
+
+    const playerJoinedAt = joinedAt ? new Date(joinedAt) : new Date();
 
     const player = await prisma.player.create({
       data: {
@@ -124,12 +126,13 @@ router.post('/', authenticate, async (req, res) => {
         number,
         position,
         birthDate: birthDate ? new Date(birthDate) : null,
+        joinedAt: playerJoinedAt,
         teamCategoryId: teamCategoryId || null
       }
     });
 
     await prisma.playerTeamHistory.create({
-      data: { playerId: player.id, teamId, joinedAt: new Date() }
+      data: { playerId: player.id, teamId, joinedAt: playerJoinedAt }
     });
 
     res.json(player);
@@ -141,7 +144,7 @@ router.post('/', authenticate, async (req, res) => {
 
 router.put('/:id', authenticate, async (req, res) => {
   try {
-    const { name, nameRomaji, number, position, birthDate, height, weight, dominantFoot, hometown, school, previousTeam, teamId, roleModel, playStyle, teamCategoryId } = req.body;
+    const { name, nameRomaji, number, position, birthDate, joinedAt, height, weight, dominantFoot, hometown, school, previousTeam, teamId, roleModel, playStyle, teamCategoryId } = req.body;
 
     const player = await prisma.player.findUnique({ where: { id: req.params.id } });
     if (!player) {
@@ -166,6 +169,7 @@ router.put('/:id', authenticate, async (req, res) => {
     if (number !== undefined) updateData.number = number;
     if (position !== undefined) updateData.position = position;
     if (birthDate !== undefined) updateData.birthDate = birthDate ? new Date(birthDate) : null;
+    if (joinedAt !== undefined) updateData.joinedAt = joinedAt ? new Date(joinedAt) : null;
     if (height !== undefined) updateData.height = height ? parseInt(height) : null;
     if (weight !== undefined) updateData.weight = weight ? parseInt(weight) : null;
     if (dominantFoot !== undefined) updateData.dominantFoot = dominantFoot;
