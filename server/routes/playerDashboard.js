@@ -302,6 +302,16 @@ router.get('/:playerId/achievement', authenticate, async (req, res) => {
     }
 
     const joinDate = player.joinedAt || player.createdAt;
+    const now = new Date();
+    const defaultGraduation = new Date(joinDate);
+    defaultGraduation.setMonth(defaultGraduation.getMonth() + 36);
+    const graduationDate = player.graduationDate || defaultGraduation;
+
+    const diffMs = graduationDate.getTime() - joinDate.getTime();
+    const totalMonths = Math.max(Math.round(diffMs / (1000 * 60 * 60 * 24 * 30.44)), 1);
+
+    const elapsedMs = now.getTime() - joinDate.getTime();
+    const elapsedMonths = Math.max(Math.round(elapsedMs / (1000 * 60 * 60 * 24 * 30.44)), 0);
 
     const teamIds = [player.teamId];
     if (player.team?.parentId) {
@@ -332,114 +342,112 @@ router.get('/:playerId/achievement', authenticate, async (req, res) => {
     ]);
 
     const categoryItems = {};
+    let monthlyMaxScoreTotal = 0;
     items.forEach(item => {
       const catName = item.parent?.name || 'その他';
       if (!categoryItems[catName]) {
-        categoryItems[catName] = [];
+        categoryItems[catName] = { items: [], monthlyMax: 0 };
       }
-      categoryItems[catName].push(item);
+      categoryItems[catName].items.push(item);
+      categoryItems[catName].monthlyMax += (item.maxScore || 5);
+      monthlyMaxScoreTotal += (item.maxScore || 5);
     });
+
+    const careerDenominator = totalMonths * monthlyMaxScoreTotal;
 
     const coachEvals = evaluations.filter(e => e.raterType === 'COACH');
     const selfEvals = evaluations.filter(e => e.raterType === 'SELF');
 
-    const categoryCumulative = {};
-    let grandTotalMax = 0;
-    let grandTotalActual = 0;
-    let grandSelfTotalMax = 0;
-    let grandSelfTotalActual = 0;
+    const categories = [];
+    let grandCoachActual = 0;
+    let grandSelfActual = 0;
+    let grandCareerDenominator = 0;
+    let totalElements = 0;
 
-    Object.entries(categoryItems).forEach(([catName, catItems]) => {
+    Object.entries(categoryItems).forEach(([catName, catData]) => {
+      const { items: catItems, monthlyMax } = catData;
+      const catDenominator = totalMonths * monthlyMax;
+
       let coachActual = 0;
-      let coachMax = 0;
       let selfActual = 0;
-      let selfMax = 0;
 
       catItems.forEach(item => {
-        const itemCoachEvals = coachEvals.filter(e => e.itemId === item.id);
-        const itemSelfEvals = selfEvals.filter(e => e.itemId === item.id);
-        
-        itemCoachEvals.forEach(e => {
+        coachEvals.filter(e => e.itemId === item.id).forEach(e => {
           coachActual += e.score;
-          coachMax += item.maxScore;
         });
-        
-        itemSelfEvals.forEach(e => {
+        selfEvals.filter(e => e.itemId === item.id).forEach(e => {
           selfActual += e.score;
-          selfMax += item.maxScore;
         });
       });
 
-      const coachRate = coachMax > 0 ? Math.round((coachActual / coachMax) * 100) : 0;
-      const selfRate = selfMax > 0 ? Math.round((selfActual / selfMax) * 100) : 0;
+      const coachRate = catDenominator > 0 ? Math.round((coachActual / catDenominator) * 1000) / 10 : 0;
+      const selfRate = catDenominator > 0 ? Math.round((selfActual / catDenominator) * 1000) / 10 : 0;
 
-      categoryCumulative[catName] = {
+      categories.push({
         category: catName,
-        coachMax,
+        elementCount: catItems.length,
+        monthlyMaxScore: monthlyMax,
+        stepsMax: catDenominator,
         coachActual,
-        coachRate,
-        selfMax,
         selfActual,
-        selfRate,
-        itemCount: catItems.length
-      };
+        coachRate,
+        selfRate
+      });
 
-      grandTotalMax += coachMax;
-      grandTotalActual += coachActual;
-      grandSelfTotalMax += selfMax;
-      grandSelfTotalActual += selfActual;
+      grandCoachActual += coachActual;
+      grandSelfActual += selfActual;
+      grandCareerDenominator += catDenominator;
+      totalElements += catItems.length;
     });
 
-    const overallCoachRate = grandTotalMax > 0 ? Math.round((grandTotalActual / grandTotalMax) * 100) : 0;
-    const overallSelfRate = grandSelfTotalMax > 0 ? Math.round((grandSelfTotalActual / grandSelfTotalMax) * 100) : 0;
+    const overallCoachRate = grandCareerDenominator > 0 
+      ? Math.round((grandCoachActual / grandCareerDenominator) * 1000) / 10 : 0;
+    const overallSelfRate = grandCareerDenominator > 0 
+      ? Math.round((grandSelfActual / grandCareerDenominator) * 1000) / 10 : 0;
 
-    const roundProgress = [];
+    const monthlyProgress = [];
+    let cumCoachScore = 0;
+    let cumSelfScore = 0;
+    const cumCatCoach = {};
+    const cumCatSelf = {};
+
     const filteredRounds = rounds.filter(r => new Date(r.startDate) >= joinDate);
-
-    let cumulativeCoachScores = {};
-    let cumulativeCoachMaxes = {};
-    let cumulativeSelfScores = {};
-    let cumulativeSelfMaxes = {};
 
     filteredRounds.forEach(round => {
       const roundEvals = evaluations.filter(e => e.roundId === round.id);
-      
+      if (roundEvals.length === 0) return;
+
       roundEvals.forEach(e => {
         const catName = e.item.parent?.name || e.item.name;
         if (e.raterType === 'COACH') {
-          cumulativeCoachScores[catName] = (cumulativeCoachScores[catName] || 0) + e.score;
-          cumulativeCoachMaxes[catName] = (cumulativeCoachMaxes[catName] || 0) + (e.item.maxScore || 5);
+          cumCoachScore += e.score;
+          cumCatCoach[catName] = (cumCatCoach[catName] || 0) + e.score;
         } else {
-          cumulativeSelfScores[catName] = (cumulativeSelfScores[catName] || 0) + e.score;
-          cumulativeSelfMaxes[catName] = (cumulativeSelfMaxes[catName] || 0) + (e.item.maxScore || 5);
+          cumSelfScore += e.score;
+          cumCatSelf[catName] = (cumCatSelf[catName] || 0) + e.score;
         }
       });
 
-      if (roundEvals.length === 0) return;
-
-      const totalCoachMax = Object.values(cumulativeCoachMaxes).reduce((a, b) => a + b, 0);
-      const totalCoachActual = Object.values(cumulativeCoachScores).reduce((a, b) => a + b, 0);
-      const totalSelfMax = Object.values(cumulativeSelfMaxes).reduce((a, b) => a + b, 0);
-      const totalSelfActual = Object.values(cumulativeSelfScores).reduce((a, b) => a + b, 0);
+      const roundDate = new Date(round.startDate);
+      const label = `${roundDate.getFullYear()}/${String(roundDate.getMonth() + 1).padStart(2, '0')}`;
 
       const categoryRates = {};
-      const allCats = new Set([...Object.keys(cumulativeCoachScores), ...Object.keys(cumulativeSelfScores)]);
-      allCats.forEach(cat => {
-        const cMax = cumulativeCoachMaxes[cat] || 0;
-        const cActual = cumulativeCoachScores[cat] || 0;
-        const sMax = cumulativeSelfMaxes[cat] || 0;
-        const sActual = cumulativeSelfScores[cat] || 0;
-        categoryRates[cat] = {
-          coachRate: cMax > 0 ? Math.round((cActual / cMax) * 100) : null,
-          selfRate: sMax > 0 ? Math.round((sActual / sMax) * 100) : null
+      Object.entries(categoryItems).forEach(([catName, catData]) => {
+        const catDenom = totalMonths * catData.monthlyMax;
+        categoryRates[catName] = {
+          coachRate: catDenom > 0 ? Math.round(((cumCatCoach[catName] || 0) / catDenom) * 1000) / 10 : 0,
+          selfRate: catDenom > 0 ? Math.round(((cumCatSelf[catName] || 0) / catDenom) * 1000) / 10 : 0
         };
       });
 
-      roundProgress.push({
-        roundName: round.name,
+      monthlyProgress.push({
+        label,
         date: round.startDate,
-        overallCoachRate: totalCoachMax > 0 ? Math.round((totalCoachActual / totalCoachMax) * 100) : null,
-        overallSelfRate: totalSelfMax > 0 ? Math.round((totalSelfActual / totalSelfMax) * 100) : null,
+        roundName: round.name,
+        overallCoachRate: grandCareerDenominator > 0 
+          ? Math.round((cumCoachScore / grandCareerDenominator) * 1000) / 10 : 0,
+        overallSelfRate: grandCareerDenominator > 0 
+          ? Math.round((cumSelfScore / grandCareerDenominator) * 1000) / 10 : 0,
         categories: categoryRates
       });
     });
@@ -448,18 +456,26 @@ router.get('/:playerId/achievement', authenticate, async (req, res) => {
       player: {
         id: player.id,
         name: player.name,
-        joinedAt: joinDate
+        joinedAt: joinDate,
+        graduationDate: graduationDate
+      },
+      period: {
+        joinDate,
+        graduationDate,
+        totalMonths,
+        elapsedMonths,
+        monthlyMaxScore: monthlyMaxScoreTotal
       },
       overall: {
-        coachMax: grandTotalMax,
-        coachActual: grandTotalActual,
+        totalElements,
+        careerDenominator: grandCareerDenominator,
+        coachActual: grandCoachActual,
         coachRate: overallCoachRate,
-        selfMax: grandSelfTotalMax,
-        selfActual: grandSelfTotalActual,
+        selfActual: grandSelfActual,
         selfRate: overallSelfRate
       },
-      categories: Object.values(categoryCumulative),
-      roundProgress
+      categories,
+      monthlyProgress
     });
   } catch (error) {
     console.error('Achievement calculation error:', error);
