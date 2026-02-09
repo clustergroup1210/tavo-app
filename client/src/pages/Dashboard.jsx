@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Building2, Plus, Upload, Edit2, X, Users, Tag, Trash2, ChevronRight } from 'lucide-react';
+import EvaluationMatrixTable from '../components/EvaluationMatrixTable';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -330,6 +331,8 @@ export default function Dashboard() {
           <p className="text-sm text-gray-500">カテゴリーはありません</p>
         )}
       </div>
+
+      <EvaluationMatrixTable />
 
       {showCategoryModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
