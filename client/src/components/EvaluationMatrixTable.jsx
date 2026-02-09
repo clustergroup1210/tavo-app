@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { BarChart3, ArrowUpDown, Filter } from 'lucide-react';
 
@@ -13,6 +14,7 @@ function getHeatmapColor(score, maxScore) {
 }
 
 export default function EvaluationMatrixTable() {
+  const navigate = useNavigate();
   const { currentTeam } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -270,10 +272,15 @@ export default function EvaluationMatrixTable() {
                         </td>
                         <td
                           rowSpan={rowCount}
-                          className="sticky z-10 bg-white border-b border-r border-gray-200 px-2 py-2 text-sm font-medium text-gray-900 align-top whitespace-nowrap"
+                          className="sticky z-10 bg-white border-b border-r border-gray-200 px-2 py-2 text-sm font-medium align-top whitespace-nowrap"
                           style={{ left: COL_NUM_W, width: COL_NAME_W, minWidth: COL_NAME_W }}
                         >
-                          {player.name}
+                          <button
+                            onClick={() => navigate(`/players/${player.id}`)}
+                            className="text-primary-600 hover:text-primary-800 hover:underline text-left font-medium"
+                          >
+                            {player.name}
+                          </button>
                         </td>
                       </>
                     )}

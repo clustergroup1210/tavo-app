@@ -1,23 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Building2, Plus, Upload, Edit2, X, Users, Tag, Trash2, ChevronRight } from 'lucide-react';
+import { Building2, Upload, Edit2 } from 'lucide-react';
 import EvaluationMatrixTable from '../components/EvaluationMatrixTable';
 
 export default function Dashboard() {
-  const navigate = useNavigate();
   const { currentTeam, isOperator, isTeamAdmin } = useAuth();
   const [team, setTeam] = useState(null);
-  const [teamCategories, setTeamCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [editingCategory, setEditingCategory] = useState(null);
-  const [editCategoryName, setEditCategoryName] = useState('');
-  const [error, setError] = useState('');
 
   useEffect(() => {
     if (currentTeam) {
@@ -29,20 +21,12 @@ export default function Dashboard() {
 
   const fetchTeamData = async () => {
     try {
-      const [teamRes, categoriesRes] = await Promise.all([
-        fetch(`/api/teams/${currentTeam.id}`, { credentials: 'include' }),
-        fetch(`/api/team-categories?teamId=${currentTeam.id}`, { credentials: 'include' })
-      ]);
-
+      const teamRes = await fetch(`/api/teams/${currentTeam.id}`, { credentials: 'include' });
       if (teamRes.ok) {
         const teamData = await teamRes.json();
         setTeam(teamData);
         setName(teamData.name);
         setDescription(teamData.description || '');
-      }
-      if (categoriesRes.ok) {
-        const categoriesData = await categoriesRes.json();
-        setTeamCategories(Array.isArray(categoriesData) ? categoriesData : []);
       }
     } catch (error) {
       console.error('Failed to fetch team data:', error);
@@ -85,77 +69,6 @@ export default function Dashboard() {
     }
   };
 
-  const handleCreateCategory = async (e) => {
-    e.preventDefault();
-    setError('');
-    try {
-      const res = await fetch('/api/team-categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ 
-          teamId: currentTeam.id, 
-          name: newCategoryName, 
-          sortOrder: teamCategories.length 
-        }),
-      });
-      if (res.ok) {
-        setNewCategoryName('');
-        setShowCategoryModal(false);
-        fetchTeamData();
-      } else {
-        const data = await res.json();
-        setError(data.error || 'カテゴリーの作成に失敗しました');
-      }
-    } catch (error) {
-      setError('カテゴリーの作成に失敗しました');
-    }
-  };
-
-  const handleEditCategory = async (e) => {
-    e.preventDefault();
-    if (!editingCategory) return;
-    setError('');
-    try {
-      const res = await fetch(`/api/team-categories/${editingCategory.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ name: editCategoryName }),
-      });
-      if (res.ok) {
-        setEditingCategory(null);
-        setEditCategoryName('');
-        fetchTeamData();
-      } else {
-        const data = await res.json();
-        setError(data.error || 'カテゴリーの更新に失敗しました');
-      }
-    } catch (error) {
-      setError('カテゴリーの更新に失敗しました');
-    }
-  };
-
-  const handleDeleteCategory = async (categoryId) => {
-    if (!confirm('このカテゴリーを削除しますか？')) return;
-    try {
-      const res = await fetch(`/api/team-categories/${categoryId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (res.ok) {
-        fetchTeamData();
-      }
-    } catch (error) {
-      console.error('Failed to delete category:', error);
-    }
-  };
-
-  const startEditCategory = (category) => {
-    setEditingCategory(category);
-    setEditCategoryName(category.name);
-  };
-
   const canEdit = currentTeam && (isTeamAdmin(currentTeam.id) || isOperator());
 
   if (loading) {
@@ -179,8 +92,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  const categories = teamCategories;
 
   return (
     <div className="space-y-6">
@@ -274,143 +185,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">カテゴリー</h3>
-          {canEdit && (
-            <button
-              onClick={() => setShowCategoryModal(true)}
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-            >
-              <Plus className="w-4 h-4" />
-              カテゴリー追加
-            </button>
-          )}
-        </div>
-        {categories.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {categories.map((category) => (
-              <div
-                key={category.id}
-                className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                onClick={() => navigate(`/players?categoryId=${category.id}`)}
-              >
-                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                  <Tag className="w-5 h-5 text-purple-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-gray-900">{category.name}</p>
-                  <p className="text-sm text-gray-500 flex items-center gap-1">
-                    <Users className="w-3 h-3" />
-                    {category._count?.players || 0}名
-                  </p>
-                </div>
-                {canEdit && (
-                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => startEditCategory(category)}
-                      className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded"
-                      title="編集"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCategory(category.id)}
-                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
-                      title="削除"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-                <ChevronRight className="w-5 h-5 text-gray-400" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-gray-500">カテゴリーはありません</p>
-        )}
-      </div>
-
       <EvaluationMatrixTable />
-
-      {showCategoryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">カテゴリー追加</h2>
-              <button onClick={() => { setShowCategoryModal(false); setError(''); }} className="p-1 hover:bg-gray-100 rounded">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
-            <form onSubmit={handleCreateCategory}>
-              <input
-                type="text"
-                placeholder="カテゴリー名（例: Aチーム）"
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4"
-                required
-              />
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => { setShowCategoryModal(false); setError(''); }}
-                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                >
-                  作成
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {editingCategory && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">カテゴリー編集</h2>
-              <button onClick={() => { setEditingCategory(null); setError(''); }} className="p-1 hover:bg-gray-100 rounded">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
-            <form onSubmit={handleEditCategory}>
-              <input
-                type="text"
-                placeholder="カテゴリー名"
-                value={editCategoryName}
-                onChange={(e) => setEditCategoryName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4"
-                required
-              />
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => { setEditingCategory(null); setError(''); }}
-                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                >
-                  保存
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
