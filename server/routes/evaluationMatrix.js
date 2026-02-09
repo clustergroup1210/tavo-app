@@ -5,6 +5,16 @@ const { authenticate } = require('../middleware/auth');
 const router = express.Router();
 const prisma = new PrismaClient();
 
+function generateRecentMonths(count = 6) {
+  const months = [];
+  const now = new Date();
+  for (let i = count - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(`${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return months;
+}
+
 router.get('/:teamId', authenticate, async (req, res) => {
   try {
     const { teamId } = req.params;
@@ -51,13 +61,22 @@ router.get('/:teamId', authenticate, async (req, res) => {
     const categories = items.filter(i => i.parentId === null);
     const leafItems = items.filter(i => i.parentId !== null);
 
-    const roundLabels = rounds.map(r => {
-      const d = new Date(r.startDate);
-      return {
-        id: r.id,
-        label: `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}`
-      };
-    });
+    let monthLabels;
+    let roundLabels;
+
+    if (rounds.length > 0) {
+      roundLabels = rounds.map(r => {
+        const d = new Date(r.startDate);
+        return {
+          id: r.id,
+          label: `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}`
+        };
+      });
+      monthLabels = roundLabels.map(r => r.label);
+    } else {
+      monthLabels = generateRecentMonths(6);
+      roundLabels = [];
+    }
 
     const evalMap = {};
     evaluations.forEach(e => {
@@ -73,29 +92,43 @@ router.get('/:teamId', authenticate, async (req, res) => {
     });
 
     const playersData = players.map(player => {
-      const rows = categories.map(cat => {
-        const catItems = categoryItemsMap[cat.id] || [];
-        const maxPerRound = catItems.reduce((sum, item) => sum + (item.maxScore || 5), 0);
+      const rows = categories.length > 0
+        ? categories.map(cat => {
+            const catItems = categoryItemsMap[cat.id] || [];
+            const maxPerRound = catItems.reduce((sum, item) => sum + (item.maxScore || 5), 0);
 
-        const scores = roundLabels.map(round => {
-          let total = 0;
-          let hasAny = false;
-          catItems.forEach(item => {
-            const key = `${player.id}_${item.id}_${round.id}`;
-            if (evalMap[key] !== undefined) {
-              total += evalMap[key];
-              hasAny = true;
+            const scores = roundLabels.map(round => {
+              let total = 0;
+              let hasAny = false;
+              catItems.forEach(item => {
+                const key = `${player.id}_${item.id}_${round.id}`;
+                if (evalMap[key] !== undefined) {
+                  total += evalMap[key];
+                  hasAny = true;
+                }
+              });
+              return hasAny ? total : null;
+            });
+
+            if (roundLabels.length === 0) {
+              return {
+                category: cat.name,
+                maxScore: maxPerRound,
+                scores: monthLabels.map(() => null)
+              };
             }
-          });
-          return hasAny ? total : null;
-        });
 
-        return {
-          category: cat.name,
-          maxScore: maxPerRound,
-          scores
-        };
-      });
+            return {
+              category: cat.name,
+              maxScore: maxPerRound,
+              scores
+            };
+          })
+        : [{
+            category: '-',
+            maxScore: 0,
+            scores: monthLabels.map(() => null)
+          }];
 
       return {
         id: player.id,
@@ -106,7 +139,7 @@ router.get('/:teamId', authenticate, async (req, res) => {
     });
 
     res.json({
-      months: roundLabels.map(r => r.label),
+      months: monthLabels,
       players: playersData
     });
   } catch (error) {
