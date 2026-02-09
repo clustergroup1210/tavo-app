@@ -28,10 +28,10 @@ router.get('/:teamId', authenticate, async (req, res) => {
     const teamIds = [teamId];
     if (team.parentId) teamIds.push(team.parentId);
 
-    const [players, items, rounds, evaluations] = await Promise.all([
+    const [players, items, rounds, evaluations, teamCategories] = await Promise.all([
       prisma.player.findMany({
         where: { teamId },
-        select: { id: true, name: true, number: true },
+        select: { id: true, name: true, number: true, teamCategoryId: true, position: true },
         orderBy: { number: 'asc' }
       }),
       prisma.evaluationItem.findMany({
@@ -55,6 +55,11 @@ router.get('/:teamId', authenticate, async (req, res) => {
           roundId: true,
           score: true
         }
+      }),
+      prisma.teamCategory.findMany({
+        where: { teamId },
+        select: { id: true, name: true },
+        orderBy: { sortOrder: 'asc' }
       })
     ]);
 
@@ -134,13 +139,17 @@ router.get('/:teamId', authenticate, async (req, res) => {
         id: player.id,
         number: player.number,
         name: player.name,
+        teamCategoryId: player.teamCategoryId,
+        position: player.position,
         rows
       };
     });
 
     res.json({
       months: monthLabels,
-      players: playersData
+      players: playersData,
+      evalCategories: categories.map(c => ({ id: c.id, name: c.name })),
+      teamCategories: teamCategories
     });
   } catch (error) {
     console.error('Evaluation matrix error:', error);
