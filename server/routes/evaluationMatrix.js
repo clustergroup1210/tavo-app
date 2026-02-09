@@ -30,7 +30,7 @@ router.get('/:teamId', authenticate, async (req, res) => {
 
     const [players, items, rounds, evaluations] = await Promise.all([
       prisma.player.findMany({
-        where: { teamId, isActive: true },
+        where: { teamId },
         select: { id: true, name: true, number: true },
         orderBy: { number: 'asc' }
       }),
