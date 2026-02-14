@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Save, Plus, Copy, X, Calendar, CheckCircle } from 'lucide-react';
+import { Save, Plus, Copy, X, Calendar, CheckCircle, HelpCircle } from 'lucide-react';
 
 export default function EvaluationEntry() {
   const { currentTeam, user, isCoach, isPlayer, playerData } = useAuth();
@@ -224,34 +224,119 @@ export default function EvaluationEntry() {
     }
   };
 
+  const [openTooltip, setOpenTooltip] = useState(null);
+  const tooltipRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (tooltipRef.current && !tooltipRef.current.contains(e.target)) {
+        setOpenTooltip(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const renderItems = (itemList, level = 0) => {
-    return itemList.map((item) => (
-      <div key={item.id} style={{ marginLeft: level * 20 }}>
-        <div className="flex items-center justify-between py-3 border-b border-gray-100">
-          <div>
-            <p className={`text-sm ${level === 0 ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>
-              {item.name}
-            </p>
+    return itemList.map((item) => {
+      const isCategory = item.children && item.children.length > 0;
+      const isLeaf = !item.children || item.children.length === 0;
+
+      if (isCategory && level === 0) {
+        return (
+          <div key={item.id} className="mb-3">
+            <div className="flex items-center gap-1.5 py-2 px-3 bg-gray-50 rounded-lg">
+              <p className="text-sm font-semibold text-gray-900">{item.name}</p>
+              {item.description && (
+                <div className="relative" ref={openTooltip === item.id ? tooltipRef : null}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenTooltip(openTooltip === item.id ? null : item.id)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5" />
+                  </button>
+                  {openTooltip === item.id && (
+                    <div className="absolute z-50 left-0 top-6 w-64 p-2.5 bg-gray-800 text-white text-xs rounded-lg shadow-lg">
+                      {item.description}
+                      <div className="absolute -top-1 left-2 w-2 h-2 bg-gray-800 rotate-45" />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="pl-2">
+              {renderItems(item.children, level + 1)}
+            </div>
+          </div>
+        );
+      }
+
+      if (isCategory) {
+        return (
+          <div key={item.id} className="mb-1">
+            <div className="flex items-center gap-1.5 py-1.5 pl-2">
+              <p className="text-xs font-medium text-gray-700">{item.name}</p>
+              {item.description && (
+                <div className="relative" ref={openTooltip === item.id ? tooltipRef : null}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenTooltip(openTooltip === item.id ? null : item.id)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <HelpCircle className="w-3 h-3" />
+                  </button>
+                  {openTooltip === item.id && (
+                    <div className="absolute z-50 left-0 top-5 w-60 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg">
+                      {item.description}
+                      <div className="absolute -top-1 left-2 w-2 h-2 bg-gray-800 rotate-45" />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="pl-2">
+              {renderItems(item.children, level + 1)}
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div key={item.id} className="flex items-center justify-between py-1.5 px-2 border-b border-gray-50 hover:bg-gray-50 rounded">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <p className="text-sm text-gray-600 truncate">{item.name}</p>
             {item.description && (
-              <p className="text-xs text-gray-500">{item.description}</p>
+              <div className="relative flex-shrink-0" ref={openTooltip === item.id ? tooltipRef : null}>
+                <button
+                  type="button"
+                  onClick={() => setOpenTooltip(openTooltip === item.id ? null : item.id)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                </button>
+                {openTooltip === item.id && (
+                  <div className="absolute z-50 left-0 top-6 w-60 p-2.5 bg-gray-800 text-white text-xs rounded-lg shadow-lg">
+                    {item.description}
+                    <div className="absolute -top-1 left-2 w-2 h-2 bg-gray-800 rotate-45" />
+                  </div>
+                )}
+              </div>
             )}
           </div>
-          {(!item.children || item.children.length === 0) && (
-            <select
-              value={scores[item.id] || ''}
-              onChange={(e) => handleScoreChange(item.id, e.target.value)}
-              className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-sm"
-            >
-              <option value="">-</option>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-          )}
+          <select
+            value={scores[item.id] || ''}
+            onChange={(e) => handleScoreChange(item.id, e.target.value)}
+            className="w-16 px-1.5 py-1 border border-gray-300 rounded text-sm text-center flex-shrink-0 ml-2"
+          >
+            <option value="">-</option>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
         </div>
-        {item.children && renderItems(item.children, level + 1)}
-      </div>
-    ));
+      );
+    });
   };
 
   const currentYear = new Date().getFullYear();
