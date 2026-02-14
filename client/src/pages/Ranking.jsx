@@ -1,15 +1,27 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Trophy, Medal, Filter, Users, TrendingUp } from 'lucide-react';
+import { Trophy, Medal, Filter, Users, TrendingUp, Zap } from 'lucide-react';
+
+function getRateColor(rate) {
+  if (rate >= 60) return 'text-blue-600';
+  if (rate >= 40) return 'text-orange-500';
+  return 'text-red-500';
+}
+
+function getRateBarColor(rate) {
+  if (rate >= 60) return 'from-blue-400 to-blue-600';
+  if (rate >= 40) return 'from-orange-300 to-orange-500';
+  return 'from-red-400 to-red-600';
+}
 
 export default function Ranking() {
+  const navigate = useNavigate();
   const { currentTeam } = useAuth();
-  const [rounds, setRounds] = useState([]);
-  const [selectedRound, setSelectedRound] = useState('');
   const [ranking, setRanking] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [teamCategories, setTeamCategories] = useState([]);
-  const [evaluationCategories, setEvaluationCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedTeamCategory, setSelectedTeamCategory] = useState('');
   const [selectedPosition, setSelectedPosition] = useState('');
   const [activeTab, setActiveTab] = useState('total');
   const [loading, setLoading] = useState(false);
@@ -18,55 +30,25 @@ export default function Ranking() {
 
   useEffect(() => {
     if (currentTeam) {
-      fetchInitialData();
-    }
-  }, [currentTeam]);
-
-  useEffect(() => {
-    if (selectedRound) {
       fetchRanking();
     }
-  }, [selectedRound, selectedCategory, selectedPosition, activeTab]);
-
-  const fetchInitialData = async () => {
-    try {
-      const [roundsRes, categoriesRes] = await Promise.all([
-        fetch(`/api/evaluations/rounds?teamId=${currentTeam.id}`, { credentials: 'include' }),
-        fetch(`/api/team-categories?teamId=${currentTeam.id}`, { credentials: 'include' })
-      ]);
-      
-      if (roundsRes.ok) {
-        const data = await roundsRes.json();
-        setRounds(data);
-        if (data.length > 0) {
-          setSelectedRound(data[0].id);
-        }
-      }
-      if (categoriesRes.ok) {
-        const data = await categoriesRes.json();
-        setTeamCategories(Array.isArray(data) ? data : []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch initial data:', error);
-    }
-  };
+  }, [currentTeam, selectedTeamCategory, selectedPosition]);
 
   const fetchRanking = async () => {
-    if (!selectedRound) return;
+    if (!currentTeam) return;
     setLoading(true);
     try {
-      let url = `/api/evaluations/ranking?teamId=${currentTeam.id}&roundId=${selectedRound}`;
-      if (activeTab === 'category' && selectedCategory) {
-        url += `&teamCategoryId=${selectedCategory}`;
-      }
-      if (activeTab === 'position' && selectedPosition) {
-        url += `&position=${selectedPosition}`;
-      }
+      let url = `/api/evaluations/ranking?teamId=${currentTeam.id}`;
+      if (selectedTeamCategory) url += `&teamCategoryId=${selectedTeamCategory}`;
+      if (selectedPosition) url += `&position=${selectedPosition}`;
 
       const res = await fetch(url, { credentials: 'include' });
-      const data = await res.json();
-      setRanking(data.ranking || []);
-      setEvaluationCategories(data.categories || []);
+      if (res.ok) {
+        const data = await res.json();
+        setRanking(data.ranking || []);
+        setCategories(data.categories || []);
+        setTeamCategories(data.teamCategories || []);
+      }
     } catch (error) {
       console.error('Failed to fetch ranking:', error);
     } finally {
@@ -75,27 +57,21 @@ export default function Ranking() {
   };
 
   const getRankBadge = (rank) => {
-    if (rank === 1) {
-      return (
-        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-yellow-100">
-          <Trophy className="w-5 h-5 text-yellow-600" />
-        </div>
-      );
-    }
-    if (rank === 2) {
-      return (
-        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100">
-          <Medal className="w-5 h-5 text-gray-500" />
-        </div>
-      );
-    }
-    if (rank === 3) {
-      return (
-        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-orange-100">
-          <Medal className="w-5 h-5 text-orange-600" />
-        </div>
-      );
-    }
+    if (rank === 1) return (
+      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-yellow-100">
+        <Trophy className="w-5 h-5 text-yellow-600" />
+      </div>
+    );
+    if (rank === 2) return (
+      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100">
+        <Medal className="w-5 h-5 text-gray-500" />
+      </div>
+    );
+    if (rank === 3) return (
+      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-orange-100">
+        <Medal className="w-5 h-5 text-orange-600" />
+      </div>
+    );
     return (
       <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-50 text-gray-600 font-semibold text-sm">
         {rank}
@@ -103,40 +79,17 @@ export default function Ranking() {
     );
   };
 
-  const getScoreBarWidth = (score, maxScore) => {
-    if (!maxScore || maxScore === 0) return 0;
-    return Math.min((score / maxScore) * 100, 100);
-  };
-
-  const maxScore = ranking.length > 0 ? Math.max(...ranking.map(r => r.totalScore)) : 0;
-
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">ランキング</h1>
-        <p className="mt-1 text-sm text-gray-500">チーム内の評価スコアランキング</p>
+        <p className="mt-1 text-sm text-gray-500">累積達成率によるチーム内ランキング</p>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-wrap gap-4 mb-6">
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-gray-700 mb-1">評価期間</label>
-            <select
-              value={selectedRound}
-              onChange={(e) => setSelectedRound(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            >
-              <option value="">選択してください</option>
-              {rounds.map((round) => (
-                <option key={round.id} value={round.id}>{round.name}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
         <div className="flex gap-2 mb-6 border-b border-gray-200">
           <button
-            onClick={() => { setActiveTab('total'); setSelectedCategory(''); setSelectedPosition(''); }}
+            onClick={() => { setActiveTab('total'); setSelectedTeamCategory(''); setSelectedPosition(''); }}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === 'total'
                 ? 'border-primary-600 text-primary-600'
@@ -146,19 +99,21 @@ export default function Ranking() {
             <TrendingUp className="w-4 h-4 inline-block mr-1" />
             総合ランキング
           </button>
+          {teamCategories.length > 0 && (
+            <button
+              onClick={() => { setActiveTab('category'); setSelectedPosition(''); }}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === 'category'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Filter className="w-4 h-4 inline-block mr-1" />
+              カテゴリー別
+            </button>
+          )}
           <button
-            onClick={() => { setActiveTab('category'); setSelectedPosition(''); }}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              activeTab === 'category'
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Filter className="w-4 h-4 inline-block mr-1" />
-            カテゴリー別
-          </button>
-          <button
-            onClick={() => { setActiveTab('position'); setSelectedCategory(''); }}
+            onClick={() => { setActiveTab('position'); setSelectedTeamCategory(''); }}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === 'position'
                 ? 'border-primary-600 text-primary-600'
@@ -170,12 +125,12 @@ export default function Ranking() {
           </button>
         </div>
 
-        {activeTab === 'category' && (
+        {activeTab === 'category' && teamCategories.length > 0 && (
           <div className="mb-4 flex gap-2 flex-wrap">
             <button
-              onClick={() => setSelectedCategory('')}
+              onClick={() => setSelectedTeamCategory('')}
               className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                selectedCategory === ''
+                selectedTeamCategory === ''
                   ? 'bg-primary-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
@@ -185,9 +140,9 @@ export default function Ranking() {
             {teamCategories.map((cat) => (
               <button
                 key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
+                onClick={() => setSelectedTeamCategory(cat.id)}
                 className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                  selectedCategory === cat.id
+                  selectedTeamCategory === cat.id
                     ? 'bg-primary-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
@@ -240,8 +195,9 @@ export default function Ranking() {
                   <th className="text-left py-3 px-2 font-medium text-gray-600">選手</th>
                   <th className="text-left py-3 px-2 font-medium text-gray-600 w-20">ポジション</th>
                   <th className="text-left py-3 px-2 font-medium text-gray-600 w-24">カテゴリー</th>
-                  <th className="text-left py-3 px-2 font-medium text-gray-600 w-48">スコア</th>
-                  {activeTab === 'total' && evaluationCategories.slice(0, 4).map((cat) => (
+                  <th className="text-left py-3 px-2 font-medium text-gray-600 w-56">達成率</th>
+                  <th className="text-center py-3 px-2 font-medium text-gray-600 w-24">累積スコア</th>
+                  {categories.slice(0, 4).map((cat) => (
                     <th key={cat.id} className="text-center py-3 px-2 font-medium text-gray-600 w-20">
                       {cat.name}
                     </th>
@@ -250,7 +206,7 @@ export default function Ranking() {
               </thead>
               <tbody>
                 {ranking.map((item) => (
-                  <tr key={item.player.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <tr key={item.player.id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/players/${item.player.id}`)}>
                     <td className="py-3 px-2">
                       {getRankBadge(item.rank)}
                     </td>
@@ -291,22 +247,28 @@ export default function Ranking() {
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-gradient-to-r from-primary-500 to-primary-600 rounded-full transition-all duration-500"
-                            style={{ width: `${getScoreBarWidth(item.totalScore, maxScore)}%` }}
+                            className={`h-full bg-gradient-to-r ${getRateBarColor(item.achievementRate)} rounded-full transition-all duration-500`}
+                            style={{ width: `${Math.min(item.achievementRate, 100)}%` }}
                           />
                         </div>
-                        <span className="text-sm font-semibold text-gray-900 w-12 text-right">
-                          {item.totalScore}
+                        <span className={`text-sm font-bold w-16 text-right ${getRateColor(item.achievementRate)}`}>
+                          {item.achievementRate}%
                         </span>
                       </div>
                     </td>
-                    {activeTab === 'total' && evaluationCategories.slice(0, 4).map((cat) => (
-                      <td key={cat.id} className="py-3 px-2 text-center">
-                        <span className="text-sm font-medium text-gray-700">
-                          {item.categoryScores[cat.id] || 0}
-                        </span>
-                      </td>
-                    ))}
+                    <td className="py-3 px-2 text-center">
+                      <span className="text-sm font-medium text-gray-700">{item.totalActual}</span>
+                    </td>
+                    {categories.slice(0, 4).map((cat) => {
+                      const catRate = item.categoryRates?.[cat.id];
+                      return (
+                        <td key={cat.id} className="py-3 px-2 text-center">
+                          <span className={`text-sm font-medium ${catRate ? getRateColor(catRate.rate) : 'text-gray-400'}`}>
+                            {catRate ? `${catRate.rate}%` : '-'}
+                          </span>
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
@@ -315,11 +277,16 @@ export default function Ranking() {
         ) : (
           <div className="text-center py-12">
             <Trophy className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">
-              {!selectedRound ? '評価期間を選択してください' : 'ランキングデータがありません'}
-            </p>
+            <p className="text-gray-500">ランキングデータがありません</p>
           </div>
         )}
+
+        <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+          <p className="text-xs text-gray-500">
+            <Zap className="w-3.5 h-3.5 inline-block mr-1 text-gray-400" />
+            達成率 = 累積獲得スコア ÷ (在籍総月数 × 月あたり満点) × 100
+          </p>
+        </div>
       </div>
     </div>
   );

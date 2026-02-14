@@ -870,123 +870,140 @@ router.get('/heatmap/:playerId', authenticate, async (req, res) => {
 
 router.get('/ranking', authenticate, async (req, res) => {
   try {
-    const { teamId, roundId, category, position, teamCategoryId } = req.query;
+    const { teamId, position, teamCategoryId } = req.query;
 
-    if (!teamId || !roundId) {
-      return res.status(400).json({ error: 'teamId and roundId are required' });
+    if (!teamId) {
+      return res.status(400).json({ error: 'teamId is required' });
     }
 
     const team = await prisma.team.findUnique({
       where: { id: teamId },
-      include: { children: { select: { id: true } } }
+      include: { parent: true }
     });
+    if (!team) return res.status(404).json({ error: 'Team not found' });
+
     const teamIds = [teamId];
-    if (team?.children) {
-      team.children.forEach(child => teamIds.push(child.id));
-    }
+    if (team.parentId) teamIds.push(team.parentId);
 
-    const playerWhere = { teamId: { in: teamIds } };
-    if (position) {
-      playerWhere.position = position;
-    }
-    if (teamCategoryId) {
-      playerWhere.teamCategoryId = teamCategoryId;
-    }
+    const playerWhere = { teamId };
+    if (position) playerWhere.position = position;
+    if (teamCategoryId) playerWhere.teamCategoryId = teamCategoryId;
 
-    const players = await prisma.player.findMany({
-      where: playerWhere,
-      select: { 
-        id: true, 
-        name: true, 
-        number: true, 
-        position: true,
-        teamCategory: { select: { id: true, name: true } }
-      }
-    });
+    const [players, leafItems, teamCategories] = await Promise.all([
+      prisma.player.findMany({
+        where: playerWhere,
+        select: {
+          id: true, name: true, number: true, position: true, photoUrl: true,
+          joinedAt: true, graduationDate: true, createdAt: true,
+          teamCategory: { select: { id: true, name: true } }
+        }
+      }),
+      prisma.evaluationItem.findMany({
+        where: { teamId: { in: teamIds }, isActive: true, parentId: { not: null } },
+        include: { parent: true },
+        orderBy: { sortOrder: 'asc' }
+      }),
+      prisma.teamCategory.findMany({
+        where: { teamId },
+        select: { id: true, name: true },
+        orderBy: { sortOrder: 'asc' }
+      })
+    ]);
 
     const playerIds = players.map(p => p.id);
-
-    let itemIds = null;
-    let categories = [];
-
-    const allItems = await prisma.evaluationItem.findMany({
-      where: { teamId: { in: teamIds }, isActive: true }
-    });
-
-    const topLevelItems = allItems.filter(i => !i.parentId);
-    categories = topLevelItems.map(i => ({ id: i.id, name: i.name }));
-
-    if (category) {
-      const getDescendantIds = (parentId) => {
-        const children = allItems.filter(i => i.parentId === parentId);
-        if (children.length === 0) {
-          return [parentId];
-        }
-        let ids = [];
-        children.forEach(c => {
-          const hasChildren = allItems.some(i => i.parentId === c.id);
-          if (!hasChildren) {
-            ids.push(c.id);
-          } else {
-            ids = ids.concat(getDescendantIds(c.id));
-          }
-        });
-        return ids;
-      };
-      itemIds = getDescendantIds(category);
-    }
-
-    const evalWhere = {
-      playerId: { in: playerIds },
-      roundId,
-      raterType: 'COACH'
-    };
-    if (itemIds && itemIds.length > 0) {
-      evalWhere.itemId = { in: itemIds };
-    }
+    const leafItemIds = leafItems.map(i => i.id);
 
     const evaluations = await prisma.evaluation.findMany({
-      where: evalWhere,
-      include: { item: { select: { id: true, parentId: true } } }
+      where: {
+        playerId: { in: playerIds },
+        itemId: { in: leafItemIds },
+        raterType: 'COACH'
+      },
+      select: { playerId: true, itemId: true, score: true }
     });
 
-    const getTopLevelCategory = (itemId) => {
-      const item = allItems.find(i => i.id === itemId);
-      if (!item) return null;
-      if (!item.parentId) return item.id;
-      return getTopLevelCategory(item.parentId);
-    };
-
-    const playerScores = {};
-    players.forEach(p => {
-      playerScores[p.id] = {
-        player: p,
-        totalScore: 0,
-        categoryScores: {}
-      };
-      categories.forEach(cat => {
-        playerScores[p.id].categoryScores[cat.id] = 0;
-      });
-    });
-
-    evaluations.forEach(e => {
-      if (playerScores[e.playerId]) {
-        playerScores[e.playerId].totalScore += e.score;
-        const catId = getTopLevelCategory(e.itemId);
-        if (catId && playerScores[e.playerId].categoryScores[catId] !== undefined) {
-          playerScores[e.playerId].categoryScores[catId] += e.score;
-        }
+    const categoryItems = {};
+    let monthlyMaxScoreTotal = 0;
+    leafItems.forEach(item => {
+      const catName = item.parent?.name || 'その他';
+      const catId = item.parentId;
+      if (!categoryItems[catId]) {
+        categoryItems[catId] = { id: catId, name: catName, items: [], monthlyMax: 0 };
       }
+      categoryItems[catId].items.push(item);
+      categoryItems[catId].monthlyMax += (item.maxScore || 5);
+      monthlyMaxScoreTotal += (item.maxScore || 5);
     });
 
-    const ranking = Object.values(playerScores)
-      .sort((a, b) => b.totalScore - a.totalScore)
-      .map((item, index) => ({
-        rank: index + 1,
-        ...item
-      }));
+    const categories = Object.values(categoryItems);
 
-    res.json({ ranking, categories });
+    const evalByPlayer = {};
+    evaluations.forEach(e => {
+      if (!evalByPlayer[e.playerId]) evalByPlayer[e.playerId] = [];
+      evalByPlayer[e.playerId].push(e);
+    });
+
+    const ranking = players.map(player => {
+      const joinDate = player.joinedAt || player.createdAt;
+      const now = new Date();
+      const defaultGrad = new Date(joinDate);
+      defaultGrad.setMonth(defaultGrad.getMonth() + 36);
+      const graduationDate = player.graduationDate || defaultGrad;
+
+      const diffMs = graduationDate.getTime() - new Date(joinDate).getTime();
+      const totalMonths = Math.max(Math.round(diffMs / (1000 * 60 * 60 * 24 * 30.44)), 1);
+      const careerDenominator = totalMonths * monthlyMaxScoreTotal;
+
+      const playerEvals = evalByPlayer[player.id] || [];
+      let totalActual = 0;
+      const catActuals = {};
+      categories.forEach(cat => { catActuals[cat.id] = 0; });
+
+      playerEvals.forEach(e => {
+        totalActual += e.score;
+        const item = leafItems.find(i => i.id === e.itemId);
+        if (item && catActuals[item.parentId] !== undefined) {
+          catActuals[item.parentId] += e.score;
+        }
+      });
+
+      const achievementRate = careerDenominator > 0
+        ? Math.round((totalActual / careerDenominator) * 1000) / 10
+        : 0;
+
+      const categoryRates = {};
+      categories.forEach(cat => {
+        const catDenom = totalMonths * cat.monthlyMax;
+        categoryRates[cat.id] = {
+          name: cat.name,
+          actual: catActuals[cat.id],
+          denominator: catDenom,
+          rate: catDenom > 0 ? Math.round((catActuals[cat.id] / catDenom) * 1000) / 10 : 0
+        };
+      });
+
+      return {
+        player: {
+          id: player.id, name: player.name, number: player.number,
+          position: player.position, photoUrl: player.photoUrl,
+          teamCategory: player.teamCategory
+        },
+        totalActual,
+        careerDenominator,
+        achievementRate,
+        totalMonths,
+        categoryRates
+      };
+    });
+
+    ranking.sort((a, b) => b.achievementRate - a.achievementRate);
+    ranking.forEach((item, idx) => { item.rank = idx + 1; });
+
+    res.json({
+      ranking,
+      categories: categories.map(c => ({ id: c.id, name: c.name })),
+      teamCategories
+    });
   } catch (error) {
     console.error('Ranking error:', error);
     res.status(500).json({ error: 'Failed to fetch ranking data' });
