@@ -278,10 +278,12 @@ export default function EvaluationEntry() {
             {leaves.map((leaf, idx) => (
               <div
                 key={leaf.id}
-                className={`flex items-center gap-2 px-2 py-1 ${idx < leaves.length - 1 ? 'border-b border-gray-50' : ''} hover:bg-gray-50`}
+                className={`flex items-center justify-between px-2 py-1 ${idx < leaves.length - 1 ? 'border-b border-gray-50' : ''} hover:bg-gray-50`}
               >
-                <span className="text-xs text-gray-600 flex-1 min-w-0 truncate">{leaf.name}</span>
-                <TooltipButton id={leaf.id} description={leaf.description} />
+                <div className="flex items-center gap-1 min-w-0 flex-1">
+                  <span className="text-xs text-gray-600 truncate">{leaf.name}</span>
+                  <TooltipButton id={leaf.id} description={leaf.description} />
+                </div>
                 <select
                   value={scores[leaf.id] || ''}
                   onChange={(e) => handleScoreChange(leaf.id, e.target.value)}
