@@ -102,6 +102,8 @@ router.get('/:teamId', authenticate, async (req, res) => {
             const catItems = categoryItemsMap[cat.id] || [];
             const maxPerRound = catItems.reduce((sum, item) => sum + (item.maxScore || 5), 0);
 
+            let cumulative = 0;
+            let cumulativeMax = 0;
             const scores = roundLabels.map(round => {
               let total = 0;
               let hasAny = false;
@@ -112,7 +114,12 @@ router.get('/:teamId', authenticate, async (req, res) => {
                   hasAny = true;
                 }
               });
-              return hasAny ? total : null;
+              cumulativeMax += maxPerRound;
+              if (hasAny) {
+                cumulative += total;
+                return { score: cumulative, max: cumulativeMax };
+              }
+              return null;
             });
 
             if (roundLabels.length === 0) {

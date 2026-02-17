@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { BarChart3, ArrowUpDown, Filter } from 'lucide-react';
 
-function getHeatmapColor(score, maxScore) {
-  if (score === null || score === undefined) return 'bg-gray-50 text-gray-300';
-  const rate = maxScore > 0 ? score / maxScore : 0;
+function getHeatmapColor(entry) {
+  if (!entry || entry.score === null || entry.score === undefined) return 'bg-gray-50 text-gray-300';
+  const rate = entry.max > 0 ? entry.score / entry.max : 0;
   if (rate >= 0.8) return 'bg-blue-100 text-blue-800';
   if (rate >= 0.6) return 'bg-green-100 text-green-800';
   if (rate >= 0.4) return 'bg-yellow-100 text-yellow-800';
@@ -39,6 +39,11 @@ export default function EvaluationMatrixTable() {
     };
     fetchData();
   }, [currentTeam]);
+
+  const getScoreVal = (entry) => {
+    if (!entry || entry.score === null || entry.score === undefined) return 0;
+    return entry.score;
+  };
 
   const filteredAndSorted = useMemo(() => {
     if (!data || !data.players) return [];
@@ -75,20 +80,26 @@ export default function EvaluationMatrixTable() {
           valB = b.position || '';
           break;
         case 'totalScore': {
-          const sumA = a.rows.reduce((s, r) => s + r.scores.reduce((ss, sc) => ss + (sc || 0), 0), 0);
-          const sumB = b.rows.reduce((s, r) => s + r.scores.reduce((ss, sc) => ss + (sc || 0), 0), 0);
-          valA = sumA;
-          valB = sumB;
+          const lastEntryA = a.rows.reduce((s, r) => {
+            const last = [...r.scores].reverse().find(e => e !== null);
+            return s + getScoreVal(last);
+          }, 0);
+          const lastEntryB = b.rows.reduce((s, r) => {
+            const last = [...r.scores].reverse().find(e => e !== null);
+            return s + getScoreVal(last);
+          }, 0);
+          valA = lastEntryA;
+          valB = lastEntryB;
           break;
         }
         case 'latestScore': {
           const lastA = a.rows.reduce((s, r) => {
-            const lastVal = [...r.scores].reverse().find(sc => sc !== null);
-            return s + (lastVal || 0);
+            const last = [...r.scores].reverse().find(e => e !== null);
+            return s + getScoreVal(last);
           }, 0);
           const lastB = b.rows.reduce((s, r) => {
-            const lastVal = [...r.scores].reverse().find(sc => sc !== null);
-            return s + (lastVal || 0);
+            const last = [...r.scores].reverse().find(e => e !== null);
+            return s + getScoreVal(last);
           }, 0);
           valA = lastA;
           valB = lastB;
@@ -139,38 +150,45 @@ export default function EvaluationMatrixTable() {
   const { months, evalCategories = [], teamCategories = [] } = data;
   const hasPlayers = filteredAndSorted.length > 0;
 
-  const COL_NUM_W = 50;
-  const COL_NAME_W = 100;
-  const COL_CAT_W = 100;
+  const COL_NUM_W = 40;
+  const COL_NAME_W = 90;
+  const COL_CAT_W = 70;
 
   const sortLabel = (key) => {
     if (sortKey !== key) return '';
     return sortDir === 'asc' ? ' ↑' : ' ↓';
   };
 
+  const formatMonth = (m) => {
+    const parts = m.split('/');
+    if (parts.length === 2) {
+      return `${parts[1]}月`;
+    }
+    return m;
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-      <div className="p-4 border-b border-gray-200 space-y-3">
+      <div className="p-3 border-b border-gray-200 space-y-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-lg font-semibold text-gray-900">選手別評価マトリクス</h3>
-          <div className="flex items-center gap-3 text-xs">
-            <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 border border-red-200"></span>~20%</span>
-            <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-orange-100 border border-orange-200"></span>~40%</span>
-            <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-yellow-100 border border-yellow-200"></span>~60%</span>
-            <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-100 border border-green-200"></span>~80%</span>
-            <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-100 border border-blue-200"></span>80%~</span>
-            <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-gray-50 border border-gray-200"></span>未入力</span>
+          <h3 className="text-sm font-semibold text-gray-900">選手別評価マトリクス（累積）</h3>
+          <div className="flex items-center gap-2 text-[10px]">
+            <span className="inline-flex items-center gap-0.5"><span className="w-2.5 h-2.5 rounded bg-red-100 border border-red-200"></span>~20%</span>
+            <span className="inline-flex items-center gap-0.5"><span className="w-2.5 h-2.5 rounded bg-orange-100 border border-orange-200"></span>~40%</span>
+            <span className="inline-flex items-center gap-0.5"><span className="w-2.5 h-2.5 rounded bg-yellow-100 border border-yellow-200"></span>~60%</span>
+            <span className="inline-flex items-center gap-0.5"><span className="w-2.5 h-2.5 rounded bg-green-100 border border-green-200"></span>~80%</span>
+            <span className="inline-flex items-center gap-0.5"><span className="w-2.5 h-2.5 rounded bg-blue-100 border border-blue-200"></span>80%~</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           {teamCategories.length > 0 && (
-            <div className="flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5 text-gray-400" />
+            <div className="flex items-center gap-1">
+              <Filter className="w-3 h-3 text-gray-400" />
               <select
                 value={filterTeamCategory}
                 onChange={(e) => setFilterTeamCategory(e.target.value)}
-                className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
               >
                 <option value="all">全カテゴリー</option>
                 {teamCategories.map(tc => (
@@ -181,12 +199,12 @@ export default function EvaluationMatrixTable() {
           )}
 
           {evalCategories.length > 0 && (
-            <div className="flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5 text-gray-400" />
+            <div className="flex items-center gap-1">
+              <Filter className="w-3 h-3 text-gray-400" />
               <select
                 value={filterCategory}
                 onChange={(e) => setFilterCategory(e.target.value)}
-                className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
               >
                 <option value="all">全評価項目</option>
                 {evalCategories.map(ec => (
@@ -196,25 +214,25 @@ export default function EvaluationMatrixTable() {
             </div>
           )}
 
-          <div className="flex items-center gap-1.5">
-            <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
+          <div className="flex items-center gap-1">
+            <ArrowUpDown className="w-3 h-3 text-gray-400" />
             <select
               value={sortKey}
               onChange={(e) => { setSortKey(e.target.value); setSortDir('asc'); }}
-              className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+              className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
             >
               <option value="number">背番号順</option>
               <option value="name">名前順</option>
               <option value="position">ポジション順</option>
-              <option value="totalScore">合計スコア順</option>
+              <option value="totalScore">累積スコア順</option>
               <option value="latestScore">最新スコア順</option>
             </select>
             <button
               onClick={() => setSortDir(prev => prev === 'asc' ? 'desc' : 'asc')}
-              className="px-2 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-1.5 py-1 text-[10px] border border-gray-300 rounded hover:bg-gray-50 transition-colors"
               title={sortDir === 'asc' ? '昇順' : '降順'}
             >
-              {sortDir === 'asc' ? '↑ 昇順' : '↓ 降順'}
+              {sortDir === 'asc' ? '↑' : '↓'}
             </button>
           </div>
         </div>
@@ -225,21 +243,21 @@ export default function EvaluationMatrixTable() {
           <thead>
             <tr className="bg-gray-50">
               <th
-                className="sticky left-0 z-20 bg-gray-50 border-b border-r border-gray-200 px-2 py-3 text-xs font-medium text-gray-500 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 select-none"
+                className="sticky left-0 z-20 bg-gray-50 border-b border-r border-gray-200 px-1 py-2 text-[10px] font-medium text-gray-500 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 select-none"
                 style={{ width: COL_NUM_W, minWidth: COL_NUM_W }}
                 onClick={() => handleSort('number')}
               >
                 No.{sortLabel('number')}
               </th>
               <th
-                className="sticky z-20 bg-gray-50 border-b border-r border-gray-200 px-2 py-3 text-xs font-medium text-gray-500 text-left whitespace-nowrap cursor-pointer hover:bg-gray-100 select-none"
+                className="sticky z-20 bg-gray-50 border-b border-r border-gray-200 px-1 py-2 text-[10px] font-medium text-gray-500 text-left whitespace-nowrap cursor-pointer hover:bg-gray-100 select-none"
                 style={{ left: COL_NUM_W, width: COL_NAME_W, minWidth: COL_NAME_W }}
                 onClick={() => handleSort('name')}
               >
                 氏名{sortLabel('name')}
               </th>
               <th
-                className="sticky z-20 bg-gray-50 border-b border-r border-gray-200 px-2 py-3 text-xs font-medium text-gray-500 text-left whitespace-nowrap"
+                className="sticky z-20 bg-gray-50 border-b border-r border-gray-200 px-1 py-2 text-[10px] font-medium text-gray-500 text-left whitespace-nowrap"
                 style={{ left: COL_NUM_W + COL_NAME_W, width: COL_CAT_W, minWidth: COL_CAT_W }}
               >
                 項目
@@ -247,10 +265,10 @@ export default function EvaluationMatrixTable() {
               {months.map((m, i) => (
                 <th
                   key={i}
-                  className="border-b border-r border-gray-200 px-3 py-3 text-xs font-medium text-gray-500 text-center whitespace-nowrap"
-                  style={{ minWidth: 70 }}
+                  className="border-b border-r border-gray-200 px-1 py-2 text-[10px] font-medium text-gray-500 text-center whitespace-nowrap"
+                  style={{ minWidth: 48 }}
                 >
-                  {m}
+                  {formatMonth(m)}
                 </th>
               ))}
             </tr>
@@ -265,19 +283,19 @@ export default function EvaluationMatrixTable() {
                       <>
                         <td
                           rowSpan={rowCount}
-                          className="sticky left-0 z-10 bg-white border-b border-r border-gray-200 px-2 py-2 text-sm font-bold text-gray-700 text-center align-top whitespace-nowrap"
+                          className="sticky left-0 z-10 bg-white border-b border-r border-gray-200 px-1 py-1 text-xs font-bold text-gray-700 text-center align-top whitespace-nowrap"
                           style={{ width: COL_NUM_W, minWidth: COL_NUM_W }}
                         >
                           {player.number ?? '-'}
                         </td>
                         <td
                           rowSpan={rowCount}
-                          className="sticky z-10 bg-white border-b border-r border-gray-200 px-2 py-2 text-sm font-medium align-top whitespace-nowrap"
+                          className="sticky z-10 bg-white border-b border-r border-gray-200 px-1 py-1 text-xs font-medium align-top whitespace-nowrap"
                           style={{ left: COL_NUM_W, width: COL_NAME_W, minWidth: COL_NAME_W }}
                         >
                           <button
                             onClick={() => navigate(`/players/${player.id}`)}
-                            className="text-primary-600 hover:text-primary-800 hover:underline text-left font-medium"
+                            className="text-primary-600 hover:text-primary-800 hover:underline text-left font-medium text-xs"
                           >
                             {player.name}
                           </button>
@@ -285,18 +303,18 @@ export default function EvaluationMatrixTable() {
                       </>
                     )}
                     <td
-                      className="sticky z-10 bg-white border-b border-r border-gray-200 px-2 py-2 text-xs text-gray-600 whitespace-nowrap"
+                      className="sticky z-10 bg-white border-b border-r border-gray-200 px-1 py-1 text-[10px] text-gray-600 whitespace-nowrap"
                       style={{ left: COL_NUM_W + COL_NAME_W, width: COL_CAT_W, minWidth: COL_CAT_W }}
                     >
                       {row.category}
                     </td>
-                    {row.scores.map((score, sIdx) => (
+                    {row.scores.map((entry, sIdx) => (
                       <td
                         key={sIdx}
-                        className={`border-b border-r border-gray-200 px-2 py-2 text-center text-sm font-medium whitespace-nowrap ${getHeatmapColor(score, row.maxScore)}`}
-                        style={{ minWidth: 70 }}
+                        className={`border-b border-r border-gray-200 px-0.5 py-1 text-center text-[10px] font-medium whitespace-nowrap ${getHeatmapColor(entry)}`}
+                        style={{ minWidth: 48 }}
                       >
-                        {score !== null && score !== undefined ? `${score}/${row.maxScore}` : '-'}
+                        {entry !== null ? entry.score : '-'}
                       </td>
                     ))}
                   </tr>
