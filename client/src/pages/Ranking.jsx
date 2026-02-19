@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Trophy, Medal, Filter, Users, TrendingUp, Zap } from 'lucide-react';
+import { Trophy, Medal, Filter, Users, TrendingUp, Zap, ArrowUpDown } from 'lucide-react';
 
 function getRateColor(rate) {
   if (rate >= 60) return 'text-blue-600';
@@ -24,6 +24,7 @@ export default function Ranking() {
   const [selectedTeamCategory, setSelectedTeamCategory] = useState('');
   const [selectedPosition, setSelectedPosition] = useState('');
   const [activeTab, setActiveTab] = useState('total');
+  const [sortBy, setSortBy] = useState('total');
   const [loading, setLoading] = useState(false);
 
   const positions = ['GK', 'DF', 'MF', 'FW'];
@@ -55,6 +56,26 @@ export default function Ranking() {
       setLoading(false);
     }
   };
+
+  const sortedRanking = useMemo(() => {
+    if (!ranking.length) return [];
+    const sorted = [...ranking];
+    if (sortBy === 'total') {
+      sorted.sort((a, b) => b.achievementRate - a.achievementRate);
+    } else {
+      sorted.sort((a, b) => {
+        const rateA = a.categoryRates?.[sortBy]?.rate || 0;
+        const rateB = b.categoryRates?.[sortBy]?.rate || 0;
+        return rateB - rateA;
+      });
+    }
+    sorted.forEach((item, idx) => { item.rank = idx + 1; });
+    return sorted;
+  }, [ranking, sortBy]);
+
+  const activeSortLabel = sortBy === 'total'
+    ? '総合'
+    : categories.find(c => c.id === sortBy)?.name || '総合';
 
   const getRankBadge = (rank) => {
     if (rank === 1) return (
@@ -181,12 +202,42 @@ export default function Ranking() {
           </div>
         )}
 
+        {categories.length > 0 && (
+          <div className="mb-4 flex items-center gap-2 flex-wrap">
+            <ArrowUpDown className="w-4 h-4 text-gray-400" />
+            <span className="text-sm text-gray-600">ソート：</span>
+            <button
+              onClick={() => setSortBy('total')}
+              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                sortBy === 'total'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              総合
+            </button>
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setSortBy(cat.id)}
+                className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                  sortBy === cat.id
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+        )}
+
         {loading ? (
           <div className="text-center py-8">
             <div className="animate-spin w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full mx-auto"></div>
             <p className="mt-2 text-sm text-gray-500">読み込み中...</p>
           </div>
-        ) : ranking.length > 0 ? (
+        ) : sortedRanking.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -194,83 +245,91 @@ export default function Ranking() {
                   <th className="text-left py-3 px-2 font-medium text-gray-600 w-16">順位</th>
                   <th className="text-left py-3 px-2 font-medium text-gray-600">選手</th>
                   <th className="text-left py-3 px-2 font-medium text-gray-600 w-20">ポジション</th>
-                  <th className="text-left py-3 px-2 font-medium text-gray-600 w-24">カテゴリー</th>
-                  <th className="text-left py-3 px-2 font-medium text-gray-600 w-56">達成率</th>
-                  <th className="text-center py-3 px-2 font-medium text-gray-600 w-24">累積スコア</th>
-                  {categories.slice(0, 4).map((cat) => (
-                    <th key={cat.id} className="text-center py-3 px-2 font-medium text-gray-600 w-20">
-                      {cat.name}
+                  <th
+                    className={`text-left py-3 px-2 font-medium w-56 cursor-pointer hover:bg-gray-50 select-none ${sortBy === 'total' ? 'text-primary-600' : 'text-gray-600'}`}
+                    onClick={() => setSortBy('total')}
+                  >
+                    総合達成率{sortBy === 'total' ? ' ▼' : ''}
+                  </th>
+                  {categories.map((cat) => (
+                    <th
+                      key={cat.id}
+                      className={`text-center py-3 px-2 font-medium w-20 cursor-pointer hover:bg-gray-50 select-none ${sortBy === cat.id ? 'text-primary-600' : 'text-gray-600'}`}
+                      onClick={() => setSortBy(cat.id)}
+                    >
+                      {cat.name}{sortBy === cat.id ? ' ▼' : ''}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {ranking.map((item) => (
-                  <tr key={item.player.id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/players/${item.player.id}`)}>
-                    <td className="py-3 px-2">
-                      {getRankBadge(item.rank)}
-                    </td>
-                    <td className="py-3 px-2">
-                      <div className="flex items-center gap-3">
-                        {item.player.photoUrl ? (
-                          <img
-                            src={item.player.photoUrl}
-                            alt={item.player.name}
-                            className="w-10 h-10 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
-                            <span className="text-primary-600 font-semibold text-sm">
-                              {item.player.number || item.player.name?.charAt(0)}
-                            </span>
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-medium text-gray-900">{item.player.name}</p>
-                          {item.player.number && (
-                            <p className="text-xs text-gray-500">#{item.player.number}</p>
+                {sortedRanking.map((item) => {
+                  const displayRate = sortBy === 'total'
+                    ? item.achievementRate
+                    : (item.categoryRates?.[sortBy]?.rate || 0);
+
+                  return (
+                    <tr key={item.player.id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/players/${item.player.id}`)}>
+                      <td className="py-3 px-2">
+                        {getRankBadge(item.rank)}
+                      </td>
+                      <td className="py-3 px-2">
+                        <div className="flex items-center gap-3">
+                          {item.player.photoUrl ? (
+                            <img
+                              src={item.player.photoUrl}
+                              alt={item.player.name}
+                              className="w-10 h-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
+                              <span className="text-primary-600 font-semibold text-sm">
+                                {item.player.number || item.player.name?.charAt(0)}
+                              </span>
+                            </div>
                           )}
+                          <div>
+                            <p className="font-medium text-gray-900">{item.player.name}</p>
+                            {item.player.number && (
+                              <p className="text-xs text-gray-500">#{item.player.number}</p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-2">
-                      {item.player.position && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
-                          {item.player.position}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 px-2 text-sm text-gray-500">
-                      {item.player.teamCategory?.name || '-'}
-                    </td>
-                    <td className="py-3 px-2">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full bg-gradient-to-r ${getRateBarColor(item.achievementRate)} rounded-full transition-all duration-500`}
-                            style={{ width: `${Math.min(item.achievementRate, 100)}%` }}
-                          />
-                        </div>
-                        <span className={`text-sm font-bold w-16 text-right ${getRateColor(item.achievementRate)}`}>
-                          {item.achievementRate}%
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-2 text-center">
-                      <span className="text-sm font-medium text-gray-700">{item.totalActual}</span>
-                    </td>
-                    {categories.slice(0, 4).map((cat) => {
-                      const catRate = item.categoryRates?.[cat.id];
-                      return (
-                        <td key={cat.id} className="py-3 px-2 text-center">
-                          <span className={`text-sm font-medium ${catRate ? getRateColor(catRate.rate) : 'text-gray-400'}`}>
-                            {catRate ? `${catRate.rate}%` : '-'}
+                      </td>
+                      <td className="py-3 px-2">
+                        {item.player.position && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                            {item.player.position}
                           </span>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+                        )}
+                      </td>
+                      <td className="py-3 px-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full bg-gradient-to-r ${getRateBarColor(displayRate)} rounded-full transition-all duration-500`}
+                              style={{ width: `${Math.min(displayRate, 100)}%` }}
+                            />
+                          </div>
+                          <span className={`text-sm font-bold w-16 text-right ${getRateColor(displayRate)}`}>
+                            {displayRate}%
+                          </span>
+                        </div>
+                      </td>
+                      {categories.map((cat) => {
+                        const catRate = item.categoryRates?.[cat.id];
+                        const isActive = sortBy === cat.id;
+                        return (
+                          <td key={cat.id} className={`py-3 px-2 text-center ${isActive ? 'bg-primary-50' : ''}`}>
+                            <span className={`text-sm font-medium ${catRate ? getRateColor(catRate.rate) : 'text-gray-400'}`}>
+                              {catRate ? `${catRate.rate}%` : '-'}
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
