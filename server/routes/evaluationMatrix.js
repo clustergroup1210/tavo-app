@@ -164,4 +164,101 @@ router.get('/:teamId', authenticate, async (req, res) => {
   }
 });
 
+router.get('/player/:playerId', authenticate, async (req, res) => {
+  try {
+    const { playerId } = req.params;
+
+    const player = await prisma.player.findUnique({
+      where: { id: playerId },
+      select: { id: true, teamId: true, name: true }
+    });
+    if (!player) return res.status(404).json({ error: 'Player not found' });
+
+    const team = await prisma.team.findUnique({
+      where: { id: player.teamId },
+      select: { id: true, parentId: true }
+    });
+    const teamIds = [player.teamId];
+    if (team?.parentId) teamIds.push(team.parentId);
+
+    const [items, rounds, evaluations] = await Promise.all([
+      prisma.evaluationItem.findMany({
+        where: { teamId: { in: teamIds }, isActive: true },
+        include: { parent: true },
+        orderBy: { sortOrder: 'asc' }
+      }),
+      prisma.evaluationRound.findMany({
+        where: { teamId: { in: teamIds }, isActive: true },
+        orderBy: { startDate: 'asc' }
+      }),
+      prisma.evaluation.findMany({
+        where: {
+          playerId,
+          item: { teamId: { in: teamIds } },
+          raterType: 'COACH'
+        },
+        select: { itemId: true, roundId: true, score: true }
+      })
+    ]);
+
+    const categories = items.filter(i => i.parentId === null);
+    const leafItems = items.filter(i => i.parentId !== null);
+
+    const roundLabels = rounds.map(r => {
+      const d = new Date(r.startDate);
+      return { id: r.id, label: `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}` };
+    });
+    const monthLabels = roundLabels.length > 0 ? roundLabels.map(r => r.label) : generateRecentMonths(6);
+
+    const evalMap = {};
+    evaluations.forEach(e => {
+      const key = `${e.itemId}_${e.roundId}`;
+      evalMap[key] = e.score;
+    });
+
+    const categoryItemsMap = {};
+    categories.forEach(cat => {
+      categoryItemsMap[cat.id] = leafItems
+        .filter(li => li.parentId === cat.id)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+    });
+
+    const rows = categories.map(cat => {
+      const catItems = categoryItemsMap[cat.id] || [];
+      const maxPerRound = catItems.reduce((sum, item) => sum + (item.maxScore || 5), 0);
+
+      let cumulative = 0;
+      let cumulativeMax = 0;
+      const scores = roundLabels.map(round => {
+        let total = 0;
+        let hasAny = false;
+        catItems.forEach(item => {
+          const key = `${item.id}_${round.id}`;
+          if (evalMap[key] !== undefined) {
+            total += evalMap[key];
+            hasAny = true;
+          }
+        });
+        cumulativeMax += maxPerRound;
+        if (hasAny) {
+          cumulative += total;
+          return { score: cumulative, max: cumulativeMax };
+        }
+        return null;
+      });
+
+      return { category: cat.name, maxScore: maxPerRound, scores };
+    });
+
+    res.json({
+      months: monthLabels,
+      rows,
+      evalCategories: categories.map(c => ({ id: c.id, name: c.name }))
+    });
+  } catch (error) {
+    console.error('Player matrix error:', error);
+    res.status(500).json({ error: 'Failed to fetch player matrix' });
+  }
+});
+
 module.exports = router;
