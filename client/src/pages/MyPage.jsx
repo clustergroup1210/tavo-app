@@ -2,16 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   UserCircle, TrendingUp, Link2, Edit2, Save, X, Target, Plus, Trash2, Camera,
-  Calendar, Ruler, Weight, MapPin, GraduationCap, Users, Footprints, Star, Zap, Upload, ClipboardList
+  Calendar, Ruler, Weight, MapPin, GraduationCap, Users, Footprints, Star, Zap, Upload
 } from 'lucide-react';
-import EvaluationComparisonTable from '../components/EvaluationComparisonTable';
 import PlayerMatrix from '../components/PlayerMatrix';
 
 export default function MyPage() {
   const { user, isParent, childPlayerData } = useAuth();
   const [playerData, setPlayerData] = useState(null);
-  const [evaluationSummary, setEvaluationSummary] = useState([]);
-  const [evaluationComparison, setEvaluationComparison] = useState({ comparison: [], hasData: false });
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
@@ -60,24 +57,16 @@ export default function MyPage() {
         });
         
         const categoryTeamId = myPlayer.team?.parentId || myPlayer.teamId;
-        const [summaryRes, goalsRes, categoriesRes, comparisonRes] = await Promise.all([
-          fetch(`/api/evaluations/summary/${myPlayer.id}`, { credentials: 'include' }),
+        const [goalsRes, categoriesRes] = await Promise.all([
           fetch(`/api/goals/player/${myPlayer.id}`, { credentials: 'include' }),
           fetch(`/api/goals/categories?teamId=${categoryTeamId}`, { credentials: 'include' }),
-          fetch(`/api/evaluations/comparison/${myPlayer.id}`, { credentials: 'include' })
         ]);
-        
-        const summary = await summaryRes.json();
-        setEvaluationSummary(summary);
         
         const goalsData = await goalsRes.json();
         setGoals(Array.isArray(goalsData) ? goalsData : []);
         
         const categoriesData = await categoriesRes.json();
         setGoalCategories(Array.isArray(categoriesData) ? categoriesData : []);
-        
-        const comparisonData = await comparisonRes.json();
-        setEvaluationComparison(comparisonData);
       }
     } catch (error) {
       console.error('Failed to fetch player data:', error);
@@ -520,58 +509,7 @@ export default function MyPage() {
 
       <PlayerMatrix playerId={playerData.id} />
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <ClipboardList className="w-5 h-5 text-primary-600" />
-          <h3 className="text-lg font-semibold text-gray-900">評価データ（認識ギャップ比較）</h3>
-        </div>
-        <EvaluationComparisonTable 
-          data={evaluationComparison.comparison} 
-          loading={loading}
-          hasData={evaluationComparison.hasData}
-        />
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-5 h-5 text-primary-600" />
-            <h3 className="text-lg font-semibold text-gray-900">評価サマリー</h3>
-          </div>
-          {evaluationSummary.length > 0 ? (
-            <div className="space-y-3">
-              {evaluationSummary.slice(0, 5).map((s) => (
-                <div key={s.item.id} className="py-2 border-b border-gray-100">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-gray-600">{s.item.name}</span>
-                    {s.progress !== 0 && (
-                      <span className={`text-xs ${s.progress > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {s.progress > 0 ? '+' : ''}{s.progress}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-gray-500">指導者:</span>
-                      <span className="text-lg font-semibold text-primary-600">
-                        {s.latestCoachScore ?? '-'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-gray-500">自己:</span>
-                      <span className="text-lg font-semibold text-gray-600">
-                        {s.latestSelfScore ?? '-'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">まだ評価がありません</p>
-          )}
-        </div>
-
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center gap-2 mb-4">
             <Link2 className="w-5 h-5 text-primary-600" />
