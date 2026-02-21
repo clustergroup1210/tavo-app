@@ -5,6 +5,7 @@ import {
   Calendar, Ruler, Weight, MapPin, GraduationCap, Users, Footprints, Star, Zap, Upload, ClipboardList
 } from 'lucide-react';
 import EvaluationComparisonTable from '../components/EvaluationComparisonTable';
+import PlayerMatrix from '../components/PlayerMatrix';
 
 export default function MyPage() {
   const { user, isParent, childPlayerData } = useAuth();
@@ -516,6 +517,8 @@ export default function MyPage() {
           </div>
         )}
       </div>
+
+      <PlayerMatrix playerId={playerData.id} />
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center gap-2 mb-4">
