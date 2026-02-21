@@ -250,12 +250,28 @@ function PlayerMatrix({ playerId }) {
 function SummaryTab({ data, achievementData, navigate, playerId }) {
   if (!data) return null;
   
-  const { notifications, nextActions } = data;
-  const overallRate = achievementData?.overall?.coachRate != null ? achievementData.overall.coachRate : (data.summary?.achievementRate || 0);
+  const { summary, notifications, nextActions } = data;
+  const overallRate = achievementData?.overall?.coachRate != null ? achievementData.overall.coachRate : summary.achievementRate;
   
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-gray-500">総合スコア</h3>
+            <Award className="w-5 h-5 text-primary-500" />
+          </div>
+          <div className="text-3xl font-bold text-gray-900">
+            {summary.currentScore}
+            <span className="text-lg font-normal text-gray-400"> / {summary.maxScore}</span>
+          </div>
+          {summary.latestRound && (
+            <p className="text-sm text-gray-500 mt-2">
+              {summary.latestRound.name}
+            </p>
+          )}
+        </div>
+
         <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-sm p-6 text-white">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-medium text-indigo-100">累積達成率</h3>
@@ -269,7 +285,7 @@ function SummaryTab({ data, achievementData, navigate, playerId }) {
               <div className="h-3 bg-white/20 rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-gradient-to-r from-yellow-300 to-yellow-400 rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(overallRate, 100)}%` }}
+                  style={{ width: `${overallRate}%` }}
                 />
               </div>
             </div>
@@ -277,31 +293,46 @@ function SummaryTab({ data, achievementData, navigate, playerId }) {
           <p className="text-xs text-indigo-200 mt-1">入団からの経験値</p>
         </div>
 
-        {notifications.unreadCount > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-gray-500">未読通知</h3>
-              <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                {notifications.unreadCount}
-              </span>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-gray-500">最新達成率</h3>
+            <Target className="w-5 h-5 text-green-500" />
+          </div>
+          <div className="flex items-end gap-3">
+            <div className="text-3xl font-bold text-gray-900">
+              {summary.achievementRate}%
             </div>
-            <div className="space-y-2">
-              {notifications.recent.slice(0, 3).map((notif) => (
+            <div className="flex-1 mb-2">
+              <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
                 <div 
-                  key={notif.id}
-                  onClick={() => notif.linkUrl && navigate(notif.linkUrl)}
-                  className="flex items-start gap-2 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                >
-                  <Bell className="w-4 h-4 text-gray-400 mt-0.5" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{notif.title}</p>
-                    <p className="text-xs text-gray-500 truncate">{notif.message}</p>
-                  </div>
-                </div>
-              ))}
+                  className="h-full bg-gradient-to-r from-green-400 to-green-500 rounded-full transition-all duration-500"
+                  style={{ width: `${summary.achievementRate}%` }}
+                />
+              </div>
             </div>
           </div>
-        )}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-gray-500">評価平均</h3>
+            <BarChart3 className="w-5 h-5 text-blue-500" />
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">指導者評価</span>
+              <span className="text-lg font-semibold text-blue-600">
+                {summary.coachAvg ?? '-'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">自己評価</span>
+              <span className="text-lg font-semibold text-green-600">
+                {summary.selfAvg ?? '-'}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {nextActions.length > 0 && (
@@ -325,7 +356,43 @@ function SummaryTab({ data, achievementData, navigate, playerId }) {
         </div>
       )}
 
+      {notifications.unreadCount > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">未読通知</h3>
+            <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+              {notifications.unreadCount}
+            </span>
+          </div>
+          <div className="space-y-3">
+            {notifications.recent.map((notif) => (
+              <div 
+                key={notif.id}
+                onClick={() => notif.linkUrl && navigate(notif.linkUrl)}
+                className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+              >
+                <Bell className="w-5 h-5 text-gray-400 mt-0.5" />
+                <div>
+                  <p className="font-medium text-gray-900">{notif.title}</p>
+                  <p className="text-sm text-gray-500">{notif.message}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <PlayerMatrix playerId={playerId} />
+
+      {!data.evaluation.hasData && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+          <User className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+          <h3 className="text-lg font-medium text-gray-700">評価データがありません</h3>
+          <p className="text-gray-500 mt-1">
+            評価が入力されると、ここにデータが表示されます。
+          </p>
+        </div>
+      )}
     </div>
   );
 }
