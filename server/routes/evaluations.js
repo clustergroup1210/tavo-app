@@ -944,15 +944,16 @@ router.get('/ranking', authenticate, async (req, res) => {
     });
 
     const ranking = players.map(player => {
-      const joinDate = player.joinedAt || player.createdAt;
-      const now = new Date();
-      const defaultGrad = new Date(joinDate);
-      defaultGrad.setMonth(defaultGrad.getMonth() + 36);
-      const graduationDate = player.graduationDate || defaultGrad;
+      const hasPeriod = !!(player.joinedAt && player.graduationDate);
+      let totalMonths = null;
+      let careerDenominator = 0;
 
-      const diffMs = graduationDate.getTime() - new Date(joinDate).getTime();
-      const totalMonths = Math.max(Math.round(diffMs / (1000 * 60 * 60 * 24 * 30.44)), 1);
-      const careerDenominator = totalMonths * monthlyMaxScoreTotal;
+      if (hasPeriod) {
+        const joinDate = new Date(player.joinedAt);
+        const gradDate = new Date(player.graduationDate);
+        totalMonths = Math.max(1, (gradDate.getFullYear() - joinDate.getFullYear()) * 12 + (gradDate.getMonth() - joinDate.getMonth()) + 1);
+        careerDenominator = totalMonths * monthlyMaxScoreTotal;
+      }
 
       const playerEvals = evalByPlayer[player.id] || [];
       let totalActual = 0;
@@ -967,19 +968,28 @@ router.get('/ranking', authenticate, async (req, res) => {
         }
       });
 
-      const achievementRate = careerDenominator > 0
+      const achievementRate = hasPeriod && careerDenominator > 0
         ? Math.round((totalActual / careerDenominator) * 1000) / 10
-        : 0;
+        : null;
 
       const categoryRates = {};
       categories.forEach(cat => {
-        const catDenom = totalMonths * cat.monthlyMax;
-        categoryRates[cat.id] = {
-          name: cat.name,
-          actual: catActuals[cat.id],
-          denominator: catDenom,
-          rate: catDenom > 0 ? Math.round((catActuals[cat.id] / catDenom) * 1000) / 10 : 0
-        };
+        if (hasPeriod && totalMonths) {
+          const catDenom = totalMonths * cat.monthlyMax;
+          categoryRates[cat.id] = {
+            name: cat.name,
+            actual: catActuals[cat.id],
+            denominator: catDenom,
+            rate: catDenom > 0 ? Math.round((catActuals[cat.id] / catDenom) * 1000) / 10 : 0
+          };
+        } else {
+          categoryRates[cat.id] = {
+            name: cat.name,
+            actual: catActuals[cat.id],
+            denominator: null,
+            rate: null
+          };
+        }
       });
 
       return {
@@ -992,11 +1002,16 @@ router.get('/ranking', authenticate, async (req, res) => {
         careerDenominator,
         achievementRate,
         totalMonths,
+        hasPeriod,
         categoryRates
       };
     });
 
-    ranking.sort((a, b) => b.achievementRate - a.achievementRate);
+    ranking.sort((a, b) => {
+      const aRate = a.achievementRate !== null ? a.achievementRate : -1;
+      const bRate = b.achievementRate !== null ? b.achievementRate : -1;
+      return bRate - aRate;
+    });
     ranking.forEach((item, idx) => { item.rank = idx + 1; });
 
     res.json({

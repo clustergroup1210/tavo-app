@@ -61,11 +61,15 @@ export default function Ranking() {
     if (!ranking.length) return [];
     const sorted = [...ranking];
     if (sortBy === 'total') {
-      sorted.sort((a, b) => b.achievementRate - a.achievementRate);
+      sorted.sort((a, b) => {
+        const aRate = a.achievementRate !== null ? a.achievementRate : -1;
+        const bRate = b.achievementRate !== null ? b.achievementRate : -1;
+        return bRate - aRate;
+      });
     } else {
       sorted.sort((a, b) => {
-        const rateA = a.categoryRates?.[sortBy]?.rate || 0;
-        const rateB = b.categoryRates?.[sortBy]?.rate || 0;
+        const rateA = a.categoryRates?.[sortBy]?.rate ?? -1;
+        const rateB = b.categoryRates?.[sortBy]?.rate ?? -1;
         return rateB - rateA;
       });
     }
@@ -266,7 +270,8 @@ export default function Ranking() {
                 {sortedRanking.map((item) => {
                   const displayRate = sortBy === 'total'
                     ? item.achievementRate
-                    : (item.categoryRates?.[sortBy]?.rate || 0);
+                    : (item.categoryRates?.[sortBy]?.rate ?? null);
+                  const hasRate = displayRate !== null;
 
                   return (
                     <tr key={item.player.id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/players/${item.player.id}`)}>
@@ -304,25 +309,30 @@ export default function Ranking() {
                         )}
                       </td>
                       <td className="py-3 px-2">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full bg-gradient-to-r ${getRateBarColor(displayRate)} rounded-full transition-all duration-500`}
-                              style={{ width: `${Math.min(displayRate, 100)}%` }}
-                            />
+                        {hasRate ? (
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full bg-gradient-to-r ${getRateBarColor(displayRate)} rounded-full transition-all duration-500`}
+                                style={{ width: `${Math.min(displayRate, 100)}%` }}
+                              />
+                            </div>
+                            <span className={`text-sm font-bold w-16 text-right ${getRateColor(displayRate)}`}>
+                              {displayRate}%
+                            </span>
                           </div>
-                          <span className={`text-sm font-bold w-16 text-right ${getRateColor(displayRate)}`}>
-                            {displayRate}%
-                          </span>
-                        </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">期間未登録</span>
+                        )}
                       </td>
                       {categories.map((cat) => {
                         const catRate = item.categoryRates?.[cat.id];
                         const isActive = sortBy === cat.id;
+                        const catHasRate = catRate?.rate !== null && catRate?.rate !== undefined;
                         return (
                           <td key={cat.id} className={`py-3 px-2 text-center ${isActive ? 'bg-primary-50' : ''}`}>
-                            <span className={`text-sm font-medium ${catRate ? getRateColor(catRate.rate) : 'text-gray-400'}`}>
-                              {catRate ? `${catRate.rate}%` : '-'}
+                            <span className={`text-sm font-medium ${catHasRate ? getRateColor(catRate.rate) : 'text-gray-400'}`}>
+                              {catHasRate ? `${catRate.rate}%` : '-'}
                             </span>
                           </td>
                         );
@@ -343,7 +353,7 @@ export default function Ranking() {
         <div className="mt-4 p-4 bg-gray-50 rounded-lg">
           <p className="text-xs text-gray-500">
             <Zap className="w-3.5 h-3.5 inline-block mr-1 text-gray-400" />
-            達成率 = 累積獲得スコア ÷ (在籍総月数 × 月あたり満点) × 100
+            達成率 = 累積獲得スコア ÷ (入団〜退団予定の総月数 × 月あたり満点) × 100　※入団日・退団予定日の登録が必要です
           </p>
         </div>
       </div>
