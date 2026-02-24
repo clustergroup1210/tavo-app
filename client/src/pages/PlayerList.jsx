@@ -218,55 +218,59 @@ export default function PlayerList() {
           <thead className="bg-gray-50">
             <tr>
               <th 
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('name')}
               >
                 選手 {getSortIcon('name')}
               </th>
               <th 
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('number')}
               >
-                背番号 {getSortIcon('number')}
+                No. {getSortIcon('number')}
               </th>
               <th 
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('position')}
               >
-                ポジション {getSortIcon('position')}
+                Pos {getSortIcon('position')}
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 カテゴリー
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white divide-y divide-gray-100">
             {displayPlayers.map((player) => (
               <tr key={player.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <Link to={`/players/${player.id}`} className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-                      <UserCircle className="w-6 h-6 text-gray-400" />
+                <td className="px-3 py-1.5 whitespace-nowrap">
+                  <Link to={`/players/${player.id}`} className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                      {player.photoUrl ? (
+                        <img src={player.photoUrl} alt="" className="w-7 h-7 rounded-full object-cover" />
+                      ) : (
+                        <UserCircle className="w-4 h-4 text-gray-400" />
+                      )}
                     </div>
-                    <span className="font-medium text-gray-900 hover:text-primary-600">
+                    <span className="text-sm font-medium text-gray-900 hover:text-primary-600">
                       {player.name}
                     </span>
                   </Link>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td className="px-3 py-1.5 whitespace-nowrap text-sm text-gray-500">
                   {player.number || '-'}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td className="px-3 py-1.5 whitespace-nowrap text-sm text-gray-500">
                   {player.position || '-'}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td className="px-3 py-1.5 whitespace-nowrap text-sm text-gray-500">
                   {player.teamCategory?.name || '-'}
                 </td>
               </tr>
             ))}
             {displayPlayers.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                <td colSpan={4} className="px-3 py-6 text-center text-gray-500">
                   {hasActiveFilters ? '条件に一致する選手がいません' : '選手が登録されていません'}
                 </td>
               </tr>
