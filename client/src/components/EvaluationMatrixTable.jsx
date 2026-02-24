@@ -5,6 +5,7 @@ import { BarChart3, ArrowUpDown, Filter } from 'lucide-react';
 
 function getHeatmapColor(entry) {
   if (!entry || entry.score === null || entry.score === undefined) return 'bg-gray-50 text-gray-300';
+  if (!entry.hasPeriod || !entry.max) return 'bg-gray-100 text-gray-600';
   const rate = entry.max > 0 ? entry.score / entry.max : 0;
   if (rate >= 0.8) return 'bg-blue-100 text-blue-800';
   if (rate >= 0.6) return 'bg-green-100 text-green-800';

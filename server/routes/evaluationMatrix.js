@@ -31,7 +31,7 @@ router.get('/:teamId', authenticate, async (req, res) => {
     const [players, items, rounds, evaluations, teamCategories] = await Promise.all([
       prisma.player.findMany({
         where: { teamId },
-        select: { id: true, name: true, number: true, teamCategoryId: true, position: true },
+        select: { id: true, name: true, number: true, teamCategoryId: true, position: true, joinedAt: true, graduationDate: true },
         orderBy: { number: 'asc' }
       }),
       prisma.evaluationItem.findMany({
@@ -97,13 +97,20 @@ router.get('/:teamId', authenticate, async (req, res) => {
     });
 
     const playersData = players.map(player => {
+      let totalMonths = null;
+      if (player.joinedAt && player.graduationDate) {
+        const joinDate = new Date(player.joinedAt);
+        const gradDate = new Date(player.graduationDate);
+        totalMonths = Math.max(1, (gradDate.getFullYear() - joinDate.getFullYear()) * 12 + (gradDate.getMonth() - joinDate.getMonth()) + 1);
+      }
+
       const rows = categories.length > 0
         ? categories.map(cat => {
             const catItems = categoryItemsMap[cat.id] || [];
             const maxPerRound = catItems.reduce((sum, item) => sum + (item.maxScore || 5), 0);
+            const fullMax = totalMonths !== null ? totalMonths * maxPerRound : null;
 
             let cumulative = 0;
-            let cumulativeMax = 0;
             const scores = roundLabels.map(round => {
               let total = 0;
               let hasAny = false;
@@ -114,10 +121,9 @@ router.get('/:teamId', authenticate, async (req, res) => {
                   hasAny = true;
                 }
               });
-              cumulativeMax += maxPerRound;
               if (hasAny) {
                 cumulative += total;
-                return { score: cumulative, max: cumulativeMax };
+                return { score: cumulative, max: fullMax, hasPeriod: totalMonths !== null };
               }
               return null;
             });
@@ -170,7 +176,7 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
 
     const player = await prisma.player.findUnique({
       where: { id: playerId },
-      select: { id: true, teamId: true, name: true }
+      select: { id: true, teamId: true, name: true, joinedAt: true, graduationDate: true }
     });
     if (!player) return res.status(404).json({ error: 'Player not found' });
 
@@ -223,12 +229,19 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
         .sort((a, b) => a.sortOrder - b.sortOrder);
     });
 
+    let totalMonths = null;
+    if (player.joinedAt && player.graduationDate) {
+      const joinDate = new Date(player.joinedAt);
+      const gradDate = new Date(player.graduationDate);
+      totalMonths = Math.max(1, (gradDate.getFullYear() - joinDate.getFullYear()) * 12 + (gradDate.getMonth() - joinDate.getMonth()) + 1);
+    }
+
     const rows = categories.map(cat => {
       const catItems = categoryItemsMap[cat.id] || [];
       const maxPerRound = catItems.reduce((sum, item) => sum + (item.maxScore || 5), 0);
+      const fullMax = totalMonths !== null ? totalMonths * maxPerRound : null;
 
       let cumulative = 0;
-      let cumulativeMax = 0;
       const scores = roundLabels.map(round => {
         let total = 0;
         let hasAny = false;
@@ -239,10 +252,9 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
             hasAny = true;
           }
         });
-        cumulativeMax += maxPerRound;
         if (hasAny) {
           cumulative += total;
-          return { score: cumulative, max: cumulativeMax };
+          return { score: cumulative, max: fullMax, hasPeriod: totalMonths !== null };
         }
         return null;
       });
@@ -253,7 +265,12 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
     res.json({
       months: monthLabels,
       rows,
-      evalCategories: categories.map(c => ({ id: c.id, name: c.name }))
+      evalCategories: categories.map(c => ({ id: c.id, name: c.name })),
+      period: {
+        joinedAt: player.joinedAt,
+        graduationDate: player.graduationDate,
+        totalMonths
+      }
     });
   } catch (error) {
     console.error('Player matrix error:', error);

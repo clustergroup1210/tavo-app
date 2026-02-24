@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { BarChart3, AlertTriangle } from 'lucide-react';
 
 function getHeatmapColor(entry) {
   if (!entry || entry.score === null || entry.score === undefined) return 'bg-gray-50 text-gray-300';
+  if (!entry.hasPeriod || !entry.max) return 'bg-gray-100 text-gray-600';
   const rate = entry.max > 0 ? entry.score / entry.max : 0;
   if (rate >= 0.8) return 'bg-blue-100 text-blue-800';
   if (rate >= 0.6) return 'bg-green-100 text-green-800';
@@ -12,6 +14,7 @@ function getHeatmapColor(entry) {
 }
 
 export default function PlayerMatrix({ playerId }) {
+  const navigate = useNavigate();
   const [matrix, setMatrix] = useState(null);
   const [matrixLoading, setMatrixLoading] = useState(true);
 
@@ -54,6 +57,8 @@ export default function PlayerMatrix({ playerId }) {
     return parts.length === 2 ? `${parts[1]}月` : m;
   };
 
+  const hasPeriod = matrix.period?.joinedAt && matrix.period?.graduationDate;
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">
       <div className="p-3 border-b border-gray-200 flex items-center justify-between">
@@ -66,6 +71,22 @@ export default function PlayerMatrix({ playerId }) {
           <span className="inline-flex items-center gap-0.5"><span className="w-2.5 h-2.5 rounded bg-blue-100 border border-blue-200"></span>80%~</span>
         </div>
       </div>
+
+      {!hasPeriod && (
+        <div className="mx-3 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+          <p className="text-xs text-amber-700">
+            入団日・退団予定日が未登録のため、達成率の色分けが表示されません。
+            <button
+              onClick={() => navigate(`/players/${playerId}`)}
+              className="ml-1 text-amber-800 font-semibold underline hover:text-amber-900"
+            >
+              選手情報を編集
+            </button>
+          </p>
+        </div>
+      )}
+
       <div className="w-full overflow-x-auto">
         <table className="border-collapse min-w-full">
           <thead>
