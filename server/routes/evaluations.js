@@ -448,6 +448,52 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
+router.delete('/', authenticate, async (req, res) => {
+  try {
+    const { playerId, roundId, raterType } = req.body;
+
+    if (!playerId || !roundId || !raterType) {
+      return res.status(400).json({ error: 'playerId, roundId, raterType are required' });
+    }
+
+    const player = await prisma.player.findUnique({ where: { id: playerId } });
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
+    const isSelf = player.userId === req.user.id;
+    const canEval = await canEvaluatePlayer(req.user, playerId, player.teamId);
+
+    if (raterType === 'COACH' && !canEval) {
+      return res.status(403).json({ error: 'この評価を削除する権限がありません' });
+    }
+    if (raterType === 'SELF' && !isSelf) {
+      return res.status(403).json({ error: 'この評価を削除する権限がありません' });
+    }
+
+    if (raterType === 'COACH') {
+      const existing = await prisma.evaluation.findFirst({
+        where: { playerId, roundId, raterType: 'COACH' }
+      });
+      if (existing && existing.raterUserId !== req.user.id) {
+        const isOp = isOperator(req.user);
+        if (!isOp) {
+          return res.status(403).json({ error: '他の指導者の評価は削除できません' });
+        }
+      }
+    }
+
+    const deleted = await prisma.evaluation.deleteMany({
+      where: { playerId, roundId, raterType }
+    });
+
+    res.json({ deleted: deleted.count });
+  } catch (error) {
+    console.error('Delete evaluation error:', error);
+    res.status(500).json({ error: 'Failed to delete evaluations' });
+  }
+});
+
 router.get('/summary/:playerId', authenticate, async (req, res) => {
   try {
     const { raterType } = req.query;

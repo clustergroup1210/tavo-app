@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Save, Plus, Copy, X, Calendar, CheckCircle, HelpCircle } from 'lucide-react';
+import { Save, Plus, Copy, X, Calendar, CheckCircle, HelpCircle, Trash2, Edit3 } from 'lucide-react';
 
 export default function EvaluationEntry() {
   const { currentTeam, user, isCoach, isPlayer, playerData } = useAuth();
@@ -20,9 +20,10 @@ export default function EvaluationEntry() {
   const [copyMessage, setCopyMessage] = useState('');
   const [existingEvaluations, setExistingEvaluations] = useState([]);
   const [hasExistingEvaluations, setHasExistingEvaluations] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    // For players, use playerData from context to set selectedPlayer immediately
     if (isPlayer() && playerData) {
       setSelectedPlayer(playerData.id);
     }
@@ -41,7 +42,9 @@ export default function EvaluationEntry() {
       setScores({});
       setExistingEvaluations([]);
       setHasExistingEvaluations(false);
+      setIsEditing(false);
     }
+    setSuccess(false);
   }, [selectedPlayer, selectedRound]);
 
   const fetchExistingEvaluations = async () => {
@@ -56,7 +59,8 @@ export default function EvaluationEntry() {
         const evaluations = Array.isArray(data) ? data : [];
         setExistingEvaluations(evaluations);
         setHasExistingEvaluations(evaluations.length > 0);
-        
+        setIsEditing(false);
+
         const existingScores = {};
         evaluations.forEach(ev => {
           existingScores[ev.itemId] = ev.score;
@@ -70,11 +74,9 @@ export default function EvaluationEntry() {
 
   const fetchData = async () => {
     try {
-      // For players, use their team from playerData
       const teamId = isPlayer() && playerData ? playerData.teamId : currentTeam?.id;
       if (!teamId) return;
 
-      // Players don't need to fetch the players list - they only evaluate themselves
       if (isPlayer() && playerData) {
         const [itemsRes, roundsRes] = await Promise.all([
           fetch(`/api/evaluations/items?teamId=${teamId}`, { credentials: 'include' }),
@@ -92,7 +94,6 @@ export default function EvaluationEntry() {
           setSelectedRound(roundsData[0].id);
         }
       } else {
-        // Coaches/admins fetch players list too
         const [playersRes, itemsRes, roundsRes] = await Promise.all([
           fetch(`/api/players?teamId=${teamId}&includeChildren=true`, { credentials: 'include' }),
           fetch(`/api/evaluations/items?teamId=${teamId}`, { credentials: 'include' }),
@@ -154,12 +155,65 @@ export default function EvaluationEntry() {
 
       setSuccess(true);
       setHasExistingEvaluations(true);
+      setIsEditing(false);
+      await fetchExistingEvaluations();
     } catch (error) {
       console.error('Failed to save evaluations:', error);
       alert('評価の保存に失敗しました');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedPlayer || !selectedRound) return;
+    if (!confirm('この評価を削除してもよろしいですか？この操作は取り消せません。')) return;
+
+    setDeleting(true);
+    try {
+      const raterType = isPlayer() ? 'SELF' : 'COACH';
+      const res = await fetch('/api/evaluations', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          playerId: selectedPlayer,
+          roundId: selectedRound,
+          raterType,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || '削除に失敗しました');
+        return;
+      }
+
+      setScores({});
+      setExistingEvaluations([]);
+      setHasExistingEvaluations(false);
+      setIsEditing(false);
+      setSuccess(false);
+    } catch (error) {
+      console.error('Failed to delete evaluations:', error);
+      alert('削除に失敗しました');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleStartEditing = () => {
+    setIsEditing(true);
+    setSuccess(false);
+  };
+
+  const handleCancelEditing = () => {
+    setIsEditing(false);
+    const existingScores = {};
+    existingEvaluations.forEach(ev => {
+      existingScores[ev.itemId] = ev.score;
+    });
+    setScores(existingScores);
   };
 
   const handleAddRound = async () => {
@@ -179,33 +233,28 @@ export default function EvaluationEntry() {
           teamId: currentTeam.id,
           name,
           startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
+          endDate: endDate.toISOString()
         }),
       });
 
       if (res.ok) {
-        const newRound = await res.json();
-        setRounds(prev => [newRound, ...prev]);
-        setSelectedRound(newRound.id);
+        const round = await res.json();
+        setRounds(prev => [round, ...prev]);
+        setSelectedRound(round.id);
         setShowAddRound(false);
       } else {
         const error = await res.json();
-        alert(error.error || '期間の追加に失敗しました');
+        alert(error.error || '評価期間の追加に失敗しました');
       }
     } catch (error) {
-      console.error('Failed to add round:', error);
-      alert('期間の追加に失敗しました');
+      alert('評価期間の追加に失敗しました');
     } finally {
       setAddingRound(false);
     }
   };
 
   const handleCopyPrevious = async () => {
-    if (!selectedRound) {
-      alert('評価ラウンドを選択してください');
-      return;
-    }
-
+    if (!selectedRound) return;
     setCopyingPrevious(true);
     setCopyMessage('');
 
@@ -218,12 +267,12 @@ export default function EvaluationEntry() {
       const data = await res.json();
 
       if (res.ok) {
-        setCopyMessage(`${data.previousRoundName}から${data.copiedCount}件の評価をコピーしました`);
+        setCopyMessage('前回のデータをコピーしました');
+        await fetchData();
       } else {
         setCopyMessage(data.error || 'コピーに失敗しました');
       }
     } catch (error) {
-      console.error('Failed to copy previous:', error);
       setCopyMessage('コピーに失敗しました');
     } finally {
       setCopyingPrevious(false);
@@ -269,6 +318,8 @@ export default function EvaluationEntry() {
     return item.children.flatMap(c => collectLeaves(c));
   };
 
+  const canEdit = !hasExistingEvaluations || isEditing;
+
   const renderItems = (itemList) => {
     return itemList.map((topItem) => {
       const leaves = collectLeaves(topItem);
@@ -290,16 +341,26 @@ export default function EvaluationEntry() {
                   <span className="text-xs text-gray-600 truncate">{leaf.name}</span>
                   <TooltipButton id={leaf.id} description={leaf.description} />
                 </div>
-                <select
-                  value={scores[leaf.id] || ''}
-                  onChange={(e) => handleScoreChange(leaf.id, e.target.value)}
-                  className="w-14 px-1 py-0.5 border border-gray-300 rounded text-xs text-center flex-shrink-0"
-                >
-                  <option value="">-</option>
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
+                {canEdit ? (
+                  <select
+                    value={scores[leaf.id] || ''}
+                    onChange={(e) => handleScoreChange(leaf.id, e.target.value)}
+                    className="w-14 px-1 py-0.5 border border-gray-300 rounded text-xs text-center flex-shrink-0"
+                  >
+                    <option value="">-</option>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <span className={`inline-flex items-center justify-center w-8 h-6 rounded text-xs font-bold ${
+                      scores[leaf.id] ? getScoreColor(scores[leaf.id]) : 'bg-gray-100 text-gray-400'
+                    }`}>
+                      {scores[leaf.id] || '-'}
+                    </span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -308,9 +369,17 @@ export default function EvaluationEntry() {
     });
   };
 
+  const getScoreColor = (score) => {
+    if (score >= 5) return 'bg-blue-100 text-blue-700';
+    if (score >= 4) return 'bg-green-100 text-green-700';
+    if (score >= 3) return 'bg-yellow-100 text-yellow-700';
+    if (score >= 2) return 'bg-orange-100 text-orange-700';
+    return 'bg-red-100 text-red-700';
+  };
+
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
-  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
 
   return (
     <div className="space-y-6">
@@ -391,10 +460,36 @@ export default function EvaluationEntry() {
           </div>
         )}
 
-        {hasExistingEvaluations && selectedPlayer && selectedRound && (
-          <div className="mb-4 p-3 rounded-lg text-sm bg-green-50 text-green-700 border border-green-200 flex items-center gap-2">
-            <CheckCircle className="w-4 h-4" />
-            この期間の評価は入力済みです。点数を変更して再保存できます。
+        {hasExistingEvaluations && selectedPlayer && selectedRound && !isEditing && (
+          <div className="mb-4 p-3 rounded-lg text-sm bg-green-50 text-green-700 border border-green-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4" />
+              この期間の評価は入力済みです。
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleStartEditing}
+                className="inline-flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-medium transition-colors"
+              >
+                <Edit3 className="w-3 h-3" />
+                編集
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="inline-flex items-center gap-1 px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-xs font-medium transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-3 h-3" />
+                {deleting ? '削除中...' : '削除'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isEditing && (
+          <div className="mb-4 p-3 rounded-lg text-sm bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-2">
+            <Edit3 className="w-4 h-4" />
+            編集モード：点数を変更して保存してください。
           </div>
         )}
 
@@ -432,7 +527,7 @@ export default function EvaluationEntry() {
                   onChange={(e) => setNewRoundMonth(parseInt(e.target.value))}
                   className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 >
-                  {months.map((month) => (
+                  {monthOptions.map((month) => (
                     <option key={month} value={month}>{month}月</option>
                   ))}
                 </select>
@@ -465,15 +560,26 @@ export default function EvaluationEntry() {
           </div>
         )}
 
-        <div className="mt-6 flex justify-end">
-          <button
-            onClick={handleSubmit}
-            disabled={loading || !selectedPlayer || !selectedRound}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
-          >
-            <Save className="w-4 h-4" />
-            {loading ? '保存中...' : hasExistingEvaluations ? '更新' : '保存'}
-          </button>
+        <div className="mt-6 flex justify-end gap-3">
+          {isEditing && (
+            <button
+              onClick={handleCancelEditing}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              <X className="w-4 h-4" />
+              キャンセル
+            </button>
+          )}
+          {canEdit && (
+            <button
+              onClick={handleSubmit}
+              disabled={loading || !selectedPlayer || !selectedRound}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              {loading ? '保存中...' : hasExistingEvaluations ? '更新' : '保存'}
+            </button>
+          )}
         </div>
       </div>
     </div>
