@@ -318,17 +318,20 @@ router.get('/:playerId/achievement', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    const hasPeriod = !!(player.joinedAt && player.graduationDate);
     const joinDate = player.joinedAt || player.createdAt;
     const now = new Date();
-    const defaultGraduation = new Date(joinDate);
-    defaultGraduation.setMonth(defaultGraduation.getMonth() + 36);
-    const graduationDate = player.graduationDate || defaultGraduation;
+    let totalMonths = null;
+    let elapsedMonths = 0;
+    const graduationDate = player.graduationDate || null;
 
-    const diffMs = graduationDate.getTime() - joinDate.getTime();
-    const totalMonths = Math.max(Math.round(diffMs / (1000 * 60 * 60 * 24 * 30.44)), 1);
-
-    const elapsedMs = now.getTime() - joinDate.getTime();
-    const elapsedMonths = Math.max(Math.round(elapsedMs / (1000 * 60 * 60 * 24 * 30.44)), 0);
+    if (hasPeriod) {
+      const jd = new Date(player.joinedAt);
+      const gd = new Date(player.graduationDate);
+      totalMonths = Math.max(1, (gd.getFullYear() - jd.getFullYear()) * 12 + (gd.getMonth() - jd.getMonth()) + 1);
+      const elapsedMs = now.getTime() - jd.getTime();
+      elapsedMonths = Math.max(Math.round(elapsedMs / (1000 * 60 * 60 * 24 * 30.44)), 0);
+    }
 
     const teamIds = [player.teamId];
     if (player.team?.parentId) {
@@ -370,7 +373,7 @@ router.get('/:playerId/achievement', authenticate, async (req, res) => {
       monthlyMaxScoreTotal += (item.maxScore || 5);
     });
 
-    const careerDenominator = totalMonths * monthlyMaxScoreTotal;
+    const careerDenominator = hasPeriod ? totalMonths * monthlyMaxScoreTotal : 0;
 
     const coachEvals = evaluations.filter(e => e.raterType === 'COACH');
     const selfEvals = evaluations.filter(e => e.raterType === 'SELF');
@@ -383,7 +386,7 @@ router.get('/:playerId/achievement', authenticate, async (req, res) => {
 
     Object.entries(categoryItems).forEach(([catName, catData]) => {
       const { items: catItems, monthlyMax } = catData;
-      const catDenominator = totalMonths * monthlyMax;
+      const catDenominator = hasPeriod ? totalMonths * monthlyMax : 0;
 
       let coachActual = 0;
       let selfActual = 0;
@@ -450,7 +453,7 @@ router.get('/:playerId/achievement', authenticate, async (req, res) => {
 
       const categoryRates = {};
       Object.entries(categoryItems).forEach(([catName, catData]) => {
-        const catDenom = totalMonths * catData.monthlyMax;
+        const catDenom = hasPeriod ? totalMonths * catData.monthlyMax : 0;
         categoryRates[catName] = {
           coachRate: catDenom > 0 ? Math.round(((cumCatCoach[catName] || 0) / catDenom) * 1000) / 10 : 0,
           selfRate: catDenom > 0 ? Math.round(((cumCatSelf[catName] || 0) / catDenom) * 1000) / 10 : 0
@@ -481,7 +484,8 @@ router.get('/:playerId/achievement', authenticate, async (req, res) => {
         graduationDate,
         totalMonths,
         elapsedMonths,
-        monthlyMaxScore: monthlyMaxScoreTotal
+        monthlyMaxScore: monthlyMaxScoreTotal,
+        hasPeriod
       },
       overall: {
         totalElements,
