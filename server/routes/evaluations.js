@@ -56,6 +56,45 @@ function isOperator(user) {
   );
 }
 
+router.get('/', authenticate, async (req, res) => {
+  try {
+    const { playerId, roundId, evaluatorType } = req.query;
+
+    if (!playerId || !roundId) {
+      return res.status(400).json({ error: 'playerId and roundId are required' });
+    }
+
+    const player = await prisma.player.findUnique({
+      where: { id: playerId },
+      select: { id: true, userId: true, teamId: true }
+    });
+
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
+    const where = { playerId, roundId };
+    if (evaluatorType) {
+      where.raterType = evaluatorType;
+    }
+
+    const evaluations = await prisma.evaluation.findMany({
+      where,
+      include: {
+        item: { include: { parent: true } },
+        round: true,
+        rater: { select: { id: true, name: true } }
+      },
+      orderBy: { evaluatedAt: 'desc' }
+    });
+
+    res.json(evaluations);
+  } catch (error) {
+    console.error('Fetch evaluations error:', error);
+    res.status(500).json({ error: 'Failed to fetch evaluations' });
+  }
+});
+
 router.get('/items', authenticate, async (req, res) => {
   try {
     const { teamId, position } = req.query;
