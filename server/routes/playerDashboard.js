@@ -341,7 +341,8 @@ router.get('/:playerId/achievement', authenticate, async (req, res) => {
     const [evaluations, items, rounds] = await Promise.all([
       prisma.evaluation.findMany({
         where: { 
-          playerId
+          playerId,
+          evaluatedAt: { gte: joinDate }
         },
         include: { 
           item: { include: { parent: true } }, 
