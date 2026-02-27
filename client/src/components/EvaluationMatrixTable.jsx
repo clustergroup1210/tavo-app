@@ -160,12 +160,11 @@ export default function EvaluationMatrixTable() {
     return sortDir === 'asc' ? ' ↑' : ' ↓';
   };
 
-  const formatMonth = (m) => {
+  const formatMonth = (m, idx, months) => {
     const parts = m.split('/');
-    if (parts.length === 2) {
-      return `${parts[1]}月`;
-    }
-    return m;
+    if (parts.length !== 2) return m;
+    const showYear = idx === 0 || parts[0] !== months[idx - 1]?.split('/')[0];
+    return showYear ? `${parts[0]}/${parts[1]}` : `${parts[1]}月`;
   };
 
   return (
@@ -269,7 +268,7 @@ export default function EvaluationMatrixTable() {
                   className="border-b border-r border-gray-200 px-1 py-2 text-[10px] font-medium text-gray-500 text-center whitespace-nowrap"
                   style={{ minWidth: 48 }}
                 >
-                  {formatMonth(m)}
+                  {formatMonth(m, i, months)}
                 </th>
               ))}
             </tr>

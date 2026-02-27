@@ -52,9 +52,11 @@ export default function PlayerMatrix({ playerId }) {
     );
   }
 
-  const formatMonth = (m) => {
+  const formatMonth = (m, idx, months) => {
     const parts = m.split('/');
-    return parts.length === 2 ? `${parts[1]}月` : m;
+    if (parts.length !== 2) return m;
+    const showYear = idx === 0 || parts[0] !== months[idx - 1]?.split('/')[0];
+    return showYear ? `${parts[0]}/${parts[1]}` : `${parts[1]}月`;
   };
 
   const hasPeriod = matrix.period?.joinedAt && matrix.period?.graduationDate;
@@ -96,7 +98,7 @@ export default function PlayerMatrix({ playerId }) {
               </th>
               {matrix.months.map((m, i) => (
                 <th key={i} className="border-b border-r border-gray-200 px-1 py-2 text-[10px] font-medium text-gray-500 text-center whitespace-nowrap" style={{ minWidth: 48 }}>
-                  {formatMonth(m)}
+                  {formatMonth(m, i, matrix.months)}
                 </th>
               ))}
             </tr>
