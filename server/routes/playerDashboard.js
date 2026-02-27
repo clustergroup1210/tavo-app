@@ -390,11 +390,16 @@ router.get('/:playerId/achievement', authenticate, async (req, res) => {
 
       let coachActual = 0;
       let selfActual = 0;
+      let acquiredElements = 0;
 
       catItems.forEach(item => {
-        coachEvals.filter(e => e.itemId === item.id).forEach(e => {
+        const itemCoachEvals = coachEvals.filter(e => e.itemId === item.id);
+        itemCoachEvals.forEach(e => {
           coachActual += e.score;
         });
+        if (itemCoachEvals.length > 0) {
+          acquiredElements++;
+        }
         selfEvals.filter(e => e.itemId === item.id).forEach(e => {
           selfActual += e.score;
         });
@@ -406,6 +411,7 @@ router.get('/:playerId/achievement', authenticate, async (req, res) => {
       categories.push({
         category: catName,
         elementCount: catItems.length,
+        acquiredElements,
         monthlyMaxScore: monthlyMax,
         stepsMax: catDenominator,
         coachActual,

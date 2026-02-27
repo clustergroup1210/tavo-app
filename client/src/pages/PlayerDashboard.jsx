@@ -160,6 +160,7 @@ function SummaryTab({ data, achievementData, navigate, playerId }) {
   const monthlyProgress = achievementData?.monthlyProgress || [];
 
   const totalElements = categories.reduce((sum, c) => sum + c.elementCount, 0);
+  const totalAcquired = categories.reduce((sum, c) => sum + (c.acquiredElements || 0), 0);
   const totalStepsMax = categories.reduce((sum, c) => sum + c.stepsMax, 0);
   
   return (
@@ -338,7 +339,7 @@ function SummaryTab({ data, achievementData, navigate, playerId }) {
                       </div>
                     </td>
                     <td className="py-2.5 px-3 text-center text-sm text-gray-600 border-l border-gray-200">{cat.elementCount}</td>
-                    <td className="py-2.5 px-3 text-center text-sm text-gray-400">-</td>
+                    <td className="py-2.5 px-3 text-center text-sm font-semibold text-gray-900">{cat.acquiredElements || 0}</td>
                     <td className="py-2.5 px-3 text-center text-sm text-gray-600 border-l border-gray-200">{hasPeriod ? cat.stepsMax.toLocaleString() : '-'}</td>
                     <td className="py-2.5 px-3 text-center text-sm font-semibold text-gray-900">{cat.coachActual.toLocaleString()}</td>
                     <td className="py-2.5 px-3 text-center border-l border-gray-200">
@@ -355,7 +356,7 @@ function SummaryTab({ data, achievementData, navigate, playerId }) {
                 <tr className="bg-gray-800 text-white font-semibold">
                   <td className="py-2.5 px-3 text-sm">合計</td>
                   <td className="py-2.5 px-3 text-center text-sm border-l border-gray-600">{totalElements}</td>
-                  <td className="py-2.5 px-3 text-center text-sm">-</td>
+                  <td className="py-2.5 px-3 text-center text-sm">{totalAcquired}</td>
                   <td className="py-2.5 px-3 text-center text-sm border-l border-gray-600">{hasPeriod ? totalStepsMax.toLocaleString() : '-'}</td>
                   <td className="py-2.5 px-3 text-center text-sm">{overall ? overall.coachActual.toLocaleString() : '-'}</td>
                   <td className="py-2.5 px-3 text-center border-l border-gray-600">
