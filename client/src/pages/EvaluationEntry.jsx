@@ -135,7 +135,7 @@ export default function EvaluationEntry() {
         score,
       }));
 
-      await fetch('/api/evaluations', {
+      const res = await fetch('/api/evaluations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -146,8 +146,14 @@ export default function EvaluationEntry() {
         }),
       });
 
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || '評価の保存に失敗しました');
+        return;
+      }
+
       setSuccess(true);
-      setScores({});
+      setHasExistingEvaluations(true);
     } catch (error) {
       console.error('Failed to save evaluations:', error);
       alert('評価の保存に失敗しました');

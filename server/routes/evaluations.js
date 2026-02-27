@@ -358,42 +358,60 @@ router.post('/', authenticate, async (req, res) => {
           roundId,
           raterType: 'COACH'
         },
-        include: { rater: { select: { name: true } } }
+        include: { rater: { select: { id: true, name: true } } }
       });
 
-      if (existingCoachEval) {
+      if (existingCoachEval && existingCoachEval.rater.id !== req.user.id) {
         return res.status(400).json({ 
           error: `このラウンドで既に${existingCoachEval.rater.name}が評価を行っています。1ラウンドにつき指導者評価は1名のみです。`
         });
       }
-    } else {
-      const existingSelfEval = await prisma.evaluation.findFirst({
-        where: {
-          playerId,
-          roundId,
-          raterType: 'SELF'
-        }
-      });
-
-      if (existingSelfEval) {
-        return res.status(400).json({ 
-          error: 'このラウンドで既に自己評価を提出しています'
-        });
-      }
     }
 
-    const created = await prisma.$transaction(
-      evaluations.map(e => prisma.evaluation.create({
-        data: {
-          playerId,
-          itemId: e.itemId,
-          roundId,
-          score: e.score,
-          raterUserId: req.user.id,
-          raterType
-        }
-      }))
-    );
+    const existingEvals = await prisma.evaluation.findMany({
+      where: {
+        playerId,
+        roundId,
+        raterType
+      }
+    });
+
+    const isUpdate = existingEvals.length > 0;
+
+    if (isUpdate) {
+      await prisma.$transaction([
+        prisma.evaluation.deleteMany({
+          where: {
+            playerId,
+            roundId,
+            raterType
+          }
+        }),
+        ...evaluations.map(e => prisma.evaluation.create({
+          data: {
+            playerId,
+            itemId: e.itemId,
+            roundId,
+            score: e.score,
+            raterUserId: req.user.id,
+            raterType
+          }
+        }))
+      ]);
+    } else {
+      await prisma.$transaction(
+        evaluations.map(e => prisma.evaluation.create({
+          data: {
+            playerId,
+            itemId: e.itemId,
+            roundId,
+            score: e.score,
+            raterUserId: req.user.id,
+            raterType
+          }
+        }))
+      );
+    }
 
     if (raterType === 'COACH' && player.userId) {
       createNotification({
