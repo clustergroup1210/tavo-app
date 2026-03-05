@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Save, Plus, Copy, X, Calendar, CheckCircle, HelpCircle, Trash2, Edit3 } from 'lucide-react';
+import { Save, Plus, X, Calendar, CheckCircle, HelpCircle, Trash2, Edit3 } from 'lucide-react';
 
 export default function EvaluationEntry() {
   const { currentTeam, user, isCoach, isPlayer, playerData } = useAuth();
@@ -16,8 +16,6 @@ export default function EvaluationEntry() {
   const [newRoundYear, setNewRoundYear] = useState(new Date().getFullYear());
   const [newRoundMonth, setNewRoundMonth] = useState(new Date().getMonth() + 1);
   const [addingRound, setAddingRound] = useState(false);
-  const [copyingPrevious, setCopyingPrevious] = useState(false);
-  const [copyMessage, setCopyMessage] = useState('');
   const [existingEvaluations, setExistingEvaluations] = useState([]);
   const [hasExistingEvaluations, setHasExistingEvaluations] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -253,32 +251,6 @@ export default function EvaluationEntry() {
     }
   };
 
-  const handleCopyPrevious = async () => {
-    if (!selectedRound) return;
-    setCopyingPrevious(true);
-    setCopyMessage('');
-
-    try {
-      const res = await fetch(`/api/evaluations/rounds/${selectedRound}/copy-previous`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setCopyMessage('前回のデータをコピーしました');
-        await fetchData();
-      } else {
-        setCopyMessage(data.error || 'コピーに失敗しました');
-      }
-    } catch (error) {
-      setCopyMessage('コピーに失敗しました');
-    } finally {
-      setCopyingPrevious(false);
-    }
-  };
-
   const [openTooltip, setOpenTooltip] = useState(null);
   const tooltipRef = useRef(null);
 
@@ -393,7 +365,7 @@ export default function EvaluationEntry() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className={`grid grid-cols-1 ${isPlayer() ? 'md:grid-cols-1' : 'md:grid-cols-3'} gap-4 mb-6`}>
+        <div className={`grid grid-cols-1 ${isPlayer() ? 'md:grid-cols-1' : 'md:grid-cols-2'} gap-4 mb-6`}>
           {!isPlayer() && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">選手</label>
@@ -434,31 +406,7 @@ export default function EvaluationEntry() {
               )}
             </div>
           </div>
-
-          {!isPlayer() && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">データ操作</label>
-              <button
-                onClick={handleCopyPrevious}
-                disabled={copyingPrevious || !selectedRound}
-                className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
-              >
-                <Copy className="w-4 h-4" />
-                {copyingPrevious ? 'コピー中...' : '前回のデータをコピー'}
-              </button>
-            </div>
-          )}
         </div>
-
-        {copyMessage && (
-          <div className={`mb-4 p-3 rounded-lg text-sm ${
-            copyMessage.includes('失敗') || copyMessage.includes('エラー')
-              ? 'bg-red-50 text-red-700 border border-red-200'
-              : 'bg-blue-50 text-blue-700 border border-blue-200'
-          }`}>
-            {copyMessage}
-          </div>
-        )}
 
         {hasExistingEvaluations && selectedPlayer && selectedRound && !isEditing && (
           <div className="mb-4 p-3 rounded-lg text-sm bg-green-50 text-green-700 border border-green-200 flex items-center justify-between">
