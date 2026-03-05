@@ -545,6 +545,7 @@ enum NotificationType {
   VIDEO_COMMENT
   CALENDAR
   ANNOUNCEMENT
+  JOIN_REQUEST
 }
 
 model Notification {

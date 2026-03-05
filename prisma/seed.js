@@ -33,14 +33,14 @@ async function main() {
       userId_organizationId_role: {
         userId: adminUser.id,
         organizationId: org.id,
-        role: 'OPERATOR_ADMIN'
+        role: 'SUPER_ADMIN'
       }
     },
     update: {},
     create: {
       userId: adminUser.id,
       organizationId: org.id,
-      role: 'OPERATOR_ADMIN',
+      role: 'SUPER_ADMIN',
     },
   });
 
@@ -70,14 +70,14 @@ async function main() {
       userId_teamId_role: {
         userId: coachUser.id,
         teamId: team.id,
-        role: 'TEAM_HEAD_COACH'
+        role: 'COACH'
       }
     },
     update: {},
     create: {
       userId: coachUser.id,
       teamId: team.id,
-      role: 'TEAM_HEAD_COACH',
+      role: 'COACH',
     },
   });
 

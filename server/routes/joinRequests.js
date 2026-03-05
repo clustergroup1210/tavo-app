@@ -1,6 +1,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { authenticate, hasTeamAccess } = require('../middleware/auth');
+const { createNotification } = require('../services/notificationService');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -111,6 +112,36 @@ router.post('/', authenticate, async (req, res) => {
         team: { select: { id: true, name: true } }
       }
     });
+
+    const teamStaff = await prisma.userTeam.findMany({
+      where: {
+        teamId,
+        role: { in: ['TEAM_MANAGER', 'COACH'] }
+      },
+      select: { userId: true }
+    });
+
+    const operators = await prisma.organizationMember.findMany({
+      where: {
+        role: { in: ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'] }
+      },
+      select: { userId: true }
+    });
+
+    const notifyUserIds = new Set([
+      ...teamStaff.map(s => s.userId),
+      ...operators.map(o => o.userId)
+    ]);
+
+    for (const userId of notifyUserIds) {
+      createNotification({
+        userId,
+        type: 'JOIN_REQUEST',
+        title: '参加申請がありました',
+        message: `${playerName}さんが${request.team.name}への参加を申請しました`,
+        linkUrl: '/join-requests'
+      });
+    }
 
     res.status(201).json(request);
   } catch (error) {
