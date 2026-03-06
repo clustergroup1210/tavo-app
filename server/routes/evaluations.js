@@ -34,10 +34,26 @@ async function getPlayerTeamMembershipPeriods(playerId, teamId) {
     orderBy: { joinedAt: 'asc' }
   });
   
-  return histories.map(h => ({
-    joinedAt: h.joinedAt,
-    leftAt: h.leftAt
-  }));
+  if (histories.length > 0) {
+    return histories.map(h => ({
+      joinedAt: h.joinedAt,
+      leftAt: h.leftAt
+    }));
+  }
+
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { teamId: true, joinedAt: true }
+  });
+
+  if (player && teamIds.includes(player.teamId)) {
+    return [{
+      joinedAt: player.joinedAt || new Date('2000-01-01'),
+      leftAt: null
+    }];
+  }
+
+  return [];
 }
 
 function isWithinMembershipPeriods(evalDate, periods) {
@@ -619,8 +635,11 @@ router.get('/comparison/:playerId', authenticate, async (req, res) => {
       }
     }
 
+    const itemTeamIds = [player.teamId];
+    if (player.team?.parentId) itemTeamIds.push(player.team.parentId);
+
     const items = await prisma.evaluationItem.findMany({
-      where: { teamId: player.teamId, isActive: true },
+      where: { teamId: { in: itemTeamIds }, isActive: true },
       orderBy: { sortOrder: 'asc' }
     });
 
@@ -883,8 +902,11 @@ router.get('/heatmap/:playerId', authenticate, async (req, res) => {
       }
     }
 
+    const heatmapItemTeamIds = [player.teamId];
+    if (player.team?.parentId) heatmapItemTeamIds.push(player.team.parentId);
+
     const items = await prisma.evaluationItem.findMany({
-      where: { teamId: player.teamId, isActive: true },
+      where: { teamId: { in: heatmapItemTeamIds }, isActive: true },
       orderBy: { sortOrder: 'asc' }
     });
 

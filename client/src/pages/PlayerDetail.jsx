@@ -702,7 +702,7 @@ export default function PlayerDetail() {
         </div>
       )}
 
-      {(isCoach || isOperator) && (
+      {isCoachOrAdmin && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <Link2 className="w-5 h-5 text-primary-500" />
@@ -935,7 +935,7 @@ export default function PlayerDetail() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <TaskList 
             playerId={player.id} 
-            canAssign={isCoach || isOperator}
+            canAssign={isCoachOrAdmin}
             showAssigner={true}
           />
         </div>

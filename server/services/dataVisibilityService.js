@@ -1,10 +1,28 @@
 const prisma = require('../lib/prisma');
 
 async function getPlayerTeamHistory(playerId) {
-  return await prisma.playerTeamHistory.findMany({
+  const histories = await prisma.playerTeamHistory.findMany({
     where: { playerId },
     orderBy: { joinedAt: 'asc' }
   });
+
+  if (histories.length > 0) return histories;
+
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { teamId: true, joinedAt: true }
+  });
+
+  if (player) {
+    return [{
+      playerId,
+      teamId: player.teamId,
+      joinedAt: player.joinedAt || new Date('2000-01-01'),
+      leftAt: null
+    }];
+  }
+
+  return [];
 }
 
 async function getVisibleDateRange(viewerTeamId, playerId) {
