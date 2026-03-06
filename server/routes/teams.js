@@ -102,6 +102,14 @@ router.get('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Team not found' });
     }
 
+    if (team.children?.length > 0 && team.players.length === 0) {
+      const childTeamIds = team.children.map(c => c.id);
+      const childPlayers = await prisma.player.findMany({
+        where: { teamId: { in: childTeamIds } }
+      });
+      team.players = childPlayers;
+    }
+
     res.json(team);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch team' });

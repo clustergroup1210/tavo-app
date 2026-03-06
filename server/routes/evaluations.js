@@ -1015,10 +1015,17 @@ router.get('/ranking', authenticate, async (req, res) => {
     });
     if (!team) return res.status(404).json({ error: 'Team not found' });
 
-    const teamIds = [teamId];
-    if (team.parentId) teamIds.push(team.parentId);
+    const itemTeamIds = [teamId];
+    if (team.parentId) itemTeamIds.push(team.parentId);
 
-    const playerWhere = { teamId };
+    const childTeams = await prisma.team.findMany({
+      where: { parentId: teamId },
+      select: { id: true }
+    });
+    const childTeamIds = childTeams.map(ct => ct.id);
+    const playerTeamIds = childTeamIds.length > 0 ? [teamId, ...childTeamIds] : [teamId];
+
+    const playerWhere = { teamId: { in: playerTeamIds } };
     if (position) playerWhere.position = position;
     if (teamCategoryId) playerWhere.teamCategoryId = teamCategoryId;
 
@@ -1032,12 +1039,12 @@ router.get('/ranking', authenticate, async (req, res) => {
         }
       }),
       prisma.evaluationItem.findMany({
-        where: { teamId: { in: teamIds }, isActive: true, parentId: { not: null } },
+        where: { teamId: { in: itemTeamIds }, isActive: true, parentId: { not: null } },
         include: { parent: true },
         orderBy: { sortOrder: 'asc' }
       }),
       prisma.teamCategory.findMany({
-        where: { teamId },
+        where: { teamId: { in: playerTeamIds } },
         select: { id: true, name: true },
         orderBy: { sortOrder: 'asc' }
       })

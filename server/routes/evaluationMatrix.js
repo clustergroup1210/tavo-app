@@ -25,28 +25,36 @@ router.get('/:teamId', authenticate, async (req, res) => {
     });
     if (!team) return res.status(404).json({ error: 'Team not found' });
 
-    const teamIds = [teamId];
-    if (team.parentId) teamIds.push(team.parentId);
+    const itemTeamIds = [teamId];
+    if (team.parentId) itemTeamIds.push(team.parentId);
+
+    const childTeams = await prisma.team.findMany({
+      where: { parentId: teamId },
+      select: { id: true }
+    });
+    const childTeamIds = childTeams.map(ct => ct.id);
+
+    const playerTeamIds = childTeamIds.length > 0 ? [teamId, ...childTeamIds] : [teamId];
 
     const [players, items, rounds, evaluations, teamCategories] = await Promise.all([
       prisma.player.findMany({
-        where: { teamId },
+        where: { teamId: { in: playerTeamIds } },
         select: { id: true, name: true, number: true, teamCategoryId: true, position: true, joinedAt: true, graduationDate: true },
         orderBy: { number: 'asc' }
       }),
       prisma.evaluationItem.findMany({
-        where: { teamId: { in: teamIds }, isActive: true },
+        where: { teamId: { in: itemTeamIds }, isActive: true },
         include: { parent: true },
         orderBy: { sortOrder: 'asc' }
       }),
       prisma.evaluationRound.findMany({
-        where: { teamId: { in: teamIds }, isActive: true },
+        where: { teamId: { in: itemTeamIds }, isActive: true },
         orderBy: { startDate: 'asc' }
       }),
       prisma.evaluation.findMany({
         where: {
-          player: { teamId },
-          item: { teamId: { in: teamIds } },
+          player: { teamId: { in: playerTeamIds } },
+          item: { teamId: { in: itemTeamIds } },
           raterType: 'COACH'
         },
         select: {
@@ -57,7 +65,7 @@ router.get('/:teamId', authenticate, async (req, res) => {
         }
       }),
       prisma.teamCategory.findMany({
-        where: { teamId },
+        where: { teamId: { in: playerTeamIds } },
         select: { id: true, name: true },
         orderBy: { sortOrder: 'asc' }
       })
