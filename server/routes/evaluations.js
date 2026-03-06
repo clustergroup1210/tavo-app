@@ -804,21 +804,23 @@ router.get('/progress/:playerId', authenticate, async (req, res) => {
           roundId: e.roundId,
           roundName: e.round.name,
           date: e.round.startDate,
-          coach: { total: 0, count: 0, categories: {} },
-          self: { total: 0, count: 0, categories: {} }
+          coach: { total: 0, count: 0, maxTotal: 0, categories: {} },
+          self: { total: 0, count: 0, maxTotal: 0, categories: {} }
         };
       }
       
       const targetType = e.raterType === 'COACH' ? 'coach' : 'self';
       byRound[roundKey][targetType].total += e.score;
       byRound[roundKey][targetType].count += 1;
+      byRound[roundKey][targetType].maxTotal += (e.item.maxScore || 5);
 
       const categoryName = e.item.parent?.name || e.item.name;
       if (!byRound[roundKey][targetType].categories[categoryName]) {
-        byRound[roundKey][targetType].categories[categoryName] = { total: 0, count: 0 };
+        byRound[roundKey][targetType].categories[categoryName] = { total: 0, count: 0, maxTotal: 0 };
       }
       byRound[roundKey][targetType].categories[categoryName].total += e.score;
       byRound[roundKey][targetType].categories[categoryName].count += 1;
+      byRound[roundKey][targetType].categories[categoryName].maxTotal += (e.item.maxScore || 5);
     });
 
     const progressData = Object.values(byRound)
@@ -826,6 +828,8 @@ router.get('/progress/:playerId', authenticate, async (req, res) => {
       .map(r => {
         const coachTotal = r.coach.total;
         const selfTotal = r.self.total;
+        const coachMaxTotal = r.coach.maxTotal;
+        const selfMaxTotal = r.self.maxTotal;
         const coachAvg = r.coach.count > 0 ? (r.coach.total / r.coach.count).toFixed(1) : null;
         const selfAvg = r.self.count > 0 ? (r.self.total / r.self.count).toFixed(1) : null;
         
@@ -840,7 +844,9 @@ router.get('/progress/:playerId', authenticate, async (req, res) => {
           const selfCat = r.self.categories[cat];
           categoryData[cat] = {
             coach: coachCat ? (coachCat.total / coachCat.count).toFixed(1) : null,
-            self: selfCat ? (selfCat.total / selfCat.count).toFixed(1) : null
+            self: selfCat ? (selfCat.total / selfCat.count).toFixed(1) : null,
+            coachTotal: coachCat ? coachCat.total : 0,
+            coachMaxTotal: coachCat ? coachCat.maxTotal : 0
           };
         });
 
@@ -849,6 +855,8 @@ router.get('/progress/:playerId', authenticate, async (req, res) => {
           date: r.date,
           coachTotal: coachTotal > 0 ? coachTotal : null,
           selfTotal: selfTotal > 0 ? selfTotal : null,
+          coachMaxTotal: coachMaxTotal > 0 ? coachMaxTotal : null,
+          selfMaxTotal: selfMaxTotal > 0 ? selfMaxTotal : null,
           coachAvg: coachAvg ? parseFloat(coachAvg) : null,
           selfAvg: selfAvg ? parseFloat(selfAvg) : null,
           gap: coachAvg && selfAvg ? parseFloat((coachAvg - selfAvg).toFixed(1)) : null,
