@@ -27,6 +27,7 @@ const coachAssignmentRoutes = require('./routes/coachAssignments');
 const videoCommentRoutes = require('./routes/videoComments');
 const taskRoutes = require('./routes/tasks');
 const evaluationMatrixRoutes = require('./routes/evaluationMatrix');
+const evaluationTemplateRoutes = require('./routes/evaluationTemplate');
 
 const app = express();
 
@@ -76,6 +77,7 @@ app.use('/api/coach-assignments', coachAssignmentRoutes);
 app.use('/api/video-comments', videoCommentRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/evaluation-matrix', evaluationMatrixRoutes);
+app.use('/api/evaluation-templates', evaluationTemplateRoutes);
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));

@@ -39,6 +39,7 @@ The system emphasizes a team-centric display and robust role-based access contro
     -   **Role Hierarchy**: Numeric levels for permission inheritance (SUPER_ADMIN: 100 → PARENT: 15)
 -   **Team Management**: Profile management, player roster, invitation system for onboarding staff and players.
 -   **Evaluation System**: Hierarchical evaluation items, distinct evaluation rounds, coach and self-evaluations with historical data preservation, and comprehensive visualization using Recharts (progress charts, heatmaps).
+-   **Evaluation Template System**: VEDIALO CF serves as a template club with 41 standard evaluation items (6 categories: 個人技術, 戦術理解, フィジカル, メンタル, 守備, GK技術). Teams can import templates via `/api/evaluation-templates/apply`, toggle items active/inactive via `/api/evaluation-templates/items/:id/toggle`. UI at `/evaluations/items`. `originalItemId` field tracks template origin.
 -   **Evaluation Matrix** (`/evaluations/matrix`): Player-by-time heatmap table showing all players' evaluation scores across rounds/months. Horizontal scrollable table with sticky left columns (number, name, category). Heatmap coloring based on achievement rate. API: `/api/evaluation-matrix/:teamId`. Parent teams automatically include players from all child teams.
 -   **Player Management**: Detailed player profiles with personal information, JFA Passport photo upload, role model/play style fields, and coach notes.
 -   **Goal Management**: Customizable goal categories for teams, player-settable goals, and goal tracking.

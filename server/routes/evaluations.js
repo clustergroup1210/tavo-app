@@ -113,7 +113,7 @@ router.get('/', authenticate, async (req, res) => {
 
 router.get('/items', authenticate, async (req, res) => {
   try {
-    const { teamId, position } = req.query;
+    const { teamId, position, includeInactive } = req.query;
     
     const team = await prisma.team.findUnique({
       where: { id: teamId },
@@ -125,8 +125,13 @@ router.get('/items', authenticate, async (req, res) => {
       teamIds.push(team.parentId);
     }
     
+    const where = { teamId: { in: teamIds } };
+    if (includeInactive !== 'true') {
+      where.isActive = true;
+    }
+
     const items = await prisma.evaluationItem.findMany({
-      where: { teamId: { in: teamIds }, isActive: true },
+      where,
       orderBy: { sortOrder: 'asc' }
     });
 

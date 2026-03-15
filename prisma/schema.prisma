@@ -262,6 +262,7 @@ model EvaluationItem {
   maxScore        Int      @default(5)
   sortOrder       Int      @default(0)
   isActive        Boolean  @default(true)
+  originalItemId  String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
