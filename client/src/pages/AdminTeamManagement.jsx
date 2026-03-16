@@ -155,23 +155,24 @@ export default function AdminTeamManagement() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">チーム管理</h1>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">チーム管理</h1>
           <p className="mt-1 text-sm text-gray-500">全チームの管理と監視</p>
         </div>
         <button 
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm sm:text-base whitespace-nowrap shrink-0"
         >
           <Plus className="w-4 h-4" />
-          新規チーム作成
+          <span className="hidden sm:inline">新規チーム作成</span>
+          <span className="sm:hidden">新規</span>
         </button>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
+        <div className="p-4 sm:p-6 border-b border-gray-200">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h2 className="text-lg font-semibold text-gray-900">チーム一覧</h2>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -180,13 +181,13 @@ export default function AdminTeamManagement() {
                 placeholder="チームを検索..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full sm:w-auto pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
@@ -293,6 +294,60 @@ export default function AdminTeamManagement() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="md:hidden divide-y divide-gray-200">
+          {filteredTeams.length > 0 ? (
+            filteredTeams.map((team) => (
+              <div key={team.id} className="p-4">
+                <div className="flex items-start gap-3">
+                  {team.logoUrl ? (
+                    <img src={team.logoUrl} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                      <Building2 className="w-5 h-5 text-gray-400" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 truncate">{team.name}</p>
+                    <p className="text-xs text-gray-500">{team.organization?.name}</p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
+                      <span>選手: {team.playerCount || 0}人</span>
+                      <span>カテゴリー: {team.categoryCount || 0}</span>
+                      <span>{new Date(team.createdAt).toLocaleDateString('ja-JP')}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-3 pl-[52px]">
+                  <button
+                    onClick={() => handleViewTeamDashboard(team.id)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 text-xs font-medium"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    管理画面
+                  </button>
+                  <button
+                    onClick={() => handleEditClick(team)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 text-xs font-medium"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    編集
+                  </button>
+                  <button
+                    onClick={() => handleDeleteClick(team)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-xs font-medium"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    削除
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="px-4 py-12 text-center text-gray-500">
+              チームが見つかりません
+            </div>
+          )}
         </div>
       </div>
 

@@ -301,26 +301,28 @@ export default function Sidebar({ isOpen, onClose }) {
         )}
       </div>
 
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {menuItems.main.map((item) => (
-          <NavLink key={item.path} item={item} />
-        ))}
-      </nav>
+      <div className="flex-1 overflow-y-auto">
+        <nav className="p-4 space-y-1">
+          {menuItems.main.map((item) => (
+            <NavLink key={item.path} item={item} />
+          ))}
+        </nav>
 
-      {menuItems.admin.length > 0 && (
-        <div className="p-4 border-t border-gray-200">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 px-4">
-            管理
-          </p>
-          <div className="space-y-1">
-            {menuItems.admin.map((item) => (
-              <NavLink key={item.path} item={item} />
-            ))}
+        {menuItems.admin.length > 0 && (
+          <div className="px-4 pb-4 pt-2 border-t border-gray-200">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 px-4">
+              管理
+            </p>
+            <div className="space-y-1">
+              {menuItems.admin.map((item) => (
+                <NavLink key={item.path} item={item} />
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-gray-200 shrink-0">
         <Link
           to="/notification-settings"
           className={clsx(
