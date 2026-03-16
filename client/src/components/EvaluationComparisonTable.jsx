@@ -36,15 +36,15 @@ const getGapBadge = (gap) => {
 const ScoreCell = ({ score }) => {
   if (score === null || score === undefined) {
     return (
-      <td className="px-4 py-3 text-center">
+      <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
         <span className="text-gray-400">-</span>
       </td>
     );
   }
   const colorClass = scoreHeatmapColors[score] || 'bg-gray-100 text-gray-700';
   return (
-    <td className="px-4 py-3 text-center">
-      <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg font-semibold ${colorClass}`}>
+    <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+      <span className={`inline-flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg font-semibold text-sm ${colorClass}`}>
         {score}
       </span>
     </td>
@@ -84,24 +84,24 @@ export default function EvaluationComparisonTable({ data, loading, hasData = tru
   }, {});
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto -mx-2 sm:mx-0">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               大項目
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               評価項目
             </th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-              指導者評価
+            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+              指導者
             </th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-              自己評価
+            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+              自己
             </th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-              ギャップ
+            <th className="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+              差
             </th>
           </tr>
         </thead>
@@ -113,20 +113,20 @@ export default function EvaluationComparisonTable({ data, loading, hasData = tru
                   {idx === 0 && (
                     <td
                       rowSpan={items.length}
-                      className="px-4 py-3 text-sm font-medium text-gray-900 bg-gray-50 border-r border-gray-100 align-top"
+                      className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium text-gray-900 bg-gray-50 border-r border-gray-100 align-top"
                     >
                       {category}
                     </td>
                   )}
-                  <td className="px-4 py-3 text-sm text-gray-700">
+                  <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-700">
                     {item.subCategory ? (
-                      <span className="text-gray-400 text-xs mr-1">{item.subCategory} /</span>
+                      <span className="text-gray-400 text-[10px] sm:text-xs mr-1">{item.subCategory} /</span>
                     ) : null}
                     {item.itemName}
                   </td>
                   <ScoreCell score={item.coachScore} />
                   <ScoreCell score={item.selfScore} />
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                     {getGapBadge(item.gap)}
                   </td>
                 </tr>

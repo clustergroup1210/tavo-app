@@ -111,23 +111,23 @@ export default function Ranking() {
         <p className="mt-1 text-sm text-gray-500">累積達成率によるチーム内ランキング</p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex gap-2 mb-6 border-b border-gray-200">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 sm:p-6">
+        <div className="flex gap-1 sm:gap-2 mb-6 border-b border-gray-200 overflow-x-auto scrollbar-hide">
           <button
             onClick={() => { setActiveTab('total'); setSelectedTeamCategory(''); setSelectedPosition(''); }}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
               activeTab === 'total'
                 ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             <TrendingUp className="w-4 h-4 inline-block mr-1" />
-            総合ランキング
+            総合
           </button>
           {teamCategories.length > 0 && (
             <button
               onClick={() => { setActiveTab('category'); setSelectedPosition(''); }}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
                 activeTab === 'category'
                   ? 'border-primary-600 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -139,7 +139,7 @@ export default function Ranking() {
           )}
           <button
             onClick={() => { setActiveTab('position'); setSelectedTeamCategory(''); }}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
               activeTab === 'position'
                 ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -242,107 +242,161 @@ export default function Ranking() {
             <p className="mt-2 text-sm text-gray-500">読み込み中...</p>
           </div>
         ) : sortedRanking.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-2 font-medium text-gray-600 w-16">順位</th>
-                  <th className="text-left py-3 px-2 font-medium text-gray-600">選手</th>
-                  <th className="text-left py-3 px-2 font-medium text-gray-600 w-20">ポジション</th>
-                  <th
-                    className={`text-left py-3 px-2 font-medium w-56 cursor-pointer hover:bg-gray-50 select-none ${sortBy === 'total' ? 'text-primary-600' : 'text-gray-600'}`}
-                    onClick={() => setSortBy('total')}
-                  >
-                    総合達成率{sortBy === 'total' ? ' ▼' : ''}
-                  </th>
-                  {categories.map((cat) => (
+          <>
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-3 px-2 font-medium text-gray-600 w-16">順位</th>
+                    <th className="text-left py-3 px-2 font-medium text-gray-600">選手</th>
+                    <th className="text-left py-3 px-2 font-medium text-gray-600 w-20">ポジション</th>
                     <th
-                      key={cat.id}
-                      className={`text-center py-3 px-2 font-medium w-20 cursor-pointer hover:bg-gray-50 select-none ${sortBy === cat.id ? 'text-primary-600' : 'text-gray-600'}`}
-                      onClick={() => setSortBy(cat.id)}
+                      className={`text-left py-3 px-2 font-medium w-56 cursor-pointer hover:bg-gray-50 select-none ${sortBy === 'total' ? 'text-primary-600' : 'text-gray-600'}`}
+                      onClick={() => setSortBy('total')}
                     >
-                      {cat.name}{sortBy === cat.id ? ' ▼' : ''}
+                      総合達成率{sortBy === 'total' ? ' ▼' : ''}
                     </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sortedRanking.map((item) => {
-                  const displayRate = sortBy === 'total'
-                    ? item.achievementRate
-                    : (item.categoryRates?.[sortBy]?.rate ?? null);
-                  const hasRate = displayRate !== null;
+                    {categories.map((cat) => (
+                      <th
+                        key={cat.id}
+                        className={`text-center py-3 px-2 font-medium w-20 cursor-pointer hover:bg-gray-50 select-none ${sortBy === cat.id ? 'text-primary-600' : 'text-gray-600'}`}
+                        onClick={() => setSortBy(cat.id)}
+                      >
+                        {cat.name}{sortBy === cat.id ? ' ▼' : ''}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedRanking.map((item) => {
+                    const displayRate = sortBy === 'total'
+                      ? item.achievementRate
+                      : (item.categoryRates?.[sortBy]?.rate ?? null);
+                    const hasRate = displayRate !== null;
 
-                  return (
-                    <tr key={item.player.id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/players/${item.player.id}`)}>
-                      <td className="py-3 px-2">
-                        {getRankBadge(item.rank)}
-                      </td>
-                      <td className="py-3 px-2">
-                        <div className="flex items-center gap-3">
-                          {item.player.photoUrl ? (
-                            <img
-                              src={item.player.photoUrl}
-                              alt={item.player.name}
-                              className="w-10 h-10 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
-                              <span className="text-primary-600 font-semibold text-sm">
-                                {item.player.number || item.player.name?.charAt(0)}
+                    return (
+                      <tr key={item.player.id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/players/${item.player.id}`)}>
+                        <td className="py-3 px-2">
+                          {getRankBadge(item.rank)}
+                        </td>
+                        <td className="py-3 px-2">
+                          <div className="flex items-center gap-3">
+                            {item.player.photoUrl ? (
+                              <img
+                                src={item.player.photoUrl}
+                                alt={item.player.name}
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
+                                <span className="text-primary-600 font-semibold text-sm">
+                                  {item.player.number || item.player.name?.charAt(0)}
+                                </span>
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-medium text-gray-900">{item.player.name}</p>
+                              {item.player.number && (
+                                <p className="text-xs text-gray-500">#{item.player.number}</p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-2">
+                          {item.player.position && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                              {item.player.position}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-2">
+                          {hasRate ? (
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full bg-gradient-to-r ${getRateBarColor(displayRate)} rounded-full transition-all duration-500`}
+                                  style={{ width: `${Math.min(displayRate, 100)}%` }}
+                                />
+                              </div>
+                              <span className={`text-sm font-bold w-16 text-right ${getRateColor(displayRate)}`}>
+                                {displayRate}%
                               </span>
                             </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">期間未登録</span>
                           )}
-                          <div>
-                            <p className="font-medium text-gray-900">{item.player.name}</p>
-                            {item.player.number && (
-                              <p className="text-xs text-gray-500">#{item.player.number}</p>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-2">
-                        {item.player.position && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
-                            {item.player.position}
+                        </td>
+                        {categories.map((cat) => {
+                          const catRate = item.categoryRates?.[cat.id];
+                          const isActive = sortBy === cat.id;
+                          const catHasRate = catRate?.rate !== null && catRate?.rate !== undefined;
+                          return (
+                            <td key={cat.id} className={`py-3 px-2 text-center ${isActive ? 'bg-primary-50' : ''}`}>
+                              <span className={`text-sm font-medium ${catHasRate ? getRateColor(catRate.rate) : 'text-gray-400'}`}>
+                                {catHasRate ? `${catRate.rate}%` : '-'}
+                              </span>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="md:hidden divide-y divide-gray-100">
+              {sortedRanking.map((item) => {
+                const displayRate = sortBy === 'total'
+                  ? item.achievementRate
+                  : (item.categoryRates?.[sortBy]?.rate ?? null);
+                const hasRate = displayRate !== null;
+
+                return (
+                  <div key={item.player.id} className="py-3 cursor-pointer active:bg-gray-50" onClick={() => navigate(`/players/${item.player.id}`)}>
+                    <div className="flex items-center gap-3">
+                      {getRankBadge(item.rank)}
+                      {item.player.photoUrl ? (
+                        <img src={item.player.photoUrl} alt={item.player.name} className="w-10 h-10 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
+                          <span className="text-primary-600 font-semibold text-sm">
+                            {item.player.number || item.player.name?.charAt(0)}
                           </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-2">
-                        {hasRate ? (
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full bg-gradient-to-r ${getRateBarColor(displayRate)} rounded-full transition-all duration-500`}
-                                style={{ width: `${Math.min(displayRate, 100)}%` }}
-                              />
-                            </div>
-                            <span className={`text-sm font-bold w-16 text-right ${getRateColor(displayRate)}`}>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium text-gray-900 truncate">{item.player.name}</p>
+                          {hasRate && (
+                            <span className={`text-sm font-bold ml-2 ${getRateColor(displayRate)}`}>
                               {displayRate}%
                             </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          {item.player.number && (
+                            <span className="text-xs text-gray-500">#{item.player.number}</span>
+                          )}
+                          {item.player.position && (
+                            <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-700">{item.player.position}</span>
+                          )}
+                        </div>
+                        {hasRate && (
+                          <div className="mt-1.5 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full bg-gradient-to-r ${getRateBarColor(displayRate)} rounded-full`}
+                              style={{ width: `${Math.min(displayRate, 100)}%` }}
+                            />
                           </div>
-                        ) : (
-                          <span className="text-xs text-gray-400">期間未登録</span>
                         )}
-                      </td>
-                      {categories.map((cat) => {
-                        const catRate = item.categoryRates?.[cat.id];
-                        const isActive = sortBy === cat.id;
-                        const catHasRate = catRate?.rate !== null && catRate?.rate !== undefined;
-                        return (
-                          <td key={cat.id} className={`py-3 px-2 text-center ${isActive ? 'bg-primary-50' : ''}`}>
-                            <span className={`text-sm font-medium ${catHasRate ? getRateColor(catRate.rate) : 'text-gray-400'}`}>
-                              {catHasRate ? `${catRate.rate}%` : '-'}
-                            </span>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         ) : (
           <div className="text-center py-12">
             <Trophy className="w-12 h-12 text-gray-300 mx-auto mb-3" />

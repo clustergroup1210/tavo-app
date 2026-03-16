@@ -149,93 +149,151 @@ export default function Invitations() {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                役割
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                対象
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                有効期限
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                状態
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                操作
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {invitations.length === 0 ? (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                  招待URLがありません
-                </td>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  役割
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  対象
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  有効期限
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  状態
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  操作
+                </th>
               </tr>
-            ) : (
-              invitations.map((invite) => (
-                <tr key={invite.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="inline-flex items-center gap-2">
-                      {invite.role === 'PLAYER' ? (
-                        <User className="w-4 h-4 text-blue-500" />
-                      ) : invite.role === 'PARENT' ? (
-                        <Users className="w-4 h-4 text-purple-500" />
-                      ) : (
-                        <Link2 className="w-4 h-4 text-gray-400" />
-                      )}
-                      <span className="text-sm font-medium text-gray-900">{roleLabels[invite.role]}</span>
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {invite.playerName || invite.player?.name || invite.email || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(invite.expiresAt).toLocaleDateString('ja-JP')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                        invite.isUsed
-                          ? 'bg-green-100 text-green-700'
-                          : invite.isExpired
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-blue-100 text-blue-700'
-                      }`}
-                    >
-                      {invite.isUsed ? '使用済み' : invite.isExpired ? '期限切れ' : '有効'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {!invite.isUsed && !invite.isExpired && (
-                        <button
-                          onClick={() => copyUrl(invite.token)}
-                          className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-                          title="URLをコピー"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleDelete(invite.id)}
-                        className="p-2 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50"
-                        title="削除"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {invitations.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                    招待URLがありません
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                invitations.map((invite) => (
+                  <tr key={invite.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-2">
+                        {invite.role === 'PLAYER' ? (
+                          <User className="w-4 h-4 text-blue-500" />
+                        ) : invite.role === 'PARENT' ? (
+                          <Users className="w-4 h-4 text-purple-500" />
+                        ) : (
+                          <Link2 className="w-4 h-4 text-gray-400" />
+                        )}
+                        <span className="text-sm font-medium text-gray-900">{roleLabels[invite.role]}</span>
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {invite.playerName || invite.player?.name || invite.email || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(invite.expiresAt).toLocaleDateString('ja-JP')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                          invite.isUsed
+                            ? 'bg-green-100 text-green-700'
+                            : invite.isExpired
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-blue-100 text-blue-700'
+                        }`}
+                      >
+                        {invite.isUsed ? '使用済み' : invite.isExpired ? '期限切れ' : '有効'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {!invite.isUsed && !invite.isExpired && (
+                          <button
+                            onClick={() => copyUrl(invite.token)}
+                            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                            title="URLをコピー"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(invite.id)}
+                          className="p-2 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+                          title="削除"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="sm:hidden divide-y divide-gray-200">
+          {invitations.length === 0 ? (
+            <div className="px-4 py-12 text-center text-gray-500">
+              招待URLがありません
+            </div>
+          ) : (
+            invitations.map((invite) => (
+              <div key={invite.id} className="p-4">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-2">
+                    {invite.role === 'PLAYER' ? (
+                      <User className="w-4 h-4 text-blue-500" />
+                    ) : invite.role === 'PARENT' ? (
+                      <Users className="w-4 h-4 text-purple-500" />
+                    ) : (
+                      <Link2 className="w-4 h-4 text-gray-400" />
+                    )}
+                    <span className="text-sm font-medium text-gray-900">{roleLabels[invite.role]}</span>
+                  </span>
+                  <span
+                    className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                      invite.isUsed
+                        ? 'bg-green-100 text-green-700'
+                        : invite.isExpired
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-blue-100 text-blue-700'
+                    }`}
+                  >
+                    {invite.isUsed ? '使用済み' : invite.isExpired ? '期限切れ' : '有効'}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-sm text-gray-500">
+                  <span>{invite.playerName || invite.player?.name || invite.email || '-'}</span>
+                  <span>{new Date(invite.expiresAt).toLocaleDateString('ja-JP')}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-end gap-2">
+                  {!invite.isUsed && !invite.isExpired && (
+                    <button
+                      onClick={() => copyUrl(invite.token)}
+                      className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDelete(invite.id)}
+                    className="p-2 text-red-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       {showModal && (

@@ -120,7 +120,7 @@ export default function JoinRequests() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
@@ -222,6 +222,64 @@ export default function JoinRequests() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="md:hidden divide-y divide-gray-200">
+          {requests.length > 0 ? (
+            requests.map((request) => {
+              const statusBadge = getStatusBadge(request.status);
+              const StatusIcon = statusBadge.icon;
+              return (
+                <div key={request.id} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-medium text-primary-700">
+                          {request.user?.name?.charAt(0) || 'U'}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{request.user?.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{request.user?.email}</p>
+                      </div>
+                    </div>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full flex-shrink-0 ${statusBadge.color}`}>
+                      <StatusIcon className="w-3 h-3" />
+                      {statusBadge.label}
+                    </span>
+                  </div>
+                  <div className="mt-2 pl-[52px] text-sm text-gray-600">
+                    <p>選手名: {request.playerName}</p>
+                    {request.message && <p className="text-xs text-gray-500 mt-1 truncate">{request.message}</p>}
+                    <p className="text-xs text-gray-400 mt-1">{new Date(request.createdAt).toLocaleDateString('ja-JP')}</p>
+                  </div>
+                  {request.status === 'pending' && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <button
+                        onClick={() => handleApprove(request.id)}
+                        disabled={processing === request.id}
+                        className="flex-1 py-1.5 text-sm text-green-700 bg-green-50 hover:bg-green-100 rounded-lg disabled:opacity-50"
+                      >
+                        承認
+                      </button>
+                      <button
+                        onClick={() => handleReject(request.id)}
+                        disabled={processing === request.id}
+                        className="flex-1 py-1.5 text-sm text-red-700 bg-red-50 hover:bg-red-100 rounded-lg disabled:opacity-50"
+                      >
+                        却下
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <div className="px-4 py-12 text-center text-gray-500">
+              <UserPlus className="w-12 h-12 mx-auto text-gray-300 mb-4" />
+              <p>{filter === 'pending' ? '審査中の申請はありません' : '申請が見つかりません'}</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

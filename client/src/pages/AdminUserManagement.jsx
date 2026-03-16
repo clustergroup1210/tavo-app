@@ -364,25 +364,27 @@ export default function AdminUserManagement() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">ユーザー管理</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">ユーザー管理</h1>
           <p className="mt-1 text-sm text-gray-500">全システムユーザーと招待URLの管理</p>
         </div>
         <div className="flex gap-2">
           <button 
             onClick={() => setShowInviteModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
           >
             <Link2 className="w-4 h-4" />
-            招待URL発行
+            <span className="hidden sm:inline">招待URL発行</span>
+            <span className="sm:hidden">招待</span>
           </button>
           <button 
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm"
           >
             <UserPlus className="w-4 h-4" />
-            ユーザー追加
+            <span className="hidden sm:inline">ユーザー追加</span>
+            <span className="sm:hidden">追加</span>
           </button>
         </div>
       </div>
@@ -414,10 +416,10 @@ export default function AdminUserManagement() {
 
       {activeTab === 'users' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center justify-between">
+          <div className="p-4 sm:p-6 border-b border-gray-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-gray-900">ユーザー一覧</h2>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                 <select
                   value={teamFilter}
                   onChange={(e) => setTeamFilter(e.target.value)}
@@ -435,14 +437,14 @@ export default function AdminUserManagement() {
                     placeholder="ユーザーを検索..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   />
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
@@ -540,6 +542,56 @@ export default function AdminUserManagement() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div className="md:hidden divide-y divide-gray-200">
+            {filteredUsers.length > 0 ? (
+              filteredUsers.map((user) => {
+                const roleBadge = getRoleBadge(user);
+                return (
+                  <div key={user.id} className="p-4 hover:bg-gray-50">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                          <span className="text-sm font-medium text-primary-700">
+                            {user.name?.charAt(0) || 'U'}
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-900 truncate">{user.name}</p>
+                          <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => handleEditUser(user)}
+                        className="p-2 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-gray-100 flex-shrink-0"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 pl-[52px]">
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${roleBadge.color}`}>
+                        {roleBadge.label}
+                      </span>
+                      {user.teams?.map((ut) => (
+                        <span key={ut.teamId} className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded">
+                          {ut.team?.name || ut.teamId}
+                        </span>
+                      ))}
+                      {user.players?.map((player) => (
+                        <span key={player.id} className="px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded">
+                          {player.team?.name || '-'}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="px-4 py-12 text-center text-gray-500">
+                ユーザーが見つかりません
+              </div>
+            )}
           </div>
         </div>
       )}

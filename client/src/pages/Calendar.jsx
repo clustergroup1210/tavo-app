@@ -311,12 +311,12 @@ export default function Calendar() {
               <div
                 key={index}
                 onClick={() => handleDateClick(date)}
-                className={`min-h-24 p-1 border-b border-r border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors
+                className={`min-h-16 sm:min-h-24 p-0.5 sm:p-1 border-b border-r border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors
                   ${!isCurrentMonth ? 'bg-gray-50' : ''}
                   ${isSelected ? 'bg-primary-50 ring-2 ring-primary-500 ring-inset' : ''}
                 `}
               >
-                <div className={`text-sm font-medium mb-1 w-7 h-7 flex items-center justify-center rounded-full
+                <div className={`text-xs sm:text-sm font-medium mb-0.5 sm:mb-1 w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded-full
                   ${isToday ? 'bg-primary-600 text-white' : ''}
                   ${!isToday && dayOfWeek === 0 ? 'text-red-500' : ''}
                   ${!isToday && dayOfWeek === 6 ? 'text-blue-500' : ''}
@@ -324,17 +324,20 @@ export default function Calendar() {
                 `}>
                   {date.getDate()}
                 </div>
-                <div className="space-y-1">
-                  {dayEvents.slice(0, 2).map(event => (
+                <div className="space-y-0.5 sm:space-y-1">
+                  {dayEvents.slice(0, 2).map((event, evIdx) => (
                     <div
                       key={event.id}
-                      className={`text-xs px-1.5 py-0.5 rounded truncate text-white ${eventTypeColors[event.eventType] || 'bg-blue-500'}`}
+                      className={`text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5 rounded truncate text-white ${eventTypeColors[event.eventType] || 'bg-blue-500'} ${evIdx >= 1 ? 'hidden sm:block' : ''}`}
                     >
                       {event.title}
                     </div>
                   ))}
+                  {dayEvents.length > 1 && (
+                    <div className="text-[10px] text-gray-500 px-1 sm:hidden">+{dayEvents.length - 1}</div>
+                  )}
                   {dayEvents.length > 2 && (
-                    <div className="text-xs text-gray-500 px-1">+{dayEvents.length - 2}件</div>
+                    <div className="text-xs text-gray-500 px-1 hidden sm:block">+{dayEvents.length - 2}件</div>
                   )}
                 </div>
               </div>

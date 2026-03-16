@@ -843,22 +843,23 @@ export default function PlayerDetail() {
         </div>
       </div>
 
-      <div className="border-b border-gray-200">
-        <nav className="flex gap-6 overflow-x-auto">
+      <div className="border-b border-gray-200 -mx-4 px-4 lg:-mx-8 lg:px-8">
+        <nav className="flex gap-1 sm:gap-6 overflow-x-auto scrollbar-hide -mb-px">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 py-3 border-b-2 text-sm font-medium whitespace-nowrap transition-colors ${
+                className={`flex items-center gap-1.5 sm:gap-2 py-3 px-2 sm:px-0 border-b-2 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
                   activeTab === tab.id
                     ? 'border-primary-600 text-primary-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
                 <Icon className="w-4 h-4" />
-                {tab.label}
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="sm:hidden">{tab.label.length > 4 ? tab.label.substring(0, 4) : tab.label}</span>
               </button>
             );
           })}
