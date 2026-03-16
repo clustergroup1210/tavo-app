@@ -167,7 +167,7 @@ export default function EvaluationMatrixTable() {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 min-w-0">
       <div className="p-3 border-b border-gray-200 space-y-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h3 className="text-sm font-semibold text-gray-900">選手別評価マトリクス（累積）</h3>

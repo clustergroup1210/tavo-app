@@ -19,7 +19,7 @@ export default function Layout({ children }) {
 
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="flex-1 lg:ml-64 flex flex-col">
+      <div className="flex-1 lg:ml-64 flex flex-col min-w-0 overflow-x-hidden">
         <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
           <button
             onClick={() => setSidebarOpen(true)}
@@ -38,7 +38,7 @@ export default function Layout({ children }) {
             </div>
           </div>
         </header>
-        <main className="flex-1 p-4 lg:p-8">
+        <main className="flex-1 p-4 lg:p-8 min-w-0">
           {children}
         </main>
       </div>
