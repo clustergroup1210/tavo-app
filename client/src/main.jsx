@@ -5,6 +5,21 @@ import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
 import './index.css';
 
+const originalFetch = window.fetch;
+window.fetch = function(url, options = {}) {
+  if (typeof url === 'string' && url.startsWith('/api/')) {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      options = { ...options };
+      options.headers = {
+        ...(options.headers || {}),
+        'Authorization': `Bearer ${token}`,
+      };
+    }
+  }
+  return originalFetch.call(this, url, options);
+};
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>

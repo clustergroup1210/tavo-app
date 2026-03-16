@@ -30,6 +30,7 @@ const evaluationMatrixRoutes = require('./routes/evaluationMatrix');
 const evaluationTemplateRoutes = require('./routes/evaluationTemplate');
 
 const app = express();
+app.set('trust proxy', 1);
 
 const isProduction = process.env.NODE_ENV === 'production';
 app.use(helmet({

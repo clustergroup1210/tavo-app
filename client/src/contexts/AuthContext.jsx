@@ -44,6 +44,8 @@ export function AuthProvider({ children }) {
             }
           }
         }
+      } else {
+        localStorage.removeItem('auth_token');
       }
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -66,6 +68,9 @@ export function AuthProvider({ children }) {
     }
 
     const data = await res.json();
+    if (data.token) {
+      localStorage.setItem('auth_token', data.token);
+    }
     setUser(data.user);
     setRoles(data.roles);
     await checkAuth();
@@ -86,6 +91,9 @@ export function AuthProvider({ children }) {
     }
 
     const data = await res.json();
+    if (data.token) {
+      localStorage.setItem('auth_token', data.token);
+    }
     setUser(data.user);
     await checkAuth();
     return data;
@@ -93,6 +101,7 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    localStorage.removeItem('auth_token');
     setUser(null);
     setRoles(null);
     setTeams([]);
