@@ -266,11 +266,11 @@ export default function MyPage() {
         </div>
       )}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="bg-gradient-to-r from-primary-500 to-primary-600 p-6">
-          <div className="flex items-start gap-6">
-            <div className="flex gap-4">
+        <div className="bg-gradient-to-r from-primary-500 to-primary-600 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-6">
+            <div className="flex items-center gap-3 sm:gap-4">
               <div className="relative group flex flex-col items-center">
-                <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-white/20 flex items-center justify-center border-4 border-white/30 shadow-xl overflow-hidden">
+                <div className="w-20 h-20 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-2xl bg-white/20 flex items-center justify-center border-3 sm:border-4 border-white/30 shadow-xl overflow-hidden">
                   {playerData.photoUrl ? (
                     <img
                       src={playerData.photoUrl}
@@ -278,13 +278,13 @@ export default function MyPage() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <UserCircle className="w-20 h-20 text-white/60" />
+                    <UserCircle className="w-10 h-10 sm:w-20 sm:h-20 text-white/60" />
                   )}
                 </div>
-                <span className="mt-1 text-xs text-white/80">プロフィール</span>
+                <span className="mt-1 text-[10px] sm:text-xs text-white/80">プロフィール</span>
                 {!isParentView && (
-                  <label className="absolute bottom-5 -right-1 p-1.5 bg-white rounded-full shadow-lg cursor-pointer hover:bg-gray-100 transition-colors">
-                    <Upload className="w-3.5 h-3.5 text-primary-600" />
+                  <label className="absolute bottom-5 -right-1 p-1 sm:p-1.5 bg-white rounded-full shadow-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                    <Upload className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary-600" />
                     <input
                       ref={photoInputRef}
                       type="file"
@@ -297,7 +297,7 @@ export default function MyPage() {
               </div>
               
               <div className="relative group flex flex-col items-center">
-                <div className="w-16 h-20 md:w-20 md:h-24 rounded-lg bg-white/20 flex items-center justify-center border-2 border-white/30 shadow-lg overflow-hidden">
+                <div className="w-12 h-16 sm:w-16 sm:h-20 md:w-20 md:h-24 rounded-lg bg-white/20 flex items-center justify-center border-2 border-white/30 shadow-lg overflow-hidden">
                   {playerData.passportUrl ? (
                     <img
                       src={playerData.passportUrl}
@@ -305,13 +305,13 @@ export default function MyPage() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <Camera className="w-6 h-6 text-white/60" />
+                    <Camera className="w-5 h-5 sm:w-6 sm:h-6 text-white/60" />
                   )}
                 </div>
-                <span className="mt-1 text-xs text-white/80">選手証</span>
+                <span className="mt-1 text-[10px] sm:text-xs text-white/80">選手証</span>
                 {!isParentView && (
-                  <label className="absolute bottom-5 -right-1 p-1.5 bg-white rounded-full shadow-lg cursor-pointer hover:bg-gray-100 transition-colors">
-                    <Upload className="w-3.5 h-3.5 text-primary-600" />
+                  <label className="absolute bottom-5 -right-1 p-1 sm:p-1.5 bg-white rounded-full shadow-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                    <Upload className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary-600" />
                     <input
                       ref={passportInputRef}
                       type="file"
@@ -322,23 +322,33 @@ export default function MyPage() {
                   </label>
                 )}
               </div>
+
+              <div className="flex-1 text-white sm:hidden min-w-0">
+                <div className="flex items-baseline gap-2 mb-1">
+                  <span className="text-2xl font-bold">No.{playerData.number || '-'}</span>
+                </div>
+                <h1 className="text-xl font-bold truncate">{playerData.name}</h1>
+                {playerData.nameRomaji && (
+                  <p className="text-primary-100 text-xs mt-0.5 truncate">{playerData.nameRomaji}</p>
+                )}
+              </div>
             </div>
 
-            <div className="flex-1 text-white">
+            <div className="hidden sm:flex flex-1 text-white flex-col min-w-0">
               <div className="flex items-center gap-4 mb-2">
-                <span className="text-4xl font-bold">No.{playerData.number || '-'}</span>
-                <h1 className="text-3xl font-bold">{playerData.name}</h1>
+                <span className="text-3xl md:text-4xl font-bold">No.{playerData.number || '-'}</span>
+                <h1 className="text-2xl md:text-3xl font-bold truncate">{playerData.name}</h1>
               </div>
               {playerData.nameRomaji && (
                 <p className="text-primary-100 mb-3">{playerData.nameRomaji}</p>
               )}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 {playerData.position && (
                   <span className="px-3 py-1 bg-primary-400/30 rounded-full text-sm font-medium">
                     {playerData.position}
                   </span>
                 )}
-                <span className="px-3 py-1 bg-white/20 rounded-full text-sm">
+                <span className="px-3 py-1 bg-white/20 rounded-full text-sm truncate">
                   {playerData.team?.parent?.name ? `${playerData.team.parent.name} / ${playerData.team.name}` : playerData.team?.name}
                 </span>
               </div>
@@ -347,99 +357,121 @@ export default function MyPage() {
             {!isParentView && (
               <button
                 onClick={() => setEditing(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors shrink-0"
               >
                 <Edit2 className="w-4 h-4" />
                 編集
               </button>
             )}
           </div>
+
+          <div className="sm:hidden mt-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              {playerData.position && (
+                <span className="px-2.5 py-0.5 bg-primary-400/30 rounded-full text-xs font-medium text-white">
+                  {playerData.position}
+                </span>
+              )}
+              <span className="px-2.5 py-0.5 bg-white/20 rounded-full text-xs text-white truncate">
+                {playerData.team?.parent?.name ? `${playerData.team.parent.name} / ${playerData.team.name}` : playerData.team?.name}
+              </span>
+            </div>
+            {!isParentView && (
+              <button
+                onClick={() => setEditing(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors text-xs shrink-0"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+                編集
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">基本情報</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <Calendar className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="text-xs text-gray-500">生年月日</p>
-                <p className="text-sm font-medium text-gray-900">{formatDate(playerData.birthDate)}</p>
+        <div className="p-4 sm:p-6">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">基本情報</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-gray-50 rounded-lg">
+              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs text-gray-500">生年月日</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{formatDate(playerData.birthDate)}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <Ruler className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="text-xs text-gray-500">身長</p>
-                <p className="text-sm font-medium text-gray-900">{playerData.height ? `${playerData.height}cm` : '-'}</p>
+            <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-gray-50 rounded-lg">
+              <Ruler className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs text-gray-500">身長</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-900">{playerData.height ? `${playerData.height}cm` : '-'}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <Weight className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="text-xs text-gray-500">体重</p>
-                <p className="text-sm font-medium text-gray-900">{playerData.weight ? `${playerData.weight}kg` : '-'}</p>
+            <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-gray-50 rounded-lg">
+              <Weight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs text-gray-500">体重</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-900">{playerData.weight ? `${playerData.weight}kg` : '-'}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <Footprints className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="text-xs text-gray-500">利き足</p>
-                <p className="text-sm font-medium text-gray-900">{playerData.dominantFoot || '-'}</p>
+            <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-gray-50 rounded-lg">
+              <Footprints className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs text-gray-500">利き足</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-900">{playerData.dominantFoot || '-'}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <MapPin className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="text-xs text-gray-500">出身地</p>
-                <p className="text-sm font-medium text-gray-900">{playerData.hometown || '-'}</p>
+            <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-gray-50 rounded-lg">
+              <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs text-gray-500">出身地</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{playerData.hometown || '-'}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <GraduationCap className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="text-xs text-gray-500">出身校</p>
-                <p className="text-sm font-medium text-gray-900">{playerData.school || '-'}</p>
+            <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-gray-50 rounded-lg">
+              <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs text-gray-500">出身校</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{playerData.school || '-'}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <Users className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="text-xs text-gray-500">前所属チーム</p>
-                <p className="text-sm font-medium text-gray-900">{playerData.previousTeam || '-'}</p>
+            <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-gray-50 rounded-lg">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs text-gray-500">前所属</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{playerData.previousTeam || '-'}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <Star className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="text-xs text-gray-500">目標とする選手</p>
-                <p className="text-sm font-medium text-gray-900">{playerData.roleModel || '-'}</p>
+            <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-gray-50 rounded-lg">
+              <Star className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs text-gray-500">目標選手</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{playerData.roleModel || '-'}</p>
               </div>
             </div>
           </div>
 
-          <div className="mt-4 flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-            <Zap className="w-5 h-5 text-gray-400" />
-            <div className="flex-1">
-              <p className="text-xs text-gray-500">プレースタイル</p>
-              <p className="text-sm font-medium text-gray-900">{playerData.playStyle || '-'}</p>
+          <div className="mt-3 sm:mt-4 flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-gray-50 rounded-lg">
+            <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] sm:text-xs text-gray-500">プレースタイル</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-900">{playerData.playStyle || '-'}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
           <div className="flex items-center gap-2">
-            <Target className="w-5 h-5 text-primary-600" />
-            <h3 className="text-lg font-semibold text-gray-900">目標</h3>
+            <Target className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900">目標</h3>
           </div>
           {goalCategories.length > 0 && !isParentView && (
             <button
               onClick={() => setShowGoalModal(true)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+              className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700"
             >
-              <Plus className="w-4 h-4" />
-              目標を追加
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              追加
             </button>
           )}
         </div>
@@ -509,34 +541,32 @@ export default function MyPage() {
 
       <PlayerMatrix playerId={playerData.id} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Link2 className="w-5 h-5 text-primary-600" />
-            <h3 className="text-lg font-semibold text-gray-900">アピールURL</h3>
-          </div>
-          <button
-            onClick={async () => {
-              try {
-                const res = await fetch('/api/appeals', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  credentials: 'include',
-                  body: JSON.stringify({ playerId: playerData.id, type: 'simple' }),
-                });
-                const data = await res.json();
-                const url = `${window.location.origin}${data.url}`;
-                navigator.clipboard.writeText(url);
-                alert(`URLをコピーしました: ${url}`);
-              } catch (error) {
-                console.error('Failed to create appeal:', error);
-              }
-            }}
-            className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-          >
-            アピールURLを発行
-          </button>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+        <div className="flex items-center gap-2 mb-3 sm:mb-4">
+          <Link2 className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900">アピールURL</h3>
         </div>
+        <button
+          onClick={async () => {
+            try {
+              const res = await fetch('/api/appeals', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ playerId: playerData.id, type: 'simple' }),
+              });
+              const data = await res.json();
+              const url = `${window.location.origin}${data.url}`;
+              navigator.clipboard.writeText(url);
+              alert(`URLをコピーしました: ${url}`);
+            } catch (error) {
+              console.error('Failed to create appeal:', error);
+            }
+          }}
+          className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm sm:text-base"
+        >
+          アピールURLを発行
+        </button>
       </div>
 
       {editing && (

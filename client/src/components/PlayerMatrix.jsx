@@ -62,10 +62,10 @@ export default function PlayerMatrix({ playerId }) {
   const hasPeriod = matrix.period?.joinedAt && matrix.period?.graduationDate;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-      <div className="p-3 border-b border-gray-200 flex items-center justify-between">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 min-w-0">
+      <div className="p-3 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-2">
         <h3 className="text-sm font-semibold text-gray-900">評価マトリクス（累積）</h3>
-        <div className="flex items-center gap-2 text-[10px]">
+        <div className="flex items-center gap-2 text-[10px] flex-wrap">
           <span className="inline-flex items-center gap-0.5"><span className="w-2.5 h-2.5 rounded bg-red-100 border border-red-200"></span>~20%</span>
           <span className="inline-flex items-center gap-0.5"><span className="w-2.5 h-2.5 rounded bg-orange-100 border border-orange-200"></span>~40%</span>
           <span className="inline-flex items-center gap-0.5"><span className="w-2.5 h-2.5 rounded bg-yellow-100 border border-yellow-200"></span>~60%</span>
