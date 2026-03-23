@@ -10,7 +10,8 @@ export default function PlayerList() {
   const [teamCategories, setTeamCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: '', teamCategoryId: '' });
+  const [newPlayer, setNewPlayer] = useState({ name: '', number: '', position: '', teamCategoryId: '', email: '', password: '', createAccount: true });
+  const [createError, setCreateError] = useState('');
 
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
@@ -50,27 +51,47 @@ export default function PlayerList() {
   const handleCreatePlayer = async (e) => {
     e.preventDefault();
     if (!currentTeam) return;
+    setCreateError('');
+
+    if (newPlayer.createAccount && (!newPlayer.email || !newPlayer.password)) {
+      setCreateError('アカウントを作成する場合、メールアドレスとパスワードは必須です');
+      return;
+    }
+    if (newPlayer.createAccount && newPlayer.password && newPlayer.password.length < 6) {
+      setCreateError('パスワードは6文字以上で入力してください');
+      return;
+    }
     
     try {
+      const body = { 
+        name: newPlayer.name,
+        number: newPlayer.number,
+        position: newPlayer.position,
+        teamId: currentTeam.id,
+        teamCategoryId: newPlayer.teamCategoryId || null
+      };
+      if (newPlayer.createAccount && newPlayer.email) {
+        body.email = newPlayer.email;
+        body.password = newPlayer.password;
+      }
+
       const res = await fetch('/api/players', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ 
-          name: newPlayer.name,
-          number: newPlayer.number,
-          position: newPlayer.position,
-          teamId: currentTeam.id,
-          teamCategoryId: newPlayer.teamCategoryId || null
-        }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
-        setNewPlayer({ name: '', number: '', position: '', teamCategoryId: '' });
+        setNewPlayer({ name: '', number: '', position: '', teamCategoryId: '', email: '', password: '', createAccount: true });
         setShowCreateModal(false);
         fetchData();
+      } else {
+        const data = await res.json();
+        setCreateError(data.error || '選手の登録に失敗しました');
       }
     } catch (error) {
       console.error('Failed to create player:', error);
+      setCreateError('選手の登録に失敗しました');
     }
   };
 
@@ -280,17 +301,22 @@ export default function PlayerList() {
       </div>
 
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900">選手登録</h2>
-              <button onClick={() => setShowCreateModal(false)} className="p-1 hover:bg-gray-100 rounded">
+              <button onClick={() => { setShowCreateModal(false); setCreateError(''); }} className="p-1 hover:bg-gray-100 rounded">
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
+            {createError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {createError}
+              </div>
+            )}
             <form onSubmit={handleCreatePlayer} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">名前</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">名前 <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   value={newPlayer.name}
@@ -299,28 +325,30 @@ export default function PlayerList() {
                   required
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">背番号</label>
-                <input
-                  type="text"
-                  value={newPlayer.number}
-                  onChange={(e) => setNewPlayer({ ...newPlayer, number: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">ポジション</label>
-                <select
-                  value={newPlayer.position}
-                  onChange={(e) => setNewPlayer({ ...newPlayer, position: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">選択してください</option>
-                  <option value="GK">GK</option>
-                  <option value="DF">DF</option>
-                  <option value="MF">MF</option>
-                  <option value="FW">FW</option>
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">背番号</label>
+                  <input
+                    type="text"
+                    value={newPlayer.number}
+                    onChange={(e) => setNewPlayer({ ...newPlayer, number: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ポジション</label>
+                  <select
+                    value={newPlayer.position}
+                    onChange={(e) => setNewPlayer({ ...newPlayer, position: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">選択</option>
+                    <option value="GK">GK</option>
+                    <option value="DF">DF</option>
+                    <option value="MF">MF</option>
+                    <option value="FW">FW</option>
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">カテゴリー</label>
@@ -335,10 +363,56 @@ export default function PlayerList() {
                   ))}
                 </select>
               </div>
-              <div className="flex justify-end gap-3">
+
+              <div className="border-t border-gray-200 pt-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newPlayer.createAccount}
+                    onChange={(e) => setNewPlayer({ ...newPlayer, createAccount: e.target.checked })}
+                    className="w-4 h-4 text-primary-600 rounded border-gray-300"
+                  />
+                  <span className="text-sm font-medium text-gray-700">ログインアカウントも同時に作成する</span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1 ml-6">
+                  {newPlayer.createAccount 
+                    ? '選手がシステムにログインできるようになります' 
+                    : 'アカウントなしで選手情報のみ登録します（後から招待URLで作成可能）'}
+                </p>
+              </div>
+
+              {newPlayer.createAccount && (
+                <div className="space-y-3 bg-gray-50 rounded-lg p-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">メールアドレス <span className="text-red-500">*</span></label>
+                    <input
+                      type="email"
+                      value={newPlayer.email}
+                      onChange={(e) => setNewPlayer({ ...newPlayer, email: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      placeholder="player@example.com"
+                      required={newPlayer.createAccount}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">パスワード <span className="text-red-500">*</span></label>
+                    <input
+                      type="password"
+                      value={newPlayer.password}
+                      onChange={(e) => setNewPlayer({ ...newPlayer, password: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      placeholder="6文字以上"
+                      minLength={6}
+                      required={newPlayer.createAccount}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => { setShowCreateModal(false); setCreateError(''); }}
                   className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
                 >
                   キャンセル

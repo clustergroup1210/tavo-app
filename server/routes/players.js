@@ -111,34 +111,69 @@ router.get('/:id', authenticate, async (req, res) => {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { teamId, name, number, position, birthDate, joinedAt, graduationDate, teamCategoryId } = req.body;
+    const { teamId, name, number, position, birthDate, joinedAt, graduationDate, teamCategoryId, email, password } = req.body;
 
     if (!hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH', 'COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    const createAccount = !!(email && email.trim());
+    if (createAccount) {
+      const trimmedEmail = email.trim().toLowerCase();
+      if (!password || password.length < 6) {
+        return res.status(400).json({ error: 'パスワードは6文字以上で入力してください' });
+      }
+      const existing = await prisma.user.findUnique({ where: { email: trimmedEmail } });
+      if (existing) {
+        return res.status(400).json({ error: 'このメールアドレスは既に使用されています' });
+      }
+    }
+
     const playerJoinedAt = joinedAt ? new Date(joinedAt) : new Date();
 
-    const player = await prisma.player.create({
-      data: {
-        teamId,
-        name,
-        number,
-        position,
-        birthDate: birthDate ? new Date(birthDate) : null,
-        joinedAt: playerJoinedAt,
-        graduationDate: graduationDate ? new Date(graduationDate) : null,
-        teamCategoryId: teamCategoryId || null
+    const result = await prisma.$transaction(async (tx) => {
+      let userId = null;
+
+      if (createAccount) {
+        const bcrypt = require('bcryptjs');
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = await tx.user.create({
+          data: { email: email.trim().toLowerCase(), password: hashedPassword, name }
+        });
+        userId = user.id;
+
+        await tx.userTeam.create({
+          data: { userId: user.id, teamId, role: 'PLAYER' }
+        });
       }
+
+      const player = await tx.player.create({
+        data: {
+          teamId,
+          name,
+          number,
+          position,
+          birthDate: birthDate ? new Date(birthDate) : null,
+          joinedAt: playerJoinedAt,
+          graduationDate: graduationDate ? new Date(graduationDate) : null,
+          teamCategoryId: teamCategoryId || null,
+          userId: userId
+        }
+      });
+
+      await tx.playerTeamHistory.create({
+        data: { playerId: player.id, teamId, joinedAt: playerJoinedAt }
+      });
+
+      return player;
     });
 
-    await prisma.playerTeamHistory.create({
-      data: { playerId: player.id, teamId, joinedAt: playerJoinedAt }
-    });
-
-    res.json(player);
+    res.json(result);
   } catch (error) {
     console.error('Create player error:', error);
+    if (error.code === 'P2002' && error.meta?.target?.includes('email')) {
+      return res.status(400).json({ error: 'このメールアドレスは既に使用されています' });
+    }
     res.status(500).json({ error: 'Failed to create player' });
   }
 });
