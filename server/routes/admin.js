@@ -118,7 +118,23 @@ router.put('/teams/:id', authenticate, requireOperator, async (req, res) => {
 router.delete('/teams/:id', authenticate, requireOperator, async (req, res) => {
   try {
     const teamId = req.params.id;
-    
+    const { confirmPassword } = req.body || {};
+
+    if (!confirmPassword) {
+      return res.status(400).json({ error: '削除確認のためパスワードを入力してください' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user) {
+      return res.status(401).json({ error: '認証エラー' });
+    }
+
+    const bcrypt = require('bcryptjs');
+    const validPassword = await bcrypt.compare(confirmPassword, user.password);
+    if (!validPassword) {
+      return res.status(403).json({ error: 'パスワードが正しくありません' });
+    }
+
     const team = await prisma.team.findUnique({
       where: { id: teamId },
       include: {

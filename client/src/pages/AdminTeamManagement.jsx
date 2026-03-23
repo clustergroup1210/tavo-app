@@ -18,6 +18,7 @@ export default function AdminTeamManagement() {
   const [editTeamName, setEditTeamName] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [deleteConfirmPassword, setDeleteConfirmPassword] = useState('');
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -89,6 +90,8 @@ export default function AdminTeamManagement() {
     setSelectedTeam(team);
     setShowDeleteModal(true);
     setOpenMenuId(null);
+    setError('');
+    setDeleteConfirmPassword('');
   };
 
   const handleEditTeam = async (e) => {
@@ -119,15 +122,22 @@ export default function AdminTeamManagement() {
 
   const handleDeleteTeam = async () => {
     setError('');
+    if (!deleteConfirmPassword) {
+      setError('パスワードを入力してください');
+      return;
+    }
     setDeleting(true);
     try {
       const res = await fetch(`/api/admin/teams/${selectedTeam.id}`, {
         method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify({ confirmPassword: deleteConfirmPassword }),
       });
       if (res.ok) {
         setShowDeleteModal(false);
         setSelectedTeam(null);
+        setDeleteConfirmPassword('');
         fetchTeams();
       } else {
         const data = await res.json();
@@ -443,34 +453,49 @@ export default function AdminTeamManagement() {
       )}
 
       {showDeleteModal && selectedTeam && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">チームを削除</h2>
+              <h2 className="text-lg font-semibold text-red-600">チームを削除</h2>
               <button 
-                onClick={() => { setShowDeleteModal(false); setError(''); setSelectedTeam(null); }}
+                onClick={() => { setShowDeleteModal(false); setError(''); setSelectedTeam(null); setDeleteConfirmPassword(''); }}
                 className="p-1 hover:bg-gray-100 rounded"
               >
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
-            {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
-            <p className="text-gray-600 mb-6">
-              <span className="font-medium text-gray-900">{selectedTeam.name}</span> を削除しますか？この操作は取り消せません。
-            </p>
+            {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 mb-4">{error}</p>}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-amber-800">
+                <span className="font-semibold">{selectedTeam.name}</span> を削除しようとしています。この操作は取り消せません。関連する全てのデータ（評価項目、カレンダー、お知らせ等）も削除されます。
+              </p>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                削除を確認するため、ログイン中のアカウントのパスワードを入力してください
+              </label>
+              <input
+                type="password"
+                value={deleteConfirmPassword}
+                onChange={(e) => setDeleteConfirmPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                placeholder="パスワード"
+                autoComplete="off"
+              />
+            </div>
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => { setShowDeleteModal(false); setError(''); setSelectedTeam(null); }}
+                onClick={() => { setShowDeleteModal(false); setError(''); setSelectedTeam(null); setDeleteConfirmPassword(''); }}
                 className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
               >
                 キャンセル
               </button>
               <button
                 onClick={handleDeleteTeam}
-                disabled={deleting}
+                disabled={deleting || !deleteConfirmPassword}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
-                {deleting ? '削除中...' : '削除'}
+                {deleting ? '削除中...' : '削除する'}
               </button>
             </div>
           </div>
