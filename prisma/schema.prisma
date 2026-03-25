@@ -192,6 +192,7 @@ model Player {
   transferHistory  TransferHistory[]
   coachAssignments CoachAssignment[]
   tasks            Task[]
+  mentoringRecords MentoringRecord[]
 
   @@index([teamId])
   @@index([userId])
@@ -613,5 +614,21 @@ model CoachAssignment {
   @@unique([coachId, playerId])
   @@index([teamId])
   @@index([coachId])
+  @@index([playerId])
+}
+
+model MentoringRecord {
+  id           String   @id @default(uuid())
+  playerId     String
+  targetMonth  String
+  goal         String?  @db.Text
+  staffComment String?  @db.Text
+  score        Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, targetMonth])
   @@index([playerId])
 }

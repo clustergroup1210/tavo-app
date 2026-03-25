@@ -28,6 +28,7 @@ const videoCommentRoutes = require('./routes/videoComments');
 const taskRoutes = require('./routes/tasks');
 const evaluationMatrixRoutes = require('./routes/evaluationMatrix');
 const evaluationTemplateRoutes = require('./routes/evaluationTemplate');
+const mentoringRoutes = require('./routes/mentoring');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -79,6 +80,7 @@ app.use('/api/video-comments', videoCommentRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/evaluation-matrix', evaluationMatrixRoutes);
 app.use('/api/evaluation-templates', evaluationTemplateRoutes);
+app.use('/api/mentoring', mentoringRoutes);
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));

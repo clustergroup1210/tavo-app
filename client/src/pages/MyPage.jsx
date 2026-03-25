@@ -5,6 +5,7 @@ import {
   Calendar, Ruler, Weight, MapPin, GraduationCap, Users, Footprints, Star, Zap, Upload
 } from 'lucide-react';
 import PlayerMatrix from '../components/PlayerMatrix';
+import MentoringTable from '../components/MentoringTable';
 
 export default function MyPage() {
   const { user, isParent, childPlayerData } = useAuth();
@@ -540,6 +541,8 @@ export default function MyPage() {
       </div>
 
       <PlayerMatrix playerId={playerData.id} />
+
+      <MentoringTable playerId={playerData.id} isSelf={!isParent()} isCoach={false} />
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
         <div className="flex items-center gap-2 mb-3 sm:mb-4">

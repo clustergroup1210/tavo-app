@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   UserCircle, Upload, Link2, TrendingUp, Video, ClipboardList, Edit2, Save, X,
   Calendar, Ruler, Weight, MapPin, GraduationCap, Users, Footprints, MessageSquare, Send, Trash2,
-  Star, Zap, Target
+  Star, Zap, Target, BookOpen
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -14,6 +14,7 @@ import EvaluationComparisonTable from '../components/EvaluationComparisonTable';
 import AppealTab from '../components/AppealTab';
 import TaskList from '../components/TaskList';
 import CumulativeProgressCharts from '../components/CumulativeProgressCharts';
+import MentoringTable from '../components/MentoringTable';
 
 export default function PlayerDetail() {
   const { id } = useParams();
@@ -392,6 +393,7 @@ export default function PlayerDetail() {
 
   const tabs = [
     { id: 'evaluation', label: '評価データ', icon: ClipboardList },
+    { id: 'mentoring', label: 'メンタリング', icon: BookOpen },
     { id: 'tasks', label: '課題', icon: Target },
     { id: 'videos', label: '動画', icon: Video },
     { id: 'notes', label: 'コメント/ノート', icon: MessageSquare },
@@ -1043,6 +1045,14 @@ export default function PlayerDetail() {
         <div className="space-y-6">
           <CumulativeProgressCharts progressData={progressData} />
         </div>
+      )}
+
+      {activeTab === 'mentoring' && (
+        <MentoringTable 
+          playerId={id} 
+          isSelf={isSelf} 
+          isCoach={isCoachOrAdmin} 
+        />
       )}
 
       {activeTab === 'appeal' && (

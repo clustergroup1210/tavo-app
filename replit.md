@@ -82,6 +82,16 @@ The system emphasizes a team-centric display and robust role-based access contro
     -   Admin user editing: Operators can edit any user's name, email, and password from the user management page
     -   Self-service account settings: Players and parents can edit their own email and password at /account-settings
     -   Password change requires current password verification for self-service updates
+-   **Mentoring Record System**:
+    -   Monthly mentoring records for player-coach 1on1 feedback
+    -   Data per month: Goal (player-editable), Staff Comment (coach-editable), Score 1-5 (coach-editable)
+    -   Auto-generates month rows from player's joinedAt to current/graduation date
+    -   Average score displayed in header
+    -   Role-based editing: Players edit goals only, coaches edit comments/scores, parents view-only
+    -   Inline editing with auto-save per cell
+    -   Available in PlayerDetail (メンタリング tab) and MyPage (section)
+    -   API: `/api/mentoring/:playerId` (GET/PUT)
+    -   Model: `MentoringRecord` with unique constraint on playerId+targetMonth
 -   **Task Management System**:
     -   Coaches can assign tasks to players with title, description, and due date
     -   Task statuses: PENDING, IN_PROGRESS, COMPLETED, CANCELLED
