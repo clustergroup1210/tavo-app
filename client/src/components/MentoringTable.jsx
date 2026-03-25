@@ -97,7 +97,7 @@ export default function MentoringTable({ playerId, isSelf, isCoach }) {
     }
   };
 
-  const canEditGoal = isSelf || isCoach;
+  const canEditGoal = isSelf;
   const canEditStaffFields = isCoach;
 
   if (loading) {
@@ -143,7 +143,9 @@ export default function MentoringTable({ playerId, isSelf, isCoach }) {
           <tbody className="divide-y divide-gray-100">
             {months.map((month) => {
               const rec = recordMap[month] || {};
+              const hasGoal = !!(rec.goal && rec.goal.trim());
               const isCurrentMonth = month === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+              const canEditStaffThisMonth = canEditStaffFields && hasGoal;
 
               return (
                 <tr key={month} className={isCurrentMonth ? 'bg-primary-50/30' : 'hover:bg-gray-50'}>
@@ -169,30 +171,38 @@ export default function MentoringTable({ playerId, isSelf, isCoach }) {
                   </td>
 
                   <td className="px-3 py-1.5">
-                    <EditableCell
-                      value={rec.staffComment || ''}
-                      canEdit={canEditStaffFields}
-                      cellKey={month + 'staffComment'}
-                      editingCell={editingCell}
-                      setEditingCell={setEditingCell}
-                      editValue={editValue}
-                      setEditValue={setEditValue}
-                      onSave={(val) => handleSave(month, 'staffComment', val)}
-                      saving={saving}
-                      saved={saved}
-                      placeholder={canEditStaffFields ? 'コメントを入力...' : ''}
-                    />
+                    {canEditStaffFields && !hasGoal ? (
+                      <div className="text-xs text-gray-300 italic py-1">目標入力待ち</div>
+                    ) : (
+                      <EditableCell
+                        value={rec.staffComment || ''}
+                        canEdit={canEditStaffThisMonth}
+                        cellKey={month + 'staffComment'}
+                        editingCell={editingCell}
+                        setEditingCell={setEditingCell}
+                        editValue={editValue}
+                        setEditValue={setEditValue}
+                        onSave={(val) => handleSave(month, 'staffComment', val)}
+                        saving={saving}
+                        saved={saved}
+                        placeholder={canEditStaffThisMonth ? 'コメントを入力...' : ''}
+                      />
+                    )}
                   </td>
 
                   <td className="px-3 py-1.5">
-                    <ScoreCell
-                      value={rec.score}
-                      canEdit={canEditStaffFields}
-                      cellKey={month + 'score'}
-                      onSave={(val) => handleSave(month, 'score', val)}
-                      saving={saving}
-                      saved={saved}
-                    />
+                    {canEditStaffFields && !hasGoal ? (
+                      <div className="flex justify-center"><span className="text-gray-300 text-sm">-</span></div>
+                    ) : (
+                      <ScoreCell
+                        value={rec.score}
+                        canEdit={canEditStaffThisMonth}
+                        cellKey={month + 'score'}
+                        onSave={(val) => handleSave(month, 'score', val)}
+                        saving={saving}
+                        saved={saved}
+                      />
+                    )}
                   </td>
                 </tr>
               );
@@ -209,8 +219,9 @@ export default function MentoringTable({ playerId, isSelf, isCoach }) {
       </div>
 
       <div className="px-4 py-3 border-t border-gray-100 text-xs text-gray-400">
-        {isSelf && !isCoach && '※ 目標のみ編集できます。コメントと評価点はコーチが入力します。'}
-        {isCoach && '※ 全ての項目を編集できます。'}
+        {isSelf && !isCoach && '※ 目標のみ編集できます。目標を入力するとコーチがコメントと評価を追加できるようになります。'}
+        {isCoach && !isSelf && '※ 選手が目標を入力した月のみ、コメントと評価点を入力できます。'}
+        {isCoach && isSelf && '※ 目標を入力できます。コーチとして、目標が入力された月のコメントと評価点も入力できます。'}
         {!isSelf && !isCoach && '※ 閲覧のみ可能です。'}
       </div>
     </div>

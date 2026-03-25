@@ -83,12 +83,25 @@ router.put('/:playerId', authenticate, async (req, res) => {
 
     const updateData = {};
 
-    if (isSelf && !isCoachOrAdmin && !isOperator) {
+    if (isSelf) {
       if (goal !== undefined) updateData.goal = goal;
-    } else {
-      if (staffComment !== undefined) updateData.staffComment = staffComment;
-      if (score !== undefined) updateData.score = score !== null && score !== '' ? parseInt(score) : null;
-      if (goal !== undefined) updateData.goal = goal;
+    }
+
+    if (isCoachOrAdmin || isOperator) {
+      if (staffComment !== undefined || score !== undefined) {
+        const existingRecord = await prisma.mentoringRecord.findUnique({
+          where: { playerId_targetMonth: { playerId, targetMonth } }
+        });
+        if (!existingRecord || !existingRecord.goal) {
+          return res.status(400).json({ error: '選手が目標を入力してからコメント・評価を追加できます' });
+        }
+        if (staffComment !== undefined) updateData.staffComment = staffComment;
+        if (score !== undefined) updateData.score = score !== null && score !== '' ? parseInt(score) : null;
+      }
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: '更新するデータがありません' });
     }
 
     const record = await prisma.mentoringRecord.upsert({
