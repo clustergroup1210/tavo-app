@@ -501,7 +501,7 @@ router.post('/', authenticate, async (req, res) => {
       }
     }
 
-    res.json(created);
+    res.json({ success: true });
   } catch (error) {
     console.error('Create evaluation error:', error);
     res.status(500).json({ error: 'Failed to save evaluations' });
