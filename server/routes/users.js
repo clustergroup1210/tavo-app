@@ -306,29 +306,18 @@ router.put('/:id', authenticate, async (req, res) => {
       }
 
       if (teamRoles && Array.isArray(teamRoles)) {
-        for (const tr of teamRoles) {
-          if (!tr.teamId) continue;
-          
-          const existingTeamRole = await tx.userTeam.findFirst({
-            where: { userId, teamId: tr.teamId }
-          });
+        const oldTeamIds = existingUser.teams.map(t => t.teamId);
 
-          if (tr.role === null || tr.role === '') {
-            if (existingTeamRole) {
-              await tx.userTeam.delete({ where: { id: existingTeamRole.id } });
-            }
-          } else {
-            if (existingTeamRole) {
-              await tx.userTeam.update({
-                where: { id: existingTeamRole.id },
-                data: { role: tr.role }
-              });
-            } else {
-              await tx.userTeam.create({
-                data: { userId, teamId: tr.teamId, role: tr.role }
-              });
-            }
-          }
+        await tx.userTeam.deleteMany({ where: { userId } });
+
+        const newTeamIds = [];
+        for (const tr of teamRoles) {
+          if (!tr.teamId || !tr.role) continue;
+          newTeamIds.push(tr.teamId);
+
+          await tx.userTeam.create({
+            data: { userId, teamId: tr.teamId, role: tr.role }
+          });
 
           if (tr.isHeadCoach !== undefined) {
             const team = await tx.team.findUnique({ where: { id: tr.teamId } });
@@ -345,6 +334,17 @@ router.put('/:id', authenticate, async (req, res) => {
                 });
               }
             }
+          }
+        }
+
+        const removedTeamIds = oldTeamIds.filter(id => !newTeamIds.includes(id));
+        for (const teamId of removedTeamIds) {
+          const team = await tx.team.findUnique({ where: { id: teamId } });
+          if (team && team.headCoachId === userId) {
+            await tx.team.update({
+              where: { id: teamId },
+              data: { headCoachId: null }
+            });
           }
         }
       }
