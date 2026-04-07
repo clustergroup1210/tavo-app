@@ -111,7 +111,7 @@ router.get('/:id', authenticate, async (req, res) => {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { teamId, name, number, position, birthDate, joinedAt, graduationDate, teamCategoryId, email, password } = req.body;
+    const { teamId, name, number, position, birthDate, joinedAt, graduationDate, teamCategoryId, email, password, learningType, communicationType } = req.body;
 
     if (!hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH', 'COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
@@ -157,6 +157,8 @@ router.post('/', authenticate, async (req, res) => {
           joinedAt: playerJoinedAt,
           graduationDate: graduationDate ? new Date(graduationDate) : null,
           teamCategoryId: teamCategoryId || null,
+          learningType: learningType || null,
+          communicationType: communicationType || null,
           userId: userId
         }
       });
@@ -180,7 +182,7 @@ router.post('/', authenticate, async (req, res) => {
 
 router.put('/:id', authenticate, async (req, res) => {
   try {
-    const { name, nameRomaji, number, position, birthDate, joinedAt, graduationDate, height, weight, dominantFoot, hometown, school, previousTeam, teamId, roleModel, playStyle, teamCategoryId } = req.body;
+    const { name, nameRomaji, number, position, birthDate, joinedAt, graduationDate, height, weight, dominantFoot, hometown, school, previousTeam, teamId, roleModel, playStyle, learningType, communicationType, teamCategoryId } = req.body;
 
     const player = await prisma.player.findUnique({ where: { id: req.params.id } });
     if (!player) {
@@ -215,6 +217,8 @@ router.put('/:id', authenticate, async (req, res) => {
     if (previousTeam !== undefined) updateData.previousTeam = previousTeam;
     if (roleModel !== undefined) updateData.roleModel = roleModel;
     if (playStyle !== undefined) updateData.playStyle = playStyle;
+    if (learningType !== undefined) updateData.learningType = learningType;
+    if (communicationType !== undefined) updateData.communicationType = communicationType;
     if (teamCategoryId !== undefined && (isCoachOrAdmin || isOperator)) {
       updateData.teamCategoryId = teamCategoryId || null;
     }

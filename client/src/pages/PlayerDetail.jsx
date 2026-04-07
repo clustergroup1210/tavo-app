@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   UserCircle, Upload, Link2, TrendingUp, Video, ClipboardList, Edit2, Save, X,
   Calendar, Ruler, Weight, MapPin, GraduationCap, Users, Footprints, MessageSquare, Send, Trash2,
-  Star, Zap, Target, BookOpen
+  Star, Zap, Target, BookOpen, MessageCircle
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -292,6 +292,10 @@ export default function PlayerDetail() {
       hometown: player.hometown || '',
       school: player.school || '',
       previousTeam: player.previousTeam || '',
+      roleModel: player.roleModel || '',
+      playStyle: player.playStyle || '',
+      learningType: player.learningType || '',
+      communicationType: player.communicationType || '',
       teamId: player.teamId || '',
       teamCategoryId: player.teamCategoryId || ''
     });
@@ -635,6 +639,54 @@ export default function PlayerDetail() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">目標とする選手</label>
+              <input
+                type="text"
+                value={editForm.roleModel}
+                onChange={(e) => setEditForm({ ...editForm, roleModel: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="例: リオネル・メッシ"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">プレースタイル</label>
+              <input
+                type="text"
+                value={editForm.playStyle}
+                onChange={(e) => setEditForm({ ...editForm, playStyle: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="例: ドリブラー"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">学習タイプ</label>
+              <select
+                value={editForm.learningType}
+                onChange={(e) => setEditForm({ ...editForm, learningType: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="">選択してください</option>
+                <option value="視覚型">視覚型（見て学ぶ）</option>
+                <option value="聴覚型">聴覚型（聞いて学ぶ）</option>
+                <option value="体感型">体感型（やって学ぶ）</option>
+                <option value="読み書き型">読み書き型（読んで学ぶ）</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">コミュニケーションタイプ</label>
+              <select
+                value={editForm.communicationType}
+                onChange={(e) => setEditForm({ ...editForm, communicationType: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="">選択してください</option>
+                <option value="主導型">主導型（リーダーシップ）</option>
+                <option value="協調型">協調型（チームワーク重視）</option>
+                <option value="分析型">分析型（論理的・慎重）</option>
+                <option value="感覚型">感覚型（直感・感情重視）</option>
+              </select>
+            </div>
             {isCoachOrAdmin && (
               <>
                 {isOperator() ? (
@@ -840,6 +892,20 @@ export default function PlayerDetail() {
             <div>
               <p className="text-xs text-gray-500">プレースタイル</p>
               <p className="font-medium text-gray-900">{player.playStyle || '-'}</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+            <BookOpen className="w-5 h-5 text-amber-500 mt-0.5" />
+            <div>
+              <p className="text-xs text-gray-500">学習タイプ</p>
+              <p className="font-medium text-gray-900">{player.learningType || '-'}</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+            <MessageCircle className="w-5 h-5 text-teal-500 mt-0.5" />
+            <div>
+              <p className="text-xs text-gray-500">コミュニケーションタイプ</p>
+              <p className="font-medium text-gray-900">{player.communicationType || '-'}</p>
             </div>
           </div>
         </div>

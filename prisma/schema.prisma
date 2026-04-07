@@ -171,8 +171,10 @@ model Player {
   previousTeam   String?
   photoUrl       String?
   passportUrl    String?
-  roleModel      String?
-  playStyle      String?
+  roleModel          String?
+  playStyle          String?
+  learningType       String?
+  communicationType  String?
   joinedAt       DateTime?
   graduationDate DateTime?
   createdAt      DateTime @default(now())
