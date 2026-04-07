@@ -360,7 +360,10 @@ model Video {
   teamId      String?
   title       String
   description String?
-  storageKey  String
+  storageKey  String?
+  r2Key       String?
+  contentType String?
+  fileSize    Int?
   thumbnailUrl String?
   duration    Int?
   uploadedBy  String

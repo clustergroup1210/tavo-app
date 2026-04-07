@@ -1,0 +1,84 @@
+動画の直接アップロードによるサーバーへの負荷を避け、Cloudflare R2（S3互換ストレージ）を利用して効率的に動画を管理するための実装指示を作成しました。
+
+この構成では、動画の実体はCloudflareに保存し、データベースにはその「参照パス（キー）」と「メタデータ」のみを保存します。これにより、将来的に動画が増えてもシステムが重くならず、拡張しやすい設計になります。
+
+***
+
+### Replit用プロンプト（Cloudflare R2 動画ストレージ連携の実装）
+
+```text
+あなたはクラウドインフラ（AWS/Cloudflare）に精通したフルスタックエンジニアです。
+現在開発中のシステムに、Cloudflare R2を使用した「動画ストレージ機能」を実装してください。
+
+## 1. アーキテクチャ方針
+- **ファイル本体:** Cloudflare R2に保存（S3互換APIを使用）。
+- **メタデータ:** Prisma（DB）に動画のタイトル、R2上のキー、投稿者、関連選手IDを保存。
+- **アップロード方式:** サーバーを介さず、ブラウザからR2へ直接アップロード（Presigned URL方式）。
+- **セキュリティ:** 動画URLは永続公開せず、閲覧権限がある場合のみ、期間限定の署名付きURLを発行して表示する。
+
+## 2. 依頼内容
+
+### Step 1: 必要なパッケージの導入
+- `@aws-sdk/client-s3` および `@aws-sdk/s3-request-presigner` を使用してR2と通信するよう設定してください。
+
+### Step 2: schema.prisma の定義
+動画情報を管理する `Video` モデルを作成してください。
+
+```prisma
+model Video {
+  id              String   @id @default(cuid())
+  title           String
+  r2Key           String   // R2バケット内のファイルパス
+  ownerId         String   // 投稿者ID
+  relatedPlayerId String   // どの選手の動画か（権限管理用）
+  contentType     String?  // video/mp4など
+  fileSize        Int?     // バイト数
+  createdAt       DateTime @default(now())
+
+  // リレーション（既存のUserモデル等と紐付け）
+  owner           User     @relation("VideoOwner", fields: [ownerId], references: [id])
+}
+```
+
+### Step 3: R2操作用ユーティリティの作成 (`lib/r2.ts`)
+AWS SDKを使用して、以下の共通処理を実装してください。
+- `S3Client` の初期化（CloudflareのEndpoint, Access Key, Secret Keyを使用）。
+- **`getUploadPresignedUrl(key, contentType)`**: アップロード用のURLを発行。
+- **`getDownloadPresignedUrl(key)`**: 閲覧用の期間限定URLを発行。
+
+### Step 4: Server Actions の実装
+1. **`createVideoAction`**: 
+   - ユーザーからのリクエストを受け、R2用のユニークなキーを生成。
+   - `getUploadPresignedUrl` を呼び出してURLを返し、DBに「アップロード中」の状態でレコードを作成。
+2. **`getVideoViewUrlAction(videoId)`**: 
+   - 閲覧権限（本人、担当コーチ、保護者）をチェック。
+   - 権限があれば閲覧用URLを生成して返す。
+
+### Step 5: クライアント側アップロード処理
+- 動画選択後、サーバーから取得した `Presigned URL` に対して、`fetch(url, { method: 'PUT', body: file })` で直接アップロードするロジックを提示してください。
+
+## 3. 環境変数の設定
+`.env` に以下の項目が必要であることを明記してください。
+- `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`
+```
+
+***
+
+### 💡 実装を成功させるための準備（あなたの「宿題」）
+
+Replitがコードを書いた後、実際に動かすためには**Cloudflare側での設定**が3つだけ必要です。
+
+1.  **R2バケットの作成:** Cloudflareのダッシュボードでバケットを作ります。
+2.  **APIトークンの発行:** 「R2 APIトークン」を作成し、`Access Key` と `Secret Key` を取得してReplitの「Secrets」に保存してください。
+3.  **CORSの設定（重要）:** Cloudflareバケットの設定画面にある「CORSポリシー」に、以下の設定を貼り付けてください。これをしないとブラウザからの直接アップロードがブロックされます。
+    ```json
+    [
+      {
+        "AllowedOrigins": ["https://*.replit.dev", "http://localhost:3000"],
+        "AllowedMethods": ["PUT", "GET"],
+        "AllowedHeaders": ["*"]
+      }
+    ]
+    ```
+
+これで、システム上の「動画タブ」からCloudflareへ動画を飛ばす準備が整います。

@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const { PrismaClient } = require('@prisma/client');
 const { authenticate, hasTeamAccess } = require('../middleware/auth');
 const { filterDataByVisibility, getVisibleDataWhereClause } = require('../services/dataVisibilityService');
+const { isR2Configured, getUploadPresignedUrl, getDownloadPresignedUrl, deleteR2Object } = require('../lib/r2');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -56,6 +57,57 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
+router.post('/presigned-upload', authenticate, async (req, res) => {
+  try {
+    if (!isR2Configured()) {
+      return res.status(503).json({ error: 'R2ストレージが設定されていません' });
+    }
+
+    const { title, description, playerId, teamId, contentType, fileSize, fileName } = req.body;
+
+    if (!title || !contentType || !fileName) {
+      return res.status(400).json({ error: 'タイトル、ファイル名、コンテンツタイプは必須です' });
+    }
+
+    if (playerId) {
+      const player = await prisma.player.findUnique({ where: { id: playerId } });
+      if (!player) return res.status(404).json({ error: '選手が見つかりません' });
+
+      const canUpload = 
+        player.userId === req.user.id ||
+        req.user.parentPlayers?.some(pp => pp.playerId === playerId) ||
+        hasTeamAccess(req.user, player.teamId);
+
+      if (!canUpload) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+    }
+
+    const ext = path.extname(fileName);
+    const r2Key = `videos/${uuidv4()}${ext}`;
+
+    const uploadUrl = await getUploadPresignedUrl(r2Key, contentType);
+
+    const video = await prisma.video.create({
+      data: {
+        title,
+        description,
+        playerId,
+        teamId,
+        r2Key,
+        contentType,
+        fileSize: fileSize ? parseInt(fileSize) : null,
+        uploadedBy: req.user.id
+      }
+    });
+
+    res.json({ video, uploadUrl });
+  } catch (error) {
+    console.error('Presigned upload error:', error);
+    res.status(500).json({ error: 'Failed to create presigned upload URL' });
+  }
+});
+
 router.post('/', authenticate, upload.single('video'), async (req, res) => {
   try {
     const { title, description, playerId, teamId } = req.body;
@@ -89,6 +141,10 @@ router.post('/', authenticate, upload.single('video'), async (req, res) => {
   }
 });
 
+router.get('/r2-status', authenticate, async (req, res) => {
+  res.json({ configured: isR2Configured() });
+});
+
 router.get('/:id', authenticate, async (req, res) => {
   try {
     const video = await prisma.video.findUnique({
@@ -112,11 +168,16 @@ router.get('/:id', authenticate, async (req, res) => {
       }
     }
 
-    res.json({
-      ...video,
-      url: `/api/videos/${video.id}/stream`
-    });
+    let url;
+    if (video.r2Key && isR2Configured()) {
+      url = await getDownloadPresignedUrl(video.r2Key);
+    } else {
+      url = `/api/videos/${video.id}/stream`;
+    }
+
+    res.json({ ...video, url });
   } catch (error) {
+    console.error('Fetch video error:', error);
     res.status(500).json({ error: 'Failed to fetch video' });
   }
 });
@@ -130,6 +191,15 @@ router.get('/:id/stream', authenticate, async (req, res) => {
 
     if (!video) {
       return res.status(404).json({ error: 'Video not found' });
+    }
+
+    if (video.r2Key && isR2Configured()) {
+      const downloadUrl = await getDownloadPresignedUrl(video.r2Key);
+      return res.redirect(downloadUrl);
+    }
+
+    if (!video.storageKey) {
+      return res.status(404).json({ error: 'Video file not found' });
     }
 
     const isUploader = video.uploadedBy === req.user.id;
@@ -224,6 +294,14 @@ router.delete('/:id', authenticate, async (req, res) => {
 
     if (!isUploader && !isCoach) {
       return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (video.r2Key && isR2Configured()) {
+      try {
+        await deleteR2Object(video.r2Key);
+      } catch (err) {
+        console.error('R2 delete error (continuing with DB delete):', err);
+      }
     }
 
     await prisma.video.delete({ where: { id: req.params.id } });
