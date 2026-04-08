@@ -5,6 +5,8 @@ import { Save, Plus, X, Calendar, CheckCircle, HelpCircle, Trash2, Edit3 } from 
 export default function EvaluationEntry() {
   const { currentTeam, user, isCoach, isPlayer, playerData } = useAuth();
   const [players, setPlayers] = useState([]);
+  const [teamCategories, setTeamCategories] = useState([]);
+  const [filterCategory, setFilterCategory] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState('');
   const [items, setItems] = useState([]);
   const [rounds, setRounds] = useState([]);
@@ -92,10 +94,11 @@ export default function EvaluationEntry() {
           setSelectedRound(roundsData[0].id);
         }
       } else {
-        const [playersRes, itemsRes, roundsRes] = await Promise.all([
+        const [playersRes, itemsRes, roundsRes, categoriesRes] = await Promise.all([
           fetch(`/api/players?teamId=${teamId}&includeChildren=true`, { credentials: 'include' }),
           fetch(`/api/evaluations/items?teamId=${teamId}`, { credentials: 'include' }),
           fetch(`/api/evaluations/rounds?teamId=${teamId}`, { credentials: 'include' }),
+          fetch(`/api/team-categories?teamId=${teamId}`, { credentials: 'include' }),
         ]);
 
         const playersData = await playersRes.json();
@@ -105,6 +108,11 @@ export default function EvaluationEntry() {
         setPlayers(Array.isArray(playersData) ? playersData : []);
         setItems(Array.isArray(itemsData) ? itemsData : []);
         setRounds(Array.isArray(roundsData) ? roundsData : []);
+
+        if (categoriesRes.ok) {
+          const catData = await categoriesRes.json();
+          setTeamCategories(Array.isArray(catData) ? catData : []);
+        }
 
         if (roundsData.length > 0) {
           setSelectedRound(roundsData[0].id);
@@ -365,21 +373,43 @@ export default function EvaluationEntry() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className={`grid grid-cols-1 ${isPlayer() ? 'md:grid-cols-1' : 'md:grid-cols-2'} gap-4 mb-6`}>
+        <div className={`grid grid-cols-1 ${isPlayer() ? 'md:grid-cols-1' : teamCategories.length > 0 ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 mb-6`}>
           {!isPlayer() && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">選手</label>
-              <select
-                value={selectedPlayer}
-                onChange={(e) => setSelectedPlayer(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option value="">選択してください</option>
-                {players.map((player) => (
-                  <option key={player.id} value={player.id}>{player.name}</option>
-                ))}
-              </select>
-            </div>
+            <>
+              {teamCategories.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">カテゴリー</label>
+                  <select
+                    value={filterCategory}
+                    onChange={(e) => { setFilterCategory(e.target.value); setSelectedPlayer(''); }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">全カテゴリー</option>
+                    {teamCategories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">選手</label>
+                <select
+                  value={selectedPlayer}
+                  onChange={(e) => setSelectedPlayer(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                >
+                  <option value="">選択してください</option>
+                  {players
+                    .filter(p => !filterCategory || p.teamCategoryId === filterCategory)
+                    .map((player) => (
+                      <option key={player.id} value={player.id}>
+                        {player.name}
+                        {player.teamCategory ? ` (${player.teamCategory.name})` : ''}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </>
           )}
 
           <div>

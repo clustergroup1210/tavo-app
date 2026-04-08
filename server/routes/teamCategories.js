@@ -44,9 +44,15 @@ router.get('/', authenticate, async (req, res) => {
     if (!hasAccess && !isOperator(req.user)) {
       return res.status(403).json({ error: 'Access denied' });
     }
+
+    const childTeams = await prisma.team.findMany({
+      where: { parentId: teamId },
+      select: { id: true }
+    });
+    const teamIds = [teamId, ...childTeams.map(ct => ct.id)];
     
     const categories = await prisma.teamCategory.findMany({
-      where: { teamId, isActive: true },
+      where: { teamId: { in: teamIds }, isActive: true },
       orderBy: { sortOrder: 'asc' },
       include: {
         _count: { select: { players: true } }
