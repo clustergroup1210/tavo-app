@@ -3,6 +3,9 @@ module.exports = {
   content: ['./client/index.html', './client/src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['"Noto Sans JP"', 'Inter', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
+      },
       colors: {
         primary: {
           50: '#eff6ff',

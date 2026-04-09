@@ -17,6 +17,7 @@ A SaaS-type player development support system for sports teams, designed with a 
 -   **Backend**: Express.js (Node.js)
 -   **Database**: PostgreSQL with Prisma ORM
 -   **Authentication**: JWT-based with cookie storage
+-   **Typography**: Noto Sans JP + Inter (Google Fonts), Clevio-style clean design
 
 ### Core Design Principles
 The system emphasizes a team-centric display and robust role-based access control. Internal IDs are separated from display names to maintain data integrity while providing user-friendly interfaces. The UI/UX prioritizes clear, intuitive navigation and data visualization, particularly for player progress and evaluations.
