@@ -2,15 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   ChevronLeft, ChevronRight, Plus, X, Calendar as CalendarIcon, 
-  Clock, MapPin, Edit2, Trash2, Tag
+  Clock, MapPin, Edit2, Trash2, Tag, FileText, Users
 } from 'lucide-react';
 
 const eventTypeColors = {
-  practice: { bg: 'bg-green-500', light: 'bg-green-100 text-green-800', border: 'border-green-500' },
-  match: { bg: 'bg-red-500', light: 'bg-red-100 text-red-800', border: 'border-red-500' },
-  meeting: { bg: 'bg-purple-500', light: 'bg-purple-100 text-purple-800', border: 'border-purple-500' },
-  event: { bg: 'bg-blue-500', light: 'bg-blue-100 text-blue-800', border: 'border-blue-500' },
-  other: { bg: 'bg-gray-400', light: 'bg-gray-100 text-gray-700', border: 'border-gray-400' }
+  practice: { bg: 'bg-green-500', light: 'bg-green-100 text-green-800', border: 'border-green-500', dot: 'bg-green-500' },
+  match: { bg: 'bg-red-500', light: 'bg-red-100 text-red-800', border: 'border-red-500', dot: 'bg-red-500' },
+  meeting: { bg: 'bg-purple-500', light: 'bg-purple-100 text-purple-800', border: 'border-purple-500', dot: 'bg-purple-500' },
+  event: { bg: 'bg-blue-500', light: 'bg-blue-100 text-blue-800', border: 'border-blue-500', dot: 'bg-blue-500' },
+  other: { bg: 'bg-gray-400', light: 'bg-gray-100 text-gray-700', border: 'border-gray-400', dot: 'bg-gray-400' }
 };
 
 const eventTypeLabels = {
@@ -21,18 +21,152 @@ const eventTypeLabels = {
   other: 'その他'
 };
 
-function EventPill({ event, compact = false }) {
+function formatDate(dateStr) {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+function formatTime(dateStr) {
+  const d = new Date(dateStr);
+  return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+}
+
+function EventPill({ event, compact = false, onClick }) {
   const colors = eventTypeColors[event.eventType] || eventTypeColors.event;
   const startDate = new Date(event.startDate);
   const timeStr = event.allDay ? '' : `${startDate.getHours()}時`;
   const typeLabel = eventTypeLabels[event.eventType] || '';
   
   return (
-    <div className={`${colors.bg} text-white text-[10px] sm:text-[11px] leading-tight px-1.5 py-0.5 rounded truncate cursor-pointer hover:opacity-90 transition-opacity`}>
+    <div 
+      onClick={(e) => { e.stopPropagation(); onClick?.(event); }}
+      className={`${colors.bg} text-white text-[10px] sm:text-[11px] leading-tight px-1.5 py-0.5 rounded truncate cursor-pointer hover:opacity-90 transition-opacity`}
+    >
       {!compact && timeStr && <span className="font-medium">{timeStr} </span>}
       {!compact && typeLabel && <span className="opacity-80">{typeLabel}</span>}
       {!compact && ' '}
       <span>{event.title}</span>
+    </div>
+  );
+}
+
+function EventDetailModal({ event, onClose, onEdit, onDelete, canEdit }) {
+  if (!event) return null;
+  const colors = eventTypeColors[event.eventType] || eventTypeColors.event;
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center z-50 pt-[10vh]" onClick={onClose}>
+      <div className="bg-white rounded-xl w-full max-w-md mx-4 shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+          <h3 className="text-[15px] font-bold text-gray-900">予定の詳細</h3>
+          <div className="flex items-center gap-2">
+            {event.categoryTargets?.length > 0 ? (
+              event.categoryTargets.map(ct => (
+                <span key={ct.id} className="px-2.5 py-1 text-[11px] font-medium rounded bg-blue-600 text-white">
+                  {ct.teamCategory?.name}
+                </span>
+              ))
+            ) : (
+              <span className="px-2.5 py-1 text-[11px] font-medium rounded bg-green-600 text-white">
+                全員
+              </span>
+            )}
+            <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="px-5 py-4 space-y-4 max-h-[65vh] overflow-y-auto">
+          <div>
+            <p className="text-[11px] font-medium text-gray-400 mb-0.5">タイトル</p>
+            <p className="text-[13px] font-semibold text-blue-600">{event.title}</p>
+          </div>
+
+          <div className="flex items-center gap-2 mb-1">
+            <span className={`px-2 py-0.5 text-[10px] font-medium rounded ${colors.light}`}>
+              {eventTypeLabels[event.eventType] || event.eventType}
+            </span>
+            {event.allDay && (
+              <span className="px-2 py-0.5 text-[10px] font-medium rounded bg-gray-100 text-gray-600">
+                終日
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-[11px] font-medium text-gray-400 mb-0.5">開始日</p>
+              <p className="text-[13px] font-semibold text-gray-800">{formatDate(event.startDate)}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-gray-400 mb-0.5">終了日</p>
+              <p className="text-[13px] font-semibold text-gray-800">
+                {event.endDate ? formatDate(event.endDate) : '-'}
+              </p>
+            </div>
+          </div>
+
+          {!event.allDay && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-[11px] font-medium text-gray-400 mb-0.5">開始時間</p>
+                <p className="text-[13px] font-semibold text-gray-800">{formatTime(event.startDate)}</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium text-gray-400 mb-0.5">終了時間</p>
+                <p className="text-[13px] font-semibold text-gray-800">
+                  {event.endDate ? formatTime(event.endDate) : '-'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {event.location && (
+            <div>
+              <p className="text-[11px] font-medium text-gray-400 mb-0.5">場所</p>
+              <p className="text-[13px] font-semibold text-green-600">{event.location}</p>
+            </div>
+          )}
+
+          {event.team && (
+            <div>
+              <p className="text-[11px] font-medium text-gray-400 mb-0.5">チーム</p>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-full bg-green-100 text-green-800">
+                {event.team.name}
+              </span>
+            </div>
+          )}
+
+          {event.description && (
+            <div>
+              <p className="text-[11px] font-medium text-gray-400 mb-1">詳細内容</p>
+              <div className="text-[12.5px] text-gray-700 leading-relaxed whitespace-pre-wrap bg-gray-50 rounded-lg p-3">
+                {event.description}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {canEdit && (
+          <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-100 bg-gray-50/50">
+            <button
+              onClick={() => { onClose(); onEdit(event); }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Edit2 className="w-3 h-3" />
+              編集
+            </button>
+            <button
+              onClick={() => { onClose(); onDelete(event.id); }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+            >
+              <Trash2 className="w-3 h-3" />
+              削除
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -46,6 +180,7 @@ export default function Calendar() {
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
+  const [detailEvent, setDetailEvent] = useState(null);
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -161,6 +296,10 @@ export default function Calendar() {
         endDate: dateStr
       });
     }
+  };
+
+  const handleEventClick = (event) => {
+    setDetailEvent(event);
   };
 
   const openCreateModal = () => {
@@ -303,28 +442,28 @@ export default function Calendar() {
           <div className="flex items-center gap-2">
             <button
               onClick={handleToday}
-              className="px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              className="px-3 py-1.5 text-[12px] font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
             >
               今日
             </button>
             <button
               onClick={handlePrevMonth}
-              className="px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              className="px-3 py-1.5 text-[12px] font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
             >
               前へ
             </button>
             <button
               onClick={handleNextMonth}
-              className="px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              className="px-3 py-1.5 text-[12px] font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
             >
               次へ
             </button>
           </div>
-          <h2 className="text-base sm:text-lg font-semibold text-gray-800">
+          <h2 className="text-[14px] sm:text-[15px] font-semibold text-gray-800">
             {currentDate.getFullYear()}年{currentDate.getMonth() + 1}月
           </h2>
           <div className="flex items-center gap-2">
-            <span className="hidden sm:inline px-3 py-1.5 text-sm text-gray-500 bg-white border border-gray-300 rounded-md">
+            <span className="hidden sm:inline px-3 py-1.5 text-[12px] text-gray-500 bg-white border border-gray-300 rounded-md">
               月
             </span>
           </div>
@@ -334,7 +473,7 @@ export default function Calendar() {
           {weekDays.map((day, i) => (
             <div
               key={day}
-              className={`py-2 text-center text-xs font-semibold tracking-wider ${
+              className={`py-2 text-center text-[11px] font-semibold tracking-wider ${
                 i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-500'
               }`}
             >
@@ -362,7 +501,7 @@ export default function Calendar() {
                 `}
               >
                 <div className="px-1.5 pt-1 pb-0.5">
-                  <span className={`inline-flex items-center justify-center w-6 h-6 text-xs font-medium rounded-full
+                  <span className={`inline-flex items-center justify-center w-6 h-6 text-[11px] font-medium rounded-full
                     ${isToday ? 'bg-primary-600 text-white' : ''}
                     ${!isToday && !isCurrentMonth ? 'text-gray-300' : ''}
                     ${!isToday && isCurrentMonth && dayOfWeek === 0 ? 'text-red-500' : ''}
@@ -374,7 +513,7 @@ export default function Calendar() {
                 </div>
                 <div className="px-0.5 space-y-0.5 sm:hidden">
                   {dayEvents.slice(0, 1).map((event) => (
-                    <EventPill key={event.id} event={event} compact={true} />
+                    <EventPill key={event.id} event={event} compact={true} onClick={handleEventClick} />
                   ))}
                   {dayEvents.length > 1 && (
                     <div className="text-[10px] text-gray-400 px-1 font-medium">
@@ -384,7 +523,7 @@ export default function Calendar() {
                 </div>
                 <div className="px-0.5 space-y-0.5 hidden sm:block">
                   {dayEvents.slice(0, maxVisible).map((event) => (
-                    <EventPill key={event.id} event={event} compact={false} />
+                    <EventPill key={event.id} event={event} compact={false} onClick={handleEventClick} />
                   ))}
                   {overflow > 0 && (
                     <div className="text-[10px] text-gray-400 px-1.5 font-medium">
@@ -401,7 +540,7 @@ export default function Calendar() {
       {selectedDate && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/50">
-            <h3 className="text-sm font-semibold text-gray-800">
+            <h3 className="text-[13px] font-semibold text-gray-800">
               {selectedDate.getFullYear()}年{selectedDate.getMonth() + 1}月{selectedDate.getDate()}日（{weekDays[selectedDate.getDay()]}）
             </h3>
           </div>
@@ -410,7 +549,11 @@ export default function Calendar() {
               {getEventsForDate(selectedDate).map(event => {
                 const colors = eventTypeColors[event.eventType] || eventTypeColors.event;
                 return (
-                  <div key={event.id} className={`flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors border-l-[3px] ${colors.border}`}>
+                  <div
+                    key={event.id}
+                    onClick={() => handleEventClick(event)}
+                    className={`flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors border-l-[3px] ${colors.border} cursor-pointer`}
+                  >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className={`px-2 py-0.5 text-[10px] font-medium rounded ${colors.light}`}>
@@ -428,79 +571,74 @@ export default function Calendar() {
                           </span>
                         )}
                       </div>
-                      <h4 className="text-sm font-medium text-gray-900 truncate">{event.title}</h4>
+                      <h4 className="text-[13px] font-medium text-gray-900 truncate">{event.title}</h4>
                       {!event.allDay && (
-                        <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+                        <div className="flex items-center gap-1 text-[11px] text-gray-500 mt-0.5">
                           <Clock className="w-3 h-3" />
-                          {new Date(event.startDate).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
-                          {event.endDate && ` - ${new Date(event.endDate).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`}
+                          {formatTime(event.startDate)}
+                          {event.endDate && ` - ${formatTime(event.endDate)}`}
                         </div>
                       )}
                       {event.location && (
-                        <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+                        <div className="flex items-center gap-1 text-[11px] text-gray-500 mt-0.5">
                           <MapPin className="w-3 h-3" />
                           {event.location}
                         </div>
                       )}
-                      {event.description && (
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{event.description}</p>
-                      )}
-                      {event.team && (
-                        <p className="text-[10px] text-gray-400 mt-1">{event.team.name}</p>
-                      )}
                     </div>
-                    {canCreate && (
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button onClick={(e) => { e.stopPropagation(); openEditModal(event); }} className="p-1.5 text-gray-400 hover:text-primary-600 rounded hover:bg-gray-100 transition-colors">
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); handleDelete(event.id); }} className="p-1.5 text-gray-400 hover:text-red-600 rounded hover:bg-gray-100 transition-colors">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
+                    <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0 mt-1" />
                   </div>
                 );
               })}
             </div>
           ) : (
             <div className="px-5 py-6 text-center">
-              <p className="text-sm text-gray-400">この日の予定はありません</p>
+              <p className="text-[12px] text-gray-400">この日の予定はありません</p>
             </div>
           )}
         </div>
       )}
 
+      {detailEvent && (
+        <EventDetailModal
+          event={detailEvent}
+          onClose={() => setDetailEvent(null)}
+          onEdit={openEditModal}
+          onDelete={handleDelete}
+          canEdit={canCreate}
+        />
+      )}
+
       {showModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowModal(false)}>
           <div className="bg-white rounded-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto shadow-xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h3 className="text-base font-semibold text-gray-900">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+              <h3 className="text-[14px] font-semibold text-gray-900">
                 {editingEvent ? '予定を編集' : '新しい予定'}
               </h3>
               <button onClick={() => setShowModal(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors">
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">タイトル</label>
+                <label className="block text-[11px] font-medium text-gray-500 mb-1">タイトル</label>
                 <input
                   type="text"
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-shadow"
+                  className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-shadow"
                   placeholder="予定のタイトル"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">種別</label>
+                <label className="block text-[11px] font-medium text-gray-500 mb-1">種別</label>
                 <select
                   value={form.eventType}
                   onChange={(e) => setForm({ ...form, eventType: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                  className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                 >
                   <option value="event">イベント</option>
                   <option value="practice">練習</option>
@@ -518,27 +656,27 @@ export default function Calendar() {
                   onChange={(e) => setForm({ ...form, allDay: e.target.checked })}
                   className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                 />
-                <label htmlFor="allDay" className="text-sm text-gray-600">終日</label>
+                <label htmlFor="allDay" className="text-[13px] text-gray-600">終日</label>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">開始日</label>
+                  <label className="block text-[11px] font-medium text-gray-500 mb-1">開始日</label>
                   <input
                     type="date"
                     value={form.startDate}
                     onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                    className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                   />
                 </div>
                 {!form.allDay && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">開始時間</label>
+                    <label className="block text-[11px] font-medium text-gray-500 mb-1">開始時間</label>
                     <input
                       type="time"
                       value={form.startTime}
                       onChange={(e) => setForm({ ...form, startTime: e.target.value })}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                      className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                     />
                   </div>
                 )}
@@ -546,51 +684,51 @@ export default function Calendar() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">終了日</label>
+                  <label className="block text-[11px] font-medium text-gray-500 mb-1">終了日</label>
                   <input
                     type="date"
                     value={form.endDate}
                     onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                    className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                   />
                 </div>
                 {!form.allDay && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">終了時間</label>
+                    <label className="block text-[11px] font-medium text-gray-500 mb-1">終了時間</label>
                     <input
                       type="time"
                       value={form.endTime}
                       onChange={(e) => setForm({ ...form, endTime: e.target.value })}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                      className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                     />
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">場所</label>
+                <label className="block text-[11px] font-medium text-gray-500 mb-1">場所</label>
                 <input
                   type="text"
                   value={form.location}
                   onChange={(e) => setForm({ ...form, location: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                  className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                   placeholder="場所（任意）"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">説明</label>
+                <label className="block text-[11px] font-medium text-gray-500 mb-1">説明</label>
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   rows={3}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none resize-none"
+                  className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none resize-none"
                   placeholder="詳細説明（任意）"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                <label className="block text-[11px] font-medium text-gray-500 mb-1.5">
                   対象カテゴリー
                 </label>
                 {teamCategories.length > 0 ? (
@@ -602,7 +740,7 @@ export default function Calendar() {
                           key={category.id}
                           type="button"
                           onClick={() => handleCategoryToggle(category.id)}
-                          className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                          className={`px-3 py-1 text-[11px] rounded-full border transition-colors ${
                             form.categoryIds.includes(category.id)
                               ? 'bg-purple-100 border-purple-300 text-purple-800 font-medium'
                               : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
@@ -614,7 +752,7 @@ export default function Calendar() {
                     </div>
                   </>
                 ) : (
-                  <p className="text-xs text-gray-400 bg-gray-50 p-3 rounded-lg">
+                  <p className="text-[11px] text-gray-400 bg-gray-50 p-3 rounded-lg">
                     カテゴリーが未設定のため全員に表示されます
                   </p>
                 )}
@@ -623,14 +761,14 @@ export default function Calendar() {
               <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-4 py-2 text-[12px] text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   キャンセル
                 </button>
                 <button
                   onClick={handleSubmit}
                   disabled={!form.title.trim() || !form.startDate}
-                  className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-2 text-[12px] font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {editingEvent ? '更新' : '作成'}
                 </button>
