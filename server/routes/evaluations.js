@@ -608,7 +608,8 @@ router.get('/summary/:playerId', authenticate, async (req, res) => {
 
 router.get('/comparison/:playerId', authenticate, async (req, res) => {
   try {
-    const { roundId } = req.query;
+    const { roundId, mode } = req.query;
+    const isCumulative = mode === 'cumulative';
     
     const player = await prisma.player.findUnique({
       where: { id: req.params.playerId },
@@ -648,37 +649,70 @@ router.get('/comparison/:playerId', authenticate, async (req, res) => {
       orderBy: { sortOrder: 'asc' }
     });
 
-    const evalWhere = { playerId: req.params.playerId };
-    if (roundId) evalWhere.roundId = roundId;
-
-    let evaluations = await prisma.evaluation.findMany({
-      where: evalWhere,
+    let allEvaluations = await prisma.evaluation.findMany({
+      where: { playerId: req.params.playerId },
       include: { item: { include: { parent: { include: { parent: true } } } }, round: true },
       orderBy: { evaluatedAt: 'desc' }
     });
 
     if (membershipPeriods) {
-      evaluations = evaluations.filter(e => 
+      allEvaluations = allEvaluations.filter(e => 
         isWithinMembershipPeriods(new Date(e.evaluatedAt), membershipPeriods)
       );
     }
 
-    const latestRoundId = roundId || (evaluations.length > 0 ? evaluations[0].roundId : null);
-    const latestEvals = evaluations.filter(e => e.roundId === latestRoundId);
-
-    const coachEvals = {};
-    const selfEvals = {};
-    latestEvals.forEach(e => {
-      if (e.raterType === 'COACH') {
-        if (!coachEvals[e.itemId] || e.evaluatedAt > coachEvals[e.itemId].evaluatedAt) {
-          coachEvals[e.itemId] = e;
-        }
-      } else if (e.raterType === 'SELF') {
-        if (!selfEvals[e.itemId] || e.evaluatedAt > selfEvals[e.itemId].evaluatedAt) {
-          selfEvals[e.itemId] = e;
-        }
+    const roundsMap = {};
+    allEvaluations.forEach(e => {
+      if (e.round && !roundsMap[e.roundId]) {
+        roundsMap[e.roundId] = { id: e.roundId, name: e.round.name, startDate: e.round.startDate };
       }
     });
+    const availableRounds = Object.values(roundsMap).sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+
+    const evaluations = (!isCumulative && roundId)
+      ? allEvaluations.filter(e => e.roundId === roundId)
+      : allEvaluations;
+
+    let coachEvals = {};
+    let selfEvals = {};
+
+    if (isCumulative) {
+      const coachByItem = {};
+      const selfByItem = {};
+      allEvaluations.forEach(e => {
+        if (e.raterType === 'COACH') {
+          if (!coachByItem[e.itemId]) coachByItem[e.itemId] = { total: 0, count: 0 };
+          coachByItem[e.itemId].total += e.score;
+          coachByItem[e.itemId].count += 1;
+        } else if (e.raterType === 'SELF') {
+          if (!selfByItem[e.itemId]) selfByItem[e.itemId] = { total: 0, count: 0 };
+          selfByItem[e.itemId].total += e.score;
+          selfByItem[e.itemId].count += 1;
+        }
+      });
+      Object.entries(coachByItem).forEach(([itemId, data]) => {
+        coachEvals[itemId] = { score: Math.round((data.total / data.count) * 10) / 10 };
+      });
+      Object.entries(selfByItem).forEach(([itemId, data]) => {
+        selfEvals[itemId] = { score: Math.round((data.total / data.count) * 10) / 10 };
+      });
+    } else {
+      const latestRoundId = roundId || (evaluations.length > 0 ? evaluations[0].roundId : null);
+      const latestEvals = evaluations.filter(e => e.roundId === latestRoundId);
+      latestEvals.forEach(e => {
+        if (e.raterType === 'COACH') {
+          if (!coachEvals[e.itemId] || e.evaluatedAt > coachEvals[e.itemId].evaluatedAt) {
+            coachEvals[e.itemId] = e;
+          }
+        } else if (e.raterType === 'SELF') {
+          if (!selfEvals[e.itemId] || e.evaluatedAt > selfEvals[e.itemId].evaluatedAt) {
+            selfEvals[e.itemId] = e;
+          }
+        }
+      });
+    }
+
+    const selectedRoundId = isCumulative ? null : (roundId || (evaluations.length > 0 ? evaluations[0].roundId : null));
 
     const buildHierarchy = (items, parentId = null) => {
       return items
@@ -698,42 +732,48 @@ router.get('/comparison/:playerId', authenticate, async (req, res) => {
           item.children.forEach(child => {
             if (child.children && child.children.length > 0) {
               child.children.forEach(leaf => {
+                const coachScore = coachEvals[leaf.id]?.score ?? null;
+                const selfScore = selfEvals[leaf.id]?.score ?? null;
                 result.push({
                   itemId: leaf.id,
                   category: item.name,
                   subCategory: child.name,
                   itemName: leaf.name,
-                  coachScore: coachEvals[leaf.id]?.score || null,
-                  selfScore: selfEvals[leaf.id]?.score || null,
-                  gap: coachEvals[leaf.id] && selfEvals[leaf.id] 
-                    ? coachEvals[leaf.id].score - selfEvals[leaf.id].score 
+                  coachScore,
+                  selfScore,
+                  gap: coachScore !== null && selfScore !== null 
+                    ? Math.round((coachScore - selfScore) * 10) / 10
                     : null
                 });
               });
             } else {
+              const coachScore = coachEvals[child.id]?.score ?? null;
+              const selfScore = selfEvals[child.id]?.score ?? null;
               result.push({
                 itemId: child.id,
                 category: item.name,
                 subCategory: null,
                 itemName: child.name,
-                coachScore: coachEvals[child.id]?.score || null,
-                selfScore: selfEvals[child.id]?.score || null,
-                gap: coachEvals[child.id] && selfEvals[child.id] 
-                  ? coachEvals[child.id].score - selfEvals[child.id].score 
+                coachScore,
+                selfScore,
+                gap: coachScore !== null && selfScore !== null 
+                  ? Math.round((coachScore - selfScore) * 10) / 10
                   : null
               });
             }
           });
         } else {
+          const coachScore = coachEvals[item.id]?.score ?? null;
+          const selfScore = selfEvals[item.id]?.score ?? null;
           result.push({
             itemId: item.id,
             category: null,
             subCategory: null,
             itemName: item.name,
-            coachScore: coachEvals[item.id]?.score || null,
-            selfScore: selfEvals[item.id]?.score || null,
-            gap: coachEvals[item.id] && selfEvals[item.id] 
-              ? coachEvals[item.id].score - selfEvals[item.id].score 
+            coachScore,
+            selfScore,
+            gap: coachScore !== null && selfScore !== null 
+              ? Math.round((coachScore - selfScore) * 10) / 10
               : null
           });
         }
@@ -744,9 +784,11 @@ router.get('/comparison/:playerId', authenticate, async (req, res) => {
     const comparison = flattenWithHierarchy(hierarchy);
 
     res.json({
-      roundId: latestRoundId,
+      roundId: selectedRoundId,
       comparison,
-      hasData: latestEvals.length > 0
+      hasData: evaluations.length > 0,
+      availableRounds,
+      mode: isCumulative ? 'cumulative' : 'round'
     });
   } catch (error) {
     console.error('Comparison error:', error);

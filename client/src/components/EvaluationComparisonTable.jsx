@@ -33,7 +33,7 @@ const getGapBadge = (gap) => {
   );
 };
 
-const ScoreCell = ({ score }) => {
+const ScoreCell = ({ score, isCumulative }) => {
   if (score === null || score === undefined) {
     return (
       <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
@@ -41,17 +41,19 @@ const ScoreCell = ({ score }) => {
       </td>
     );
   }
-  const colorClass = scoreHeatmapColors[score] || 'bg-gray-100 text-gray-700';
+  const roundedKey = Math.round(score);
+  const colorClass = scoreHeatmapColors[roundedKey] || 'bg-gray-100 text-gray-700';
+  const displayScore = isCumulative ? (Number.isInteger(score) ? score : score.toFixed(1)) : score;
   return (
     <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
       <span className={`inline-flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg font-semibold text-sm ${colorClass}`}>
-        {score}
+        {displayScore}
       </span>
     </td>
   );
 };
 
-export default function EvaluationComparisonTable({ data, loading, hasData = true }) {
+export default function EvaluationComparisonTable({ data, loading, hasData = true, isCumulative = false }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -124,8 +126,8 @@ export default function EvaluationComparisonTable({ data, loading, hasData = tru
                     ) : null}
                     {item.itemName}
                   </td>
-                  <ScoreCell score={item.coachScore} />
-                  <ScoreCell score={item.selfScore} />
+                  <ScoreCell score={item.coachScore} isCumulative={isCumulative} />
+                  <ScoreCell score={item.selfScore} isCumulative={isCumulative} />
                   <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
                     {getGapBadge(item.gap)}
                   </td>

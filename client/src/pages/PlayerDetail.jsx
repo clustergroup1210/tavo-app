@@ -37,16 +37,22 @@ export default function PlayerDetail() {
   const [linkingUser, setLinkingUser] = useState(false);
   const [linkError, setLinkError] = useState('');
   const [teamCategories, setTeamCategories] = useState([]);
+  const [comparisonMode, setComparisonMode] = useState('round');
+  const [comparisonRoundId, setComparisonRoundId] = useState('');
+  const [availableRounds, setAvailableRounds] = useState([]);
 
   useEffect(() => {
     fetchPlayer();
     fetchEvaluationSummary();
     fetchTeams();
     fetchNotes();
-    fetchEvaluationComparison();
     fetchProgressData();
     fetchHeatmapData();
   }, [id]);
+
+  useEffect(() => {
+    fetchEvaluationComparison();
+  }, [id, comparisonMode, comparisonRoundId]);
 
   const fetchNotes = async () => {
     try {
@@ -60,9 +66,18 @@ export default function PlayerDetail() {
 
   const fetchEvaluationComparison = async () => {
     try {
-      const res = await fetch(`/api/evaluations/comparison/${id}`, { credentials: 'include' });
+      const params = new URLSearchParams();
+      if (comparisonMode === 'cumulative') {
+        params.set('mode', 'cumulative');
+      } else if (comparisonRoundId) {
+        params.set('roundId', comparisonRoundId);
+      }
+      const res = await fetch(`/api/evaluations/comparison/${id}?${params.toString()}`, { credentials: 'include' });
       const data = await res.json();
       setEvaluationComparison(data);
+      if (data.availableRounds) {
+        setAvailableRounds(data.availableRounds);
+      }
     } catch (error) {
       console.error('Failed to fetch evaluation comparison:', error);
     }
@@ -937,11 +952,53 @@ export default function PlayerDetail() {
       {activeTab === 'evaluation' && (
         <div className="space-y-6">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">指導者評価 vs 自己評価（認識ギャップ）</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">指導者評価 vs 自己評価（認識ギャップ）</h2>
+              <div className="flex items-center gap-3">
+                <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+                  <button
+                    onClick={() => setComparisonMode('round')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      comparisonMode === 'round' 
+                        ? 'bg-white text-primary-700 shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    月毎
+                  </button>
+                  <button
+                    onClick={() => setComparisonMode('cumulative')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      comparisonMode === 'cumulative' 
+                        ? 'bg-white text-primary-700 shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    累計
+                  </button>
+                </div>
+                {comparisonMode === 'round' && availableRounds.length > 0 && (
+                  <select
+                    value={comparisonRoundId}
+                    onChange={(e) => setComparisonRoundId(e.target.value)}
+                    className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">最新</option>
+                    {availableRounds.map(r => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+            {comparisonMode === 'cumulative' && (
+              <p className="text-xs text-gray-500 mb-3">全ラウンドの評価スコアを平均した累計値で比較しています</p>
+            )}
             <EvaluationComparisonTable 
               data={evaluationComparison.comparison} 
               loading={loading}
               hasData={evaluationComparison.hasData}
+              isCumulative={comparisonMode === 'cumulative'}
             />
           </div>
 
