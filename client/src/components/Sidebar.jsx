@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, UserCircle, ClipboardList, Video, 
   Bell, Settings, Building2, UserCog, ListChecks, Database,
   Link2, FileText, TrendingUp, LogOut, Megaphone, ArrowLeft, Shield, Trophy, Target,
-  Calendar, UserPlus, X, Grid3X3, HelpCircle, Menu
+  Calendar, UserPlus, X, Grid3X3
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -158,13 +158,13 @@ export default function Sidebar({ isOpen, onClose }) {
       <Link
         to={item.path}
         className={clsx(
-          'flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+          'flex items-center gap-2.5 px-3 py-[7px] rounded text-[12.5px] transition-all duration-150',
           isActive
-            ? 'bg-white/15 text-white'
-            : 'text-slate-300 hover:bg-white/10 hover:text-white'
+            ? 'bg-blue-600 text-white font-medium'
+            : 'text-slate-300/90 hover:bg-white/[0.08] hover:text-white font-normal'
         )}
       >
-        <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+        <Icon className="w-4 h-4 flex-shrink-0" />
         <span className="truncate">{item.label}</span>
       </Link>
     );
@@ -173,94 +173,69 @@ export default function Sidebar({ isOpen, onClose }) {
   return (
     <aside
       className={clsx(
-        'fixed left-0 top-0 h-screen w-64 bg-sidebar flex flex-col z-50 transition-transform duration-300',
+        'fixed left-0 top-0 h-screen w-60 bg-sidebar flex flex-col z-50 transition-transform duration-300',
         'lg:translate-x-0',
         isOpen ? 'translate-x-0' : '-translate-x-full'
       )}
     >
-      <div className="px-4 pt-5 pb-4 border-b border-white/10">
-        <div className="flex items-center justify-between lg:hidden mb-3">
-          <span className="text-sm font-medium text-slate-400">メニュー</span>
-          <button
-            onClick={onClose}
-            className="p-1 text-slate-400 hover:text-white rounded"
-          >
-            <X className="w-5 h-5" />
+      <div className="px-4 pt-4 pb-3 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between lg:hidden mb-2">
+          <span className="text-xs font-medium text-slate-400">メニュー</span>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white rounded">
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {isOperator() && (
           <Link
             to="/admin"
-            className="flex items-center gap-2 px-3 py-2 mb-3 text-xs text-blue-300 bg-white/10 rounded-lg hover:bg-white/15 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 mb-2.5 text-[11px] text-blue-300 bg-white/[0.06] rounded hover:bg-white/[0.1] transition-colors"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <ArrowLeft className="w-3 h-3" />
             管理画面に戻る
           </Link>
         )}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           {isPlayer() && playerData ? (
             <>
               {playerData.photoUrl ? (
-                <img
-                  src={playerData.photoUrl}
-                  alt=""
-                  className="w-9 h-9 rounded-full object-cover ring-2 ring-white/20"
-                />
+                <img src={playerData.photoUrl} alt="" className="w-8 h-8 rounded-full object-cover ring-1 ring-white/20" />
               ) : (
-                <div className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center">
-                  <UserCircle className="w-5 h-5 text-white/70" />
+                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                  <UserCircle className="w-4 h-4 text-white/60" />
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <h2 className="font-semibold text-white text-sm truncate">
-                  {playerData.name}
-                </h2>
-                <p className="text-[11px] text-slate-400 truncate">
-                  {currentTeam?.name}
-                </p>
+                <h2 className="font-medium text-white text-[13px] truncate">{playerData.name}</h2>
+                <p className="text-[10px] text-slate-400 truncate">{currentTeam?.name}</p>
               </div>
             </>
           ) : isParent() && childPlayerData ? (
             <>
               {childPlayerData.photoUrl ? (
-                <img
-                  src={childPlayerData.photoUrl}
-                  alt=""
-                  className="w-9 h-9 rounded-full object-cover ring-2 ring-white/20"
-                />
+                <img src={childPlayerData.photoUrl} alt="" className="w-8 h-8 rounded-full object-cover ring-1 ring-white/20" />
               ) : (
-                <div className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center">
-                  <UserCircle className="w-5 h-5 text-white/70" />
+                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                  <UserCircle className="w-4 h-4 text-white/60" />
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <h2 className="font-semibold text-white text-sm truncate">
-                  {childPlayerData.name}
-                </h2>
-                <p className="text-[11px] text-slate-400 truncate">
-                  {childPlayerData.team?.name || currentTeam?.name}
-                </p>
-                <p className="text-[10px] text-pink-400">保護者</p>
+                <h2 className="font-medium text-white text-[13px] truncate">{childPlayerData.name}</h2>
+                <p className="text-[10px] text-slate-400 truncate">{childPlayerData.team?.name || currentTeam?.name}</p>
+                <p className="text-[9px] text-pink-400">保護者</p>
               </div>
             </>
           ) : (
             <>
               {currentTeam?.logoUrl ? (
-                <img
-                  src={currentTeam.logoUrl}
-                  alt=""
-                  className="w-9 h-9 rounded-lg object-cover ring-2 ring-white/20"
-                />
+                <img src={currentTeam.logoUrl} alt="" className="w-8 h-8 rounded object-cover ring-1 ring-white/20" />
               ) : (
-                <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center">
-                  <Building2 className="w-5 h-5 text-white/70" />
+                <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center">
+                  <Building2 className="w-4 h-4 text-white/60" />
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <h2 className="font-semibold text-white text-sm truncate">
-                  {currentTeam?.name || 'チーム未選択'}
-                </h2>
+                <h2 className="font-medium text-white text-[13px] truncate">{currentTeam?.name || 'チーム未選択'}</h2>
               </div>
             </>
           )}
@@ -273,12 +248,10 @@ export default function Sidebar({ isOpen, onClose }) {
               const org = organizations.find(o => o.id === e.target.value);
               if (org) setSelectedOrg(org);
             }}
-            className="mt-3 w-full text-xs text-white bg-white/10 border border-white/10 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-white/30"
+            className="mt-2 w-full text-[11px] text-white/80 bg-white/[0.06] border border-white/[0.06] rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-white/20"
           >
             {organizations.map((org) => (
-              <option key={org.id} value={org.id} className="bg-sidebar-dark text-white">
-                {org.name}
-              </option>
+              <option key={org.id} value={org.id} className="bg-sidebar-dark text-white">{org.name}</option>
             ))}
           </select>
         )}
@@ -290,32 +263,30 @@ export default function Sidebar({ isOpen, onClose }) {
               const team = teams.find(t => t.team.id === e.target.value)?.team;
               if (team) setCurrentTeam(team);
             }}
-            className="mt-3 w-full text-xs text-white bg-white/10 border border-white/10 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-white/30"
+            className="mt-2 w-full text-[11px] text-white/80 bg-white/[0.06] border border-white/[0.06] rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-white/20"
           >
             {teams.map(({ team }) => (
-              <option key={team.id} value={team.id} className="bg-sidebar-dark text-white">
-                {team.name}
-              </option>
+              <option key={team.id} value={team.id} className="bg-sidebar-dark text-white">{team.name}</option>
             ))}
           </select>
         )}
       </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-hide">
-        <nav className="px-3 py-3 space-y-0.5">
+        <nav className="px-2.5 py-2.5 space-y-[2px]">
           {menuItems.main.map((item) => (
             <NavLink key={item.path} item={item} />
           ))}
         </nav>
 
         {menuItems.admin.length > 0 && (
-          <div className="px-3 pb-3 pt-1">
-            <div className="border-t border-white/10 pt-3 mb-1">
-              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2 px-4">
+          <div className="px-2.5 pb-2.5">
+            <div className="border-t border-white/[0.06] pt-2.5 mb-1">
+              <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1.5 px-3">
                 管理
               </p>
             </div>
-            <div className="space-y-0.5">
+            <div className="space-y-[2px]">
               {menuItems.admin.map((item) => (
                 <NavLink key={item.path} item={item} />
               ))}
@@ -324,38 +295,36 @@ export default function Sidebar({ isOpen, onClose }) {
         )}
       </div>
 
-      <div className="border-t border-white/10 flex-shrink-0">
-        <div className="px-3 py-2">
+      <div className="border-t border-white/[0.06] flex-shrink-0">
+        <div className="px-2.5 py-1.5">
           <Link
             to="/notification-settings"
             className={clsx(
-              'flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+              'flex items-center gap-2.5 px-3 py-[7px] rounded text-[12.5px] transition-all duration-150',
               location.pathname === '/notification-settings'
-                ? 'bg-white/15 text-white'
-                : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                ? 'bg-blue-600 text-white font-medium'
+                : 'text-slate-300/90 hover:bg-white/[0.08] hover:text-white font-normal'
             )}
           >
-            <Bell className="w-[18px] h-[18px]" />
+            <Bell className="w-4 h-4" />
             通知設定
           </Link>
         </div>
-        <div className="px-4 py-3 border-t border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center flex-shrink-0">
-              <span className="text-xs font-semibold text-white">
-                {user?.name?.charAt(0) || 'U'}
-              </span>
+        <div className="px-3 py-2.5 border-t border-white/[0.06]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+              <span className="text-[10px] font-medium text-white">{user?.name?.charAt(0) || 'U'}</span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">{user?.name}</p>
-              <p className="text-[11px] text-slate-400 truncate">{user?.email}</p>
+              <p className="text-[12px] font-medium text-white truncate">{user?.name}</p>
+              <p className="text-[10px] text-slate-400 truncate">{user?.email}</p>
             </div>
             <button
               onClick={logout}
-              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+              className="p-1 text-slate-400 hover:text-white rounded hover:bg-white/[0.08] transition-colors"
               title="ログアウト"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

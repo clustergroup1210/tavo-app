@@ -12,33 +12,33 @@ export default function Layout({ children }) {
     <div className="flex min-h-screen bg-gray-100">
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="flex-1 lg:ml-64 flex flex-col min-w-0">
-        <header className="h-14 bg-white border-b border-gray-200/80 flex items-center justify-between px-4 lg:px-6 fixed top-0 left-0 right-0 lg:left-64 z-30 shadow-sm">
+      <div className="flex-1 lg:ml-60 flex flex-col min-w-0">
+        <header className="h-12 bg-white border-b border-gray-200/80 flex items-center justify-between px-4 lg:px-5 fixed top-0 left-0 right-0 lg:left-60 z-30 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-lg lg:hidden"
+            className="p-1.5 -ml-1 text-gray-500 hover:bg-gray-100 rounded lg:hidden"
           >
             <Menu className="w-5 h-5" />
           </button>
 
           <div className="flex items-center gap-3 ml-auto">
             <NotificationBell />
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-sidebar flex items-center justify-center text-white font-medium text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-sidebar flex items-center justify-center text-white text-[10px] font-medium">
                 {user?.name?.charAt(0) || 'U'}
               </div>
-              <span className="text-sm font-medium text-gray-700 hidden sm:block">{user?.name}</span>
+              <span className="text-[12.5px] font-medium text-gray-600 hidden sm:block">{user?.name}</span>
             </div>
           </div>
         </header>
-        <main className="flex-1 p-4 lg:p-6 min-w-0 mt-14">
+        <main className="flex-1 p-4 lg:p-5 min-w-0 mt-12">
           {children}
         </main>
       </div>
