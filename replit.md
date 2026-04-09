@@ -127,7 +127,7 @@ The system emphasizes a team-centric display and robust role-based access contro
     -   Permission logic: `canEvaluatePlayer` function in auth middleware enforces evaluation permissions
 
 ### UI/UX Decisions
--   **Sidebar Navigation**: Clevio-style left-fixed sidebar, dynamic based on user role.
+-   **Sidebar Navigation**: Dark navy sidebar (`bg-sidebar: #1e293b`) with white text, active item highlighted with `bg-white/15`, admin section separated with border. User profile at bottom with logout button. Dynamic menu based on user role.
 -   **Player Profile**: Rich card-based design with gradient headers, photos, and tabbed navigation for evaluations, videos, notes, progress, and appeals.
 -   **Data Visualization**: Extensive use of Recharts for evaluation progress, category trends, and gap analysis with intuitive coloring (e.g., heatmap cells, blue/red bars for positive/negative gaps).
 -   **Admin Interface**: Separate, dedicated interface for operators with distinct navigation and management tools.

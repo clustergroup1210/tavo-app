@@ -40,14 +40,14 @@ export default function AdminSidebar({ isOpen, onClose }) {
       <Link
         to={item.path}
         className={clsx(
-          'flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors',
+          'flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150',
           isActive
-            ? 'bg-indigo-50 text-indigo-700'
-            : 'text-gray-600 hover:bg-gray-100'
+            ? 'bg-white/15 text-white'
+            : 'text-slate-300 hover:bg-white/10 hover:text-white'
         )}
       >
-        <Icon className="w-5 h-5" />
-        {item.label}
+        <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+        <span className="truncate">{item.label}</span>
       </Link>
     );
   };
@@ -55,58 +55,68 @@ export default function AdminSidebar({ isOpen, onClose }) {
   return (
     <aside
       className={clsx(
-        'fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 flex flex-col z-50 transition-transform duration-300',
+        'fixed left-0 top-0 h-screen w-64 bg-sidebar flex flex-col z-50 transition-transform duration-300',
         'lg:translate-x-0',
         isOpen ? 'translate-x-0' : '-translate-x-full'
       )}
     >
-      <div className="p-4 border-b border-gray-200">
+      <div className="px-4 pt-5 pb-4 border-b border-white/10">
         <div className="flex items-center justify-between lg:hidden mb-3">
-          <span className="text-sm font-medium text-gray-500">メニュー</span>
+          <span className="text-sm font-medium text-slate-400">メニュー</span>
           <button
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-600 rounded"
+            className="p-1 text-slate-400 hover:text-white rounded"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-lg bg-blue-500 flex items-center justify-center flex-shrink-0">
             <Shield className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="font-semibold text-gray-900">システム管理</h2>
-            <p className="text-xs text-gray-500">管理者コンソール</p>
+            <h2 className="font-semibold text-white text-sm">システム管理</h2>
+            <p className="text-[11px] text-slate-400">管理者コンソール</p>
           </div>
         </div>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto scrollbar-hide">
         {menuItems.main.map((item) => (
           <NavLink key={item.path} item={item} />
         ))}
       </nav>
 
-      <div className="p-4 border-t border-gray-200 flex-shrink-0">
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 px-4">
+      <div className="px-3 pb-3 pt-1 border-t border-white/10">
+        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2 px-4 pt-3">
           設定
         </p>
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {menuItems.settings.map((item) => (
             <NavLink key={item.path} item={item} />
           ))}
         </div>
       </div>
 
-      <div className="p-4 border-t border-gray-200 flex-shrink-0 mt-auto">
-        <button
-          onClick={logout}
-          className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors"
-        >
-          <LogOut className="w-5 h-5" />
-          ログアウト
-        </button>
+      <div className="px-4 py-3 border-t border-white/10 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center flex-shrink-0">
+            <span className="text-xs font-semibold text-white">
+              {user?.name?.charAt(0) || 'U'}
+            </span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-white truncate">{user?.name}</p>
+          </div>
+          <button
+            onClick={logout}
+            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+            title="ログアウト"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </aside>
   );

@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, UserCircle, ClipboardList, Video, 
   Bell, Settings, Building2, UserCog, ListChecks, Database,
   Link2, FileText, TrendingUp, LogOut, Megaphone, ArrowLeft, Shield, Trophy, Target,
-  Calendar, UserPlus, X, Grid3X3
+  Calendar, UserPlus, X, Grid3X3, HelpCircle, Menu
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -158,14 +158,14 @@ export default function Sidebar({ isOpen, onClose }) {
       <Link
         to={item.path}
         className={clsx(
-          'flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors',
+          'flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150',
           isActive
-            ? 'bg-primary-50 text-primary-700'
-            : 'text-gray-600 hover:bg-gray-100'
+            ? 'bg-white/15 text-white'
+            : 'text-slate-300 hover:bg-white/10 hover:text-white'
         )}
       >
-        <Icon className="w-5 h-5" />
-        {item.label}
+        <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+        <span className="truncate">{item.label}</span>
       </Link>
     );
   };
@@ -173,17 +173,17 @@ export default function Sidebar({ isOpen, onClose }) {
   return (
     <aside
       className={clsx(
-        'fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 flex flex-col z-50 transition-transform duration-300',
+        'fixed left-0 top-0 h-screen w-64 bg-sidebar flex flex-col z-50 transition-transform duration-300',
         'lg:translate-x-0',
         isOpen ? 'translate-x-0' : '-translate-x-full'
       )}
     >
-      <div className="p-4 border-b border-gray-200">
+      <div className="px-4 pt-5 pb-4 border-b border-white/10">
         <div className="flex items-center justify-between lg:hidden mb-3">
-          <span className="text-sm font-medium text-gray-500">メニュー</span>
+          <span className="text-sm font-medium text-slate-400">メニュー</span>
           <button
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-600 rounded"
+            className="p-1 text-slate-400 hover:text-white rounded"
           >
             <X className="w-5 h-5" />
           </button>
@@ -192,9 +192,9 @@ export default function Sidebar({ isOpen, onClose }) {
         {isOperator() && (
           <Link
             to="/admin"
-            className="flex items-center gap-2 px-3 py-2 mb-3 text-sm text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 mb-3 text-xs text-blue-300 bg-white/10 rounded-lg hover:bg-white/15 transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-3.5 h-3.5" />
             管理画面に戻る
           </Link>
         )}
@@ -205,18 +205,18 @@ export default function Sidebar({ isOpen, onClose }) {
                 <img
                   src={playerData.photoUrl}
                   alt=""
-                  className="w-10 h-10 rounded-full object-cover"
+                  className="w-9 h-9 rounded-full object-cover ring-2 ring-white/20"
                 />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
-                  <UserCircle className="w-6 h-6 text-primary-500" />
+                <div className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center">
+                  <UserCircle className="w-5 h-5 text-white/70" />
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <h2 className="font-semibold text-gray-900 truncate">
+                <h2 className="font-semibold text-white text-sm truncate">
                   {playerData.name}
                 </h2>
-                <p className="text-xs text-gray-500 truncate">
+                <p className="text-[11px] text-slate-400 truncate">
                   {currentTeam?.name}
                 </p>
               </div>
@@ -227,21 +227,21 @@ export default function Sidebar({ isOpen, onClose }) {
                 <img
                   src={childPlayerData.photoUrl}
                   alt=""
-                  className="w-10 h-10 rounded-full object-cover"
+                  className="w-9 h-9 rounded-full object-cover ring-2 ring-white/20"
                 />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-pink-100 flex items-center justify-center">
-                  <UserCircle className="w-6 h-6 text-pink-500" />
+                <div className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center">
+                  <UserCircle className="w-5 h-5 text-white/70" />
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <h2 className="font-semibold text-gray-900 truncate">
+                <h2 className="font-semibold text-white text-sm truncate">
                   {childPlayerData.name}
                 </h2>
-                <p className="text-xs text-gray-500 truncate">
+                <p className="text-[11px] text-slate-400 truncate">
                   {childPlayerData.team?.name || currentTeam?.name}
                 </p>
-                <p className="text-xs text-pink-500">保護者</p>
+                <p className="text-[10px] text-pink-400">保護者</p>
               </div>
             </>
           ) : (
@@ -250,15 +250,15 @@ export default function Sidebar({ isOpen, onClose }) {
                 <img
                   src={currentTeam.logoUrl}
                   alt=""
-                  className="w-10 h-10 rounded-lg object-cover"
+                  className="w-9 h-9 rounded-lg object-cover ring-2 ring-white/20"
                 />
               ) : (
-                <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center">
-                  <Building2 className="w-5 h-5 text-gray-500" />
+                <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-white/70" />
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <h2 className="font-semibold text-gray-900 truncate">
+                <h2 className="font-semibold text-white text-sm truncate">
                   {currentTeam?.name || 'チーム未選択'}
                 </h2>
               </div>
@@ -273,10 +273,10 @@ export default function Sidebar({ isOpen, onClose }) {
               const org = organizations.find(o => o.id === e.target.value);
               if (org) setSelectedOrg(org);
             }}
-            className="mt-3 w-full text-sm border border-gray-300 rounded-lg px-3 py-2"
+            className="mt-3 w-full text-xs text-white bg-white/10 border border-white/10 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-white/30"
           >
             {organizations.map((org) => (
-              <option key={org.id} value={org.id}>
+              <option key={org.id} value={org.id} className="bg-sidebar-dark text-white">
                 {org.name}
               </option>
             ))}
@@ -290,10 +290,10 @@ export default function Sidebar({ isOpen, onClose }) {
               const team = teams.find(t => t.team.id === e.target.value)?.team;
               if (team) setCurrentTeam(team);
             }}
-            className="mt-3 w-full text-sm border border-gray-300 rounded-lg px-3 py-2"
+            className="mt-3 w-full text-xs text-white bg-white/10 border border-white/10 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-white/30"
           >
             {teams.map(({ team }) => (
-              <option key={team.id} value={team.id}>
+              <option key={team.id} value={team.id} className="bg-sidebar-dark text-white">
                 {team.name}
               </option>
             ))}
@@ -301,19 +301,21 @@ export default function Sidebar({ isOpen, onClose }) {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        <nav className="p-4 space-y-1">
+      <div className="flex-1 overflow-y-auto scrollbar-hide">
+        <nav className="px-3 py-3 space-y-0.5">
           {menuItems.main.map((item) => (
             <NavLink key={item.path} item={item} />
           ))}
         </nav>
 
         {menuItems.admin.length > 0 && (
-          <div className="px-4 pb-4 pt-2 border-t border-gray-200">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 px-4">
-              管理
-            </p>
-            <div className="space-y-1">
+          <div className="px-3 pb-3 pt-1">
+            <div className="border-t border-white/10 pt-3 mb-1">
+              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2 px-4">
+                管理
+              </p>
+            </div>
+            <div className="space-y-0.5">
               {menuItems.admin.map((item) => (
                 <NavLink key={item.path} item={item} />
               ))}
@@ -322,35 +324,40 @@ export default function Sidebar({ isOpen, onClose }) {
         )}
       </div>
 
-      <div className="p-4 border-t border-gray-200 shrink-0">
-        <Link
-          to="/notification-settings"
-          className={clsx(
-            'flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors mb-2',
-            location.pathname === '/notification-settings'
-              ? 'bg-primary-50 text-primary-700'
-              : 'text-gray-600 hover:bg-gray-100'
-          )}
-        >
-          <Bell className="w-5 h-5" />
-          通知設定
-        </Link>
-        <div className="flex items-center gap-3 px-4 py-2">
-          <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-            <span className="text-sm font-medium text-primary-700">
-              {user?.name?.charAt(0) || 'U'}
-            </span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
-            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-          </div>
-          <button
-            onClick={logout}
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+      <div className="border-t border-white/10 flex-shrink-0">
+        <div className="px-3 py-2">
+          <Link
+            to="/notification-settings"
+            className={clsx(
+              'flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+              location.pathname === '/notification-settings'
+                ? 'bg-white/15 text-white'
+                : 'text-slate-300 hover:bg-white/10 hover:text-white'
+            )}
           >
-            <LogOut className="w-4 h-4" />
-          </button>
+            <Bell className="w-[18px] h-[18px]" />
+            通知設定
+          </Link>
+        </div>
+        <div className="px-4 py-3 border-t border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center flex-shrink-0">
+              <span className="text-xs font-semibold text-white">
+                {user?.name?.charAt(0) || 'U'}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">{user?.name}</p>
+              <p className="text-[11px] text-slate-400 truncate">{user?.email}</p>
+            </div>
+            <button
+              onClick={logout}
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+              title="ログアウト"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </aside>

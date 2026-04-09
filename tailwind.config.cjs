@@ -19,6 +19,11 @@ module.exports = {
           800: '#1e40af',
           900: '#1e3a8a',
         },
+        sidebar: {
+          DEFAULT: '#1e293b',
+          dark: '#0f172a',
+          light: '#334155',
+        },
       },
     },
   },
