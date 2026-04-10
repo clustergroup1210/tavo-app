@@ -184,7 +184,14 @@ export default function Videos() {
     try {
       const res = await fetch(`/api/videos/${video.id}`, { credentials: 'include' });
       const data = await res.json();
-      setVideoUrl(data.url);
+      let url = data.url;
+      if (url && url.startsWith('/api/')) {
+        const token = localStorage.getItem('auth_token');
+        if (token) {
+          url += (url.includes('?') ? '&' : '?') + `token=${encodeURIComponent(token)}`;
+        }
+      }
+      setVideoUrl(url);
     } catch (error) {
       console.error('Failed to get video URL:', error);
     }
