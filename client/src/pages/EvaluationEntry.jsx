@@ -1,27 +1,50 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Save, Plus, X, Calendar, CheckCircle, HelpCircle, Trash2, Edit3 } from 'lucide-react';
+import { Save, Plus, X, Calendar, CheckCircle, HelpCircle, Trash2, Edit3, ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import clsx from 'clsx';
+
+const getScoreColor = (score) => {
+  if (!score) return '';
+  if (score >= 5) return 'bg-blue-100 text-blue-700';
+  if (score >= 4) return 'bg-green-100 text-green-700';
+  if (score >= 3) return 'bg-yellow-100 text-yellow-700';
+  if (score >= 2) return 'bg-orange-100 text-orange-700';
+  return 'bg-red-100 text-red-700';
+};
+
+const getScoreBg = (score) => {
+  if (!score) return 'bg-gray-50';
+  if (score >= 5) return 'bg-blue-50';
+  if (score >= 4) return 'bg-green-50';
+  if (score >= 3) return 'bg-yellow-50';
+  if (score >= 2) return 'bg-orange-50';
+  return 'bg-red-50';
+};
 
 export default function EvaluationEntry() {
-  const { currentTeam, user, isCoach, isPlayer, playerData } = useAuth();
+  const { currentTeam, user, isCoach, isPlayer, isParent, playerData } = useAuth();
   const [players, setPlayers] = useState([]);
   const [teamCategories, setTeamCategories] = useState([]);
   const [filterCategory, setFilterCategory] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState('');
   const [items, setItems] = useState([]);
   const [rounds, setRounds] = useState([]);
+  const [scoreMap, setScoreMap] = useState({});
   const [selectedRound, setSelectedRound] = useState('');
-  const [scores, setScores] = useState({});
+  const [editScores, setEditScores] = useState({});
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [showAddRound, setShowAddRound] = useState(false);
   const [newRoundYear, setNewRoundYear] = useState(new Date().getFullYear());
   const [newRoundMonth, setNewRoundMonth] = useState(new Date().getMonth() + 1);
   const [addingRound, setAddingRound] = useState(false);
-  const [existingEvaluations, setExistingEvaluations] = useState([]);
-  const [hasExistingEvaluations, setHasExistingEvaluations] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const tableRef = useRef(null);
+
+  const isSelfEval = isPlayer();
+  const evaluatorType = isSelfEval ? 'SELF' : 'COACH';
 
   useEffect(() => {
     if (isPlayer() && playerData) {
@@ -31,126 +54,123 @@ export default function EvaluationEntry() {
 
   useEffect(() => {
     if (currentTeam || (isPlayer() && playerData)) {
-      fetchData();
+      fetchBaseData();
     }
   }, [currentTeam, playerData]);
 
   useEffect(() => {
-    if (selectedPlayer && selectedRound) {
-      fetchExistingEvaluations();
+    if (selectedPlayer) {
+      fetchHistory();
     } else {
-      setScores({});
-      setExistingEvaluations([]);
-      setHasExistingEvaluations(false);
+      setItems([]);
+      setRounds([]);
+      setScoreMap({});
+      setSelectedRound('');
+      setEditScores({});
       setIsEditing(false);
     }
     setSuccess(false);
-  }, [selectedPlayer, selectedRound]);
+  }, [selectedPlayer]);
 
-  const fetchExistingEvaluations = async () => {
-    try {
-      const evaluatorType = isPlayer() ? 'SELF' : 'COACH';
-      const res = await fetch(
-        `/api/evaluations?playerId=${selectedPlayer}&roundId=${selectedRound}&evaluatorType=${evaluatorType}`,
-        { credentials: 'include' }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        const evaluations = Array.isArray(data) ? data : [];
-        setExistingEvaluations(evaluations);
-        setHasExistingEvaluations(evaluations.length > 0);
-        setIsEditing(false);
-
-        const existingScores = {};
-        evaluations.forEach(ev => {
-          existingScores[ev.itemId] = ev.score;
-        });
-        setScores(existingScores);
-      }
-    } catch (error) {
-      console.error('Failed to fetch existing evaluations:', error);
+  useEffect(() => {
+    if (selectedRound && scoreMap) {
+      const existing = {};
+      leaves.forEach(leaf => {
+        const key = `${selectedRound}_${leaf.id}_${evaluatorType}`;
+        if (scoreMap[key]) existing[leaf.id] = scoreMap[key];
+      });
+      setEditScores(existing);
+      setIsEditing(false);
     }
-  };
+  }, [selectedRound]);
 
-  const fetchData = async () => {
-    try {
-      const teamId = isPlayer() && playerData ? playerData.teamId : currentTeam?.id;
-      if (!teamId) return;
+  const fetchBaseData = async () => {
+    const teamId = isPlayer() && playerData ? playerData.teamId : currentTeam?.id;
+    if (!teamId) return;
 
-      if (isPlayer() && playerData) {
-        const [itemsRes, roundsRes] = await Promise.all([
-          fetch(`/api/evaluations/items?teamId=${teamId}`, { credentials: 'include' }),
-          fetch(`/api/evaluations/rounds?teamId=${teamId}`, { credentials: 'include' }),
-        ]);
-
-        const itemsData = await itemsRes.json();
-        const roundsData = await roundsRes.json();
-
-        setItems(Array.isArray(itemsData) ? itemsData : []);
-        setRounds(Array.isArray(roundsData) ? roundsData : []);
-        setSelectedPlayer(playerData.id);
-
-        if (roundsData.length > 0) {
-          setSelectedRound(roundsData[0].id);
-        }
-      } else {
-        const [playersRes, itemsRes, roundsRes, categoriesRes] = await Promise.all([
+    if (!isPlayer()) {
+      try {
+        const [playersRes, categoriesRes] = await Promise.all([
           fetch(`/api/players?teamId=${teamId}&includeChildren=true`, { credentials: 'include' }),
-          fetch(`/api/evaluations/items?teamId=${teamId}`, { credentials: 'include' }),
-          fetch(`/api/evaluations/rounds?teamId=${teamId}`, { credentials: 'include' }),
           fetch(`/api/team-categories?teamId=${teamId}`, { credentials: 'include' }),
         ]);
-
         const playersData = await playersRes.json();
-        const itemsData = await itemsRes.json();
-        const roundsData = await roundsRes.json();
-
         setPlayers(Array.isArray(playersData) ? playersData : []);
-        setItems(Array.isArray(itemsData) ? itemsData : []);
-        setRounds(Array.isArray(roundsData) ? roundsData : []);
-
         if (categoriesRes.ok) {
           const catData = await categoriesRes.json();
           setTeamCategories(Array.isArray(catData) ? catData : []);
         }
-
-        if (roundsData.length > 0) {
-          setSelectedRound(roundsData[0].id);
-        }
+      } catch (error) {
+        console.error('Failed to fetch base data:', error);
       }
-    } catch (error) {
-      console.error('Failed to fetch data:', error);
     }
   };
 
+  const fetchHistory = async (preserveRound) => {
+    if (!selectedPlayer) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/evaluations/history/${selectedPlayer}`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setItems(Array.isArray(data.items) ? data.items : []);
+        const newRounds = Array.isArray(data.rounds) ? data.rounds : [];
+        setRounds(newRounds);
+        setScoreMap(data.scoreMap || {});
+
+        if (preserveRound && newRounds.some(r => r.id === preserveRound)) {
+          setSelectedRound(preserveRound);
+        } else if (newRounds.length > 0) {
+          setSelectedRound(newRounds[newRounds.length - 1].id);
+        } else {
+          setSelectedRound('');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch history:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const collectLeaves = (item) => {
+    if (!item.children || item.children.length === 0) return [item];
+    return item.children.flatMap(c => collectLeaves(c));
+  };
+
+  const leaves = useMemo(() => items.flatMap(i => collectLeaves(i)), [items]);
+
+  const hasExistingEvals = useMemo(() => {
+    if (!selectedRound) return false;
+    return leaves.some(leaf => {
+      const key = `${selectedRound}_${leaf.id}_${evaluatorType}`;
+      return scoreMap[key] !== undefined;
+    });
+  }, [selectedRound, scoreMap, leaves, evaluatorType]);
+
+  const canEdit = !hasExistingEvals || isEditing;
+
   const handleScoreChange = (itemId, value) => {
-    setScores(prev => ({ ...prev, [itemId]: parseInt(value) || 0 }));
+    setEditScores(prev => ({ ...prev, [itemId]: parseInt(value) || 0 }));
   };
 
   const handleSubmit = async () => {
     if (!selectedPlayer || !selectedRound) {
-      alert(isPlayer() ? '評価期間を選択してください' : '選手と評価ラウンドを選択してください');
+      alert(isSelfEval ? '評価期間を選択してください' : '選手と評価期間を選択してください');
       return;
     }
-
-    setLoading(true);
+    setSaving(true);
     setSuccess(false);
-
     try {
-      const evaluations = Object.entries(scores).map(([itemId, score]) => ({
-        itemId,
-        score,
-      }));
+      const evaluations = Object.entries(editScores)
+        .filter(([_, score]) => score > 0)
+        .map(([itemId, score]) => ({ itemId, score }));
 
       const res = await fetch('/api/evaluations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          playerId: selectedPlayer,
-          roundId: selectedRound,
-          evaluations,
-        }),
+        body: JSON.stringify({ playerId: selectedPlayer, roundId: selectedRound, evaluations }),
       });
 
       if (!res.ok) {
@@ -160,94 +180,61 @@ export default function EvaluationEntry() {
       }
 
       setSuccess(true);
-      setHasExistingEvaluations(true);
       setIsEditing(false);
-      await fetchExistingEvaluations();
+      await fetchHistory(selectedRound);
     } catch (error) {
-      console.error('Failed to save evaluations:', error);
       alert('評価の保存に失敗しました');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
   const handleDelete = async () => {
     if (!selectedPlayer || !selectedRound) return;
-    if (!confirm('この評価を削除してもよろしいですか？この操作は取り消せません。')) return;
-
+    if (!confirm('この評価を削除してもよろしいですか？')) return;
     setDeleting(true);
     try {
-      const raterType = isPlayer() ? 'SELF' : 'COACH';
       const res = await fetch('/api/evaluations', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          playerId: selectedPlayer,
-          roundId: selectedRound,
-          raterType,
-        }),
+        body: JSON.stringify({ playerId: selectedPlayer, roundId: selectedRound, raterType: evaluatorType }),
       });
-
       if (!res.ok) {
         const data = await res.json();
         alert(data.error || '削除に失敗しました');
         return;
       }
-
-      setScores({});
-      setExistingEvaluations([]);
-      setHasExistingEvaluations(false);
+      setEditScores({});
       setIsEditing(false);
       setSuccess(false);
+      await fetchHistory(selectedRound);
     } catch (error) {
-      console.error('Failed to delete evaluations:', error);
       alert('削除に失敗しました');
     } finally {
       setDeleting(false);
     }
   };
 
-  const handleStartEditing = () => {
-    setIsEditing(true);
-    setSuccess(false);
-  };
-
-  const handleCancelEditing = () => {
-    setIsEditing(false);
-    const existingScores = {};
-    existingEvaluations.forEach(ev => {
-      existingScores[ev.itemId] = ev.score;
-    });
-    setScores(existingScores);
-  };
-
   const handleAddRound = async () => {
-    if (!currentTeam) return;
+    const teamId = isPlayer() && playerData ? playerData.teamId : currentTeam?.id;
+    if (!teamId) return;
     setAddingRound(true);
-
     try {
       const startDate = new Date(newRoundYear, newRoundMonth - 1, 1);
       const endDate = new Date(newRoundYear, newRoundMonth, 0);
       const name = `${newRoundYear}年${newRoundMonth}月`;
-
       const res = await fetch('/api/evaluations/rounds', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          teamId: currentTeam.id,
-          name,
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString()
-        }),
+        body: JSON.stringify({ teamId, name, startDate: startDate.toISOString(), endDate: endDate.toISOString() }),
       });
-
       if (res.ok) {
         const round = await res.json();
-        setRounds(prev => [round, ...prev]);
-        setSelectedRound(round.id);
         setShowAddRound(false);
+        await fetchHistory();
+        setSelectedRound(round.id);
       } else {
         const error = await res.json();
         alert(error.error || '評価期間の追加に失敗しました');
@@ -259,307 +246,329 @@ export default function EvaluationEntry() {
     }
   };
 
-  const [openTooltip, setOpenTooltip] = useState(null);
-  const tooltipRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (tooltipRef.current && !tooltipRef.current.contains(e.target)) {
-        setOpenTooltip(null);
+  const buildRows = () => {
+    const rows = [];
+    items.forEach(parent => {
+      if (!parent.children || parent.children.length === 0) {
+        rows.push({ parentName: parent.name, childName: null, leaf: parent, parentRowSpan: 1, childRowSpan: 1, isFirstParent: true, isFirstChild: true });
+        return;
       }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+      const childGroups = parent.children.map(child => {
+        const grandchildren = child.children && child.children.length > 0 ? child.children : [child];
+        const hasGrandchildren = child.children && child.children.length > 0;
+        return { child, grandchildren, hasGrandchildren };
+      });
+      const totalParentLeaves = childGroups.reduce((sum, g) => sum + g.grandchildren.length, 0);
 
-  const TooltipButton = ({ id, description }) => {
-    if (!description) return null;
-    return (
-      <div className="relative inline-flex" ref={openTooltip === id ? tooltipRef : null}>
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); setOpenTooltip(openTooltip === id ? null : id); }}
-          className="text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          <HelpCircle className="w-3.5 h-3.5" />
-        </button>
-        {openTooltip === id && (
-          <div className="absolute z-50 left-0 top-6 w-60 p-2.5 bg-gray-800 text-white text-xs rounded-lg shadow-lg whitespace-normal">
-            {description}
-            <div className="absolute -top-1 left-2 w-2 h-2 bg-gray-800 rotate-45" />
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const collectLeaves = (item) => {
-    if (!item.children || item.children.length === 0) return [item];
-    return item.children.flatMap(c => collectLeaves(c));
-  };
-
-  const canEdit = !hasExistingEvaluations || isEditing;
-
-  const renderItems = (itemList) => {
-    return itemList.map((topItem) => {
-      const leaves = collectLeaves(topItem);
-      if (leaves.length === 0) return null;
-
-      return (
-        <div key={topItem.id} className="flex border-b border-gray-200 last:border-b-0">
-          <div className="w-28 md:w-36 flex-shrink-0 bg-gray-50 px-3 py-2 flex items-start gap-1 border-r border-gray-200">
-            <span className="text-xs font-semibold text-gray-800 leading-tight">{topItem.name}</span>
-            <TooltipButton id={topItem.id} description={topItem.description} />
-          </div>
-          <div className="flex-1 min-w-0">
-            {leaves.map((leaf, idx) => (
-              <div
-                key={leaf.id}
-                className={`flex items-center justify-between px-2 py-1 ${idx < leaves.length - 1 ? 'border-b border-gray-50' : ''} hover:bg-gray-50`}
-              >
-                <div className="flex items-center gap-1 min-w-0 flex-1">
-                  <span className="text-xs text-gray-600 truncate">{leaf.name}</span>
-                  <TooltipButton id={leaf.id} description={leaf.description} />
-                </div>
-                {canEdit ? (
-                  <select
-                    value={scores[leaf.id] || ''}
-                    onChange={(e) => handleScoreChange(leaf.id, e.target.value)}
-                    className="w-14 px-1 py-0.5 border border-gray-300 rounded text-xs text-center flex-shrink-0"
-                  >
-                    <option value="">-</option>
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <span className={`inline-flex items-center justify-center w-8 h-6 rounded text-xs font-bold ${
-                      scores[leaf.id] ? getScoreColor(scores[leaf.id]) : 'bg-gray-100 text-gray-400'
-                    }`}>
-                      {scores[leaf.id] || '-'}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      );
+      childGroups.forEach((group, ci) => {
+        group.grandchildren.forEach((gc, gi) => {
+          rows.push({
+            parentName: parent.name,
+            parentDescription: parent.description,
+            childName: group.hasGrandchildren ? group.child.name : null,
+            childDescription: group.hasGrandchildren ? group.child.description : null,
+            leaf: gc,
+            parentRowSpan: totalParentLeaves,
+            childRowSpan: group.grandchildren.length,
+            isFirstParent: ci === 0 && gi === 0,
+            isFirstChild: gi === 0,
+          });
+        });
+      });
     });
+    return rows;
   };
 
-  const getScoreColor = (score) => {
-    if (score >= 5) return 'bg-blue-100 text-blue-700';
-    if (score >= 4) return 'bg-green-100 text-green-700';
-    if (score >= 3) return 'bg-yellow-100 text-yellow-700';
-    if (score >= 2) return 'bg-orange-100 text-orange-700';
-    return 'bg-red-100 text-red-700';
-  };
+  const rows = useMemo(() => buildRows(), [items]);
+
+  const selectedRoundIdx = rounds.findIndex(r => r.id === selectedRound);
+
+  const visibleHistoryRounds = useMemo(() => {
+    if (rounds.length === 0) return [];
+    const idx = selectedRoundIdx >= 0 ? selectedRoundIdx : rounds.length - 1;
+    const start = Math.max(0, idx - 2);
+    const historyRounds = [];
+    for (let i = start; i < idx; i++) {
+      historyRounds.push(rounds[i]);
+    }
+    return historyRounds;
+  }, [rounds, selectedRoundIdx]);
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
   const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
 
+  const filteredPlayers = players.filter(p => !filterCategory || p.teamCategoryId === filterCategory);
+
+  const selectedPlayerObj = players.find(p => p.id === selectedPlayer) || (isSelfEval && playerData ? playerData : null);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          {isPlayer() ? '自己評価' : '評価入力'}
+        <h1 className="text-xl font-bold text-gray-900">
+          {isSelfEval ? '自己評価' : '評価入力'}
         </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          {isPlayer() ? '自分の評価を入力してください' : '選手の評価を入力してください'}
+        <p className="mt-0.5 text-xs text-gray-500">
+          {isSelfEval ? '自分の評価を入力してください' : '選手を選択して評価を入力してください'}
         </p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className={`grid grid-cols-1 ${isPlayer() ? 'md:grid-cols-1' : teamCategories.length > 0 ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 mb-6`}>
-          {!isPlayer() && (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className={clsx('grid gap-3', isSelfEval ? 'grid-cols-1' : teamCategories.length > 0 ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-2')}>
+          {!isSelfEval && (
             <>
               {teamCategories.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">カテゴリー</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">カテゴリー</label>
                   <select
                     value={filterCategory}
                     onChange={(e) => { setFilterCategory(e.target.value); setSelectedPlayer(''); }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   >
                     <option value="">全カテゴリー</option>
-                    {teamCategories.map((cat) => (
+                    {teamCategories.map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
                   </select>
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">選手</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">選手</label>
                 <select
                   value={selectedPlayer}
                   onChange={(e) => setSelectedPlayer(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 >
                   <option value="">選択してください</option>
-                  {players
-                    .filter(p => !filterCategory || p.teamCategoryId === filterCategory)
-                    .map((player) => (
-                      <option key={player.id} value={player.id}>
-                        {player.name}
-                        {player.teamCategory ? ` (${player.teamCategory.name})` : ''}
-                      </option>
-                    ))}
+                  {filteredPlayers.map(player => (
+                    <option key={player.id} value={player.id}>
+                      {player.number ? `#${player.number} ` : ''}{player.name}
+                      {player.teamCategory ? ` (${player.teamCategory.name})` : ''}
+                    </option>
+                  ))}
                 </select>
               </div>
             </>
           )}
-
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">評価期間</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">評価期間</label>
             <div className="flex gap-2">
               <select
                 value={selectedRound}
                 onChange={(e) => setSelectedRound(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               >
                 <option value="">選択してください</option>
-                {rounds.map((round) => (
+                {rounds.map(round => (
                   <option key={round.id} value={round.id}>{round.name}</option>
                 ))}
               </select>
-              {!isPlayer() && (
+              {!isSelfEval && (
                 <button
                   onClick={() => setShowAddRound(true)}
                   className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                   title="新しい期間を追加"
                 >
-                  <Plus className="w-5 h-5" />
+                  <Plus className="w-4 h-4" />
                 </button>
               )}
             </div>
           </div>
         </div>
 
-        {hasExistingEvaluations && selectedPlayer && selectedRound && !isEditing && (
-          <div className="mb-4 p-3 rounded-lg text-sm bg-green-50 text-green-700 border border-green-200 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4" />
-              この期間の評価は入力済みです。
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleStartEditing}
-                className="inline-flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs font-medium transition-colors"
-              >
-                <Edit3 className="w-3 h-3" />
-                編集
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="inline-flex items-center gap-1 px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-xs font-medium transition-colors disabled:opacity-50"
-              >
-                <Trash2 className="w-3 h-3" />
-                {deleting ? '削除中...' : '削除'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {isEditing && (
-          <div className="mb-4 p-3 rounded-lg text-sm bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-2">
-            <Edit3 className="w-4 h-4" />
-            編集モード：点数を変更して保存してください。
-          </div>
-        )}
-
         {showAddRound && (
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-semibold text-gray-900 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5" />
                 新しい評価期間を追加
               </h3>
-              <button
-                onClick={() => setShowAddRound(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
+              <button onClick={() => setShowAddRound(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="flex items-end gap-3">
+            <div className="flex items-end gap-2">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">年</label>
-                <select
-                  value={newRoundYear}
-                  onChange={(e) => setNewRoundYear(parseInt(e.target.value))}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                >
-                  {years.map((year) => (
-                    <option key={year} value={year}>{year}年</option>
-                  ))}
+                <label className="block text-[10px] font-medium text-gray-500 mb-1">年</label>
+                <select value={newRoundYear} onChange={(e) => setNewRoundYear(parseInt(e.target.value))} className="px-2 py-1.5 border border-gray-300 rounded text-sm">
+                  {years.map(year => <option key={year} value={year}>{year}年</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">月</label>
-                <select
-                  value={newRoundMonth}
-                  onChange={(e) => setNewRoundMonth(parseInt(e.target.value))}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                >
-                  {monthOptions.map((month) => (
-                    <option key={month} value={month}>{month}月</option>
-                  ))}
+                <label className="block text-[10px] font-medium text-gray-500 mb-1">月</label>
+                <select value={newRoundMonth} onChange={(e) => setNewRoundMonth(parseInt(e.target.value))} className="px-2 py-1.5 border border-gray-300 rounded text-sm">
+                  {monthOptions.map(month => <option key={month} value={month}>{month}月</option>)}
                 </select>
               </div>
-              <button
-                onClick={handleAddRound}
-                disabled={addingRound}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm font-medium"
-              >
+              <button onClick={handleAddRound} disabled={addingRound} className="px-3 py-1.5 bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 text-sm font-medium">
                 {addingRound ? '追加中...' : '追加'}
               </button>
             </div>
           </div>
         )}
+      </div>
 
-        {items.length > 0 ? (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">評価項目</h3>
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              {renderItems(items)}
+      {loading && (
+        <div className="flex justify-center py-10">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+        </div>
+      )}
+
+      {!loading && selectedPlayer && selectedRound && items.length > 0 && (
+        <>
+          {hasExistingEvals && !isEditing && (
+            <div className="p-3 rounded-lg text-sm bg-green-50 text-green-700 border border-green-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                <span className="text-xs">この期間の評価は入力済みです</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => { setIsEditing(true); setSuccess(false); }} className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700">
+                  <Edit3 className="w-3 h-3" />
+                  編集
+                </button>
+                <button onClick={handleDelete} disabled={deleting} className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700 disabled:opacity-50">
+                  <Trash2 className="w-3 h-3" />
+                  {deleting ? '...' : '削除'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {isEditing && (
+            <div className="p-3 rounded-lg text-xs bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-2">
+              <Edit3 className="w-3.5 h-3.5" />
+              編集モード：点数を変更して保存してください
+            </div>
+          )}
+
+          {success && (
+            <div className="p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-xs flex items-center gap-2">
+              <CheckCircle className="w-3.5 h-3.5" />
+              評価を保存しました
+            </div>
+          )}
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto" ref={tableRef}>
+              <table className="w-full border-collapse text-xs">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-2 text-left font-semibold text-gray-700 min-w-[80px] w-[80px]">大分類</th>
+                    <th className="sticky left-[80px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-2 text-left font-semibold text-gray-700 min-w-[90px] w-[90px]">中分類</th>
+                    <th className="sticky left-[170px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-2 text-left font-semibold text-gray-700 min-w-[120px] w-[120px]">評価項目</th>
+                    {visibleHistoryRounds.map(r => (
+                      <th key={r.id} className="border-b border-r border-gray-200 px-1 py-2 text-center font-medium text-gray-400 min-w-[52px] w-[52px] whitespace-nowrap">
+                        {r.name.replace(/年/, '/').replace(/月/, '')}
+                      </th>
+                    ))}
+                    <th className="border-b border-gray-200 px-1 py-2 text-center font-semibold text-primary-700 min-w-[60px] w-[60px] bg-primary-50 whitespace-nowrap">
+                      {rounds.find(r => r.id === selectedRound)?.name.replace(/年/, '/').replace(/月/, '') || '今回'}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, ri) => (
+                    <tr key={ri} className={clsx('hover:bg-gray-50/50', ri > 0 && rows[ri - 1]?.parentName !== row.parentName && 'border-t-2 border-gray-300')}>
+                      {row.isFirstParent && (
+                        <td
+                          rowSpan={row.parentRowSpan}
+                          className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-1.5 align-top font-semibold text-gray-800 text-[11px]"
+                        >
+                          <div className="flex items-start gap-0.5">
+                            <span>{row.parentName}</span>
+                          </div>
+                        </td>
+                      )}
+                      {row.isFirstChild && row.childName && (
+                        <td
+                          rowSpan={row.childRowSpan}
+                          className="sticky left-[80px] z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 align-top text-gray-600 text-[11px]"
+                        >
+                          {row.childName}
+                        </td>
+                      )}
+                      {row.isFirstChild && !row.childName && (
+                        <td
+                          rowSpan={row.childRowSpan || 1}
+                          className="sticky left-[80px] z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 align-top text-gray-400 text-[11px]"
+                        >
+                          -
+                        </td>
+                      )}
+                      <td className="sticky left-[170px] z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 text-gray-700 text-[11px]">
+                        {row.leaf.name}
+                      </td>
+                      {visibleHistoryRounds.map(r => {
+                        const score = scoreMap[`${r.id}_${row.leaf.id}_${evaluatorType}`];
+                        return (
+                          <td key={r.id} className={clsx('border-b border-r border-gray-200 px-1 py-1.5 text-center', getScoreBg(score))}>
+                            <span className={clsx('inline-flex items-center justify-center w-6 h-5 rounded text-[11px] font-bold', score ? getScoreColor(score) : 'text-gray-300')}>
+                              {score || '-'}
+                            </span>
+                          </td>
+                        );
+                      })}
+                      <td className={clsx('border-b border-gray-200 px-1 py-1 text-center bg-primary-50/30')}>
+                        {canEdit ? (
+                          <select
+                            value={editScores[row.leaf.id] || ''}
+                            onChange={(e) => handleScoreChange(row.leaf.id, e.target.value)}
+                            className="w-12 px-0.5 py-0.5 border border-gray-300 rounded text-xs text-center bg-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                          >
+                            <option value="">-</option>
+                            {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                        ) : (
+                          <span className={clsx('inline-flex items-center justify-center w-6 h-5 rounded text-[11px] font-bold', editScores[row.leaf.id] ? getScoreColor(editScores[row.leaf.id]) : 'text-gray-300')}>
+                            {editScores[row.leaf.id] || '-'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-        ) : (
-          <p className="text-sm text-gray-500">評価項目が設定されていません</p>
-        )}
 
-        {success && (
-          <div className="mt-4 p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg">
-            評価を保存しました
+          <div className="flex justify-end gap-2">
+            {isEditing && (
+              <button
+                onClick={() => {
+                  setIsEditing(false);
+                  const existing = {};
+                  leaves.forEach(leaf => {
+                    const key = `${selectedRound}_${leaf.id}_${evaluatorType}`;
+                    if (scoreMap[key]) existing[leaf.id] = scoreMap[key];
+                  });
+                  setEditScores(existing);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
+              >
+                <X className="w-4 h-4" />
+                キャンセル
+              </button>
+            )}
+            {canEdit && (
+              <button
+                onClick={handleSubmit}
+                disabled={saving || !selectedPlayer || !selectedRound}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm font-medium"
+              >
+                <Save className="w-4 h-4" />
+                {saving ? '保存中...' : hasExistingEvals ? '更新' : '保存'}
+              </button>
+            )}
           </div>
-        )}
+        </>
+      )}
 
-        <div className="mt-6 flex justify-end gap-3">
-          {isEditing && (
-            <button
-              onClick={handleCancelEditing}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              <X className="w-4 h-4" />
-              キャンセル
-            </button>
-          )}
-          {canEdit && (
-            <button
-              onClick={handleSubmit}
-              disabled={loading || !selectedPlayer || !selectedRound}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              {loading ? '保存中...' : hasExistingEvaluations ? '更新' : '保存'}
-            </button>
-          )}
+      {!loading && selectedPlayer && items.length === 0 && !selectedRound && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+          <p className="text-sm text-gray-500">評価項目が設定されていません</p>
         </div>
-      </div>
+      )}
     </div>
   );
 }

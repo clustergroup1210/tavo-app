@@ -24,7 +24,7 @@ The system is built on a team-centric display and robust role-based access contr
 ### Key Features
 -   **Role-Based Access Control (RBAC)**: A comprehensive 9-role system across 3 categories (Operations, Team, User) with granular permissions and a numeric hierarchy for inheritance.
 -   **Team Management**: Includes profile management, player rosters, and an invitation system for onboarding.
--   **Evaluation System**: Supports hierarchical evaluation items, distinct rounds, coach and self-evaluations, historical data preservation, and visualization using Recharts. A template system (VEDIALO CF) is provided for standardized evaluations. The Evaluation Matrix provides a heatmap view of player scores over time.
+-   **Evaluation System**: Supports 3-level hierarchical evaluation items (大分類→中分類→評価項目), distinct rounds, coach and self-evaluations, historical data preservation, and visualization using Recharts. Evaluation entry page uses a matrix-style table showing the 3-level hierarchy with sticky left columns, past round scores for comparison, and current round input. API: `/api/evaluations/history/:playerId` returns items hierarchy, rounds, and full scoreMap. A template system (VEDIALO CF) is provided for standardized evaluations. The Evaluation Matrix provides a heatmap view of player scores over time.
 -   **Player Management**: Detailed player profiles with personal information, JFA Passport photo upload, role model/play style fields, and coach notes.
 -   **Goal Management**: Customizable goal categories and player-settable, trackable goals.
 -   **Communication Tools**:

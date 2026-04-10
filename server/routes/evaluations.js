@@ -260,6 +260,84 @@ router.post('/rounds', authenticate, async (req, res) => {
   }
 });
 
+router.get('/history/:playerId', authenticate, async (req, res) => {
+  try {
+    const player = await prisma.player.findUnique({
+      where: { id: req.params.playerId },
+      include: { team: { include: { parent: true } } }
+    });
+
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
+    const isSelf = player.userId === req.user.id;
+    const isParentUser = req.user.parentPlayers?.some(pp => pp.playerId === req.params.playerId);
+    const isOp = isOperator(req.user);
+    const hasAccess = hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH', 'GUEST_COACH']);
+
+    if (!isSelf && !isParentUser && !isOp && !hasAccess) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const teamIds = [player.teamId];
+    if (player.team?.parentId) {
+      teamIds.push(player.team.parentId);
+    }
+
+    const [allItems, rounds, evaluations] = await Promise.all([
+      prisma.evaluationItem.findMany({
+        where: { teamId: { in: teamIds }, isActive: true },
+        orderBy: { sortOrder: 'asc' }
+      }),
+      prisma.evaluationRound.findMany({
+        where: { teamId: { in: teamIds } },
+        orderBy: { startDate: 'asc' }
+      }),
+      prisma.evaluation.findMany({
+        where: { playerId: req.params.playerId },
+        select: { itemId: true, roundId: true, score: true, raterType: true }
+      })
+    ]);
+
+    const scoreMap = {};
+    evaluations.forEach(e => {
+      const key = `${e.roundId}_${e.itemId}_${e.raterType}`;
+      scoreMap[key] = e.score;
+    });
+
+    const filterByPosition = (items) => {
+      if (!player.position) return items;
+      return items.filter(item => {
+        if (!item.targetPositions || item.targetPositions.length === 0) return true;
+        return item.targetPositions.includes(player.position);
+      });
+    };
+
+    const buildHierarchy = (items, parentId = null) => {
+      return filterByPosition(items)
+        .filter(item => item.parentId === parentId)
+        .map(item => ({
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          maxScore: item.maxScore,
+          parentId: item.parentId,
+          children: buildHierarchy(items, item.id)
+        }));
+    };
+
+    res.json({
+      items: buildHierarchy(allItems),
+      rounds: rounds.map(r => ({ id: r.id, name: r.name, startDate: r.startDate, endDate: r.endDate })),
+      scoreMap
+    });
+  } catch (error) {
+    console.error('Fetch evaluation history error:', error);
+    res.status(500).json({ error: 'Failed to fetch evaluation history' });
+  }
+});
+
 router.get('/player/:playerId', authenticate, async (req, res) => {
   try {
     const { roundId } = req.query;
