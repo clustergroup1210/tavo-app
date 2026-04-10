@@ -99,6 +99,15 @@ The system emphasizes a team-centric display and robust role-based access contro
     -   Players receive notifications when new tasks are assigned
     -   Task list visible on player detail page (課題 tab)
     -   Players can mark tasks as in-progress or completed
+-   **Video Sharing & Tag System**:
+    -   Videos can be tagged with specific players and team categories for targeted sharing
+    -   `VideoPlayerTag` and `VideoCategoryTag` models (many-to-many) link videos to players and categories
+    -   Tag selection during upload and post-upload editing via tag edit modal
+    -   Player search with number/name filtering in tag picker
+    -   Video list filterable by category and player tags
+    -   Tags displayed as colored badges on video cards (purple for categories, blue for players)
+    -   Validation ensures tags belong to the same team as the video (prevents cross-team data leakage)
+    -   API: Tags sent as `playerTagIds` and `categoryTagIds` arrays on create/update
 -   **Video Comment System**:
     -   Users can comment on uploaded videos
     -   Comments support create, edit, and delete operations

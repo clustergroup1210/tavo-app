@@ -195,6 +195,7 @@ model Player {
   coachAssignments CoachAssignment[]
   tasks            Task[]
   mentoringRecords MentoringRecord[]
+  videoTags        VideoPlayerTag[]
 
   @@index([teamId])
   @@index([userId])
@@ -214,6 +215,7 @@ model TeamCategory {
   players                       Player[]
   announcementCategoryTargets   AnnouncementCategoryTarget[]
   calendarEventCategoryTargets  CalendarEventCategoryTarget[]
+  videoTags                     VideoCategoryTag[]
 
   @@unique([teamId, name])
 }
@@ -371,12 +373,40 @@ model Video {
   uploadedBy  String
   createdAt   DateTime @default(now())
 
-  player   Player?        @relation(fields: [playerId], references: [id])
-  comments VideoComment[]
+  player        Player?              @relation(fields: [playerId], references: [id])
+  comments      VideoComment[]
+  playerTags    VideoPlayerTag[]
+  categoryTags  VideoCategoryTag[]
 
   @@index([playerId])
   @@index([uploadedBy])
   @@index([teamId])
+}
+
+model VideoPlayerTag {
+  id       String @id @default(uuid())
+  videoId  String
+  playerId String
+
+  video  Video  @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, playerId])
+  @@index([videoId])
+  @@index([playerId])
+}
+
+model VideoCategoryTag {
+  id             String @id @default(uuid())
+  videoId        String
+  teamCategoryId String
+
+  video        Video        @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  teamCategory TeamCategory @relation(fields: [teamCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, teamCategoryId])
+  @@index([videoId])
+  @@index([teamCategoryId])
 }
 
 model VideoComment {

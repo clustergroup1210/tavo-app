@@ -16,6 +16,12 @@ function isOperator(user) {
   );
 }
 
+const videoInclude = {
+  player: { select: { id: true, name: true, teamId: true, userId: true } },
+  playerTags: { include: { player: { select: { id: true, name: true, number: true } } } },
+  categoryTags: { include: { teamCategory: { select: { id: true, name: true } } } }
+};
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/'),
   filename: (req, file, cb) => cb(null, `video_${uuidv4()}${path.extname(file.originalname)}`)
@@ -32,7 +38,7 @@ router.get('/', authenticate, async (req, res) => {
 
     let videos = await prisma.video.findMany({
       where,
-      include: { player: { select: { id: true, name: true, teamId: true, userId: true } } },
+      include: videoInclude,
       orderBy: { createdAt: 'desc' }
     });
 
@@ -63,7 +69,7 @@ router.post('/presigned-upload', authenticate, async (req, res) => {
       return res.status(503).json({ error: 'R2ストレージが設定されていません' });
     }
 
-    const { title, description, playerId, teamId, contentType, fileSize, fileName } = req.body;
+    const { title, description, playerId, teamId, contentType, fileSize, fileName, playerTagIds, categoryTagIds } = req.body;
 
     if (!title || !contentType || !fileName) {
       return res.status(400).json({ error: 'タイトル、ファイル名、コンテンツタイプは必須です' });
@@ -88,6 +94,24 @@ router.post('/presigned-upload', authenticate, async (req, res) => {
 
     const uploadUrl = await getUploadPresignedUrl(r2Key, contentType);
 
+    if (playerTagIds?.length && teamId) {
+      const validPlayers = await prisma.player.findMany({
+        where: { id: { in: playerTagIds }, teamId }
+      });
+      if (validPlayers.length !== playerTagIds.length) {
+        return res.status(400).json({ error: '無効な選手タグが含まれています' });
+      }
+    }
+
+    if (categoryTagIds?.length && teamId) {
+      const validCats = await prisma.teamCategory.findMany({
+        where: { id: { in: categoryTagIds }, teamId }
+      });
+      if (validCats.length !== categoryTagIds.length) {
+        return res.status(400).json({ error: '無効なカテゴリータグが含まれています' });
+      }
+    }
+
     const video = await prisma.video.create({
       data: {
         title,
@@ -97,7 +121,13 @@ router.post('/presigned-upload', authenticate, async (req, res) => {
         r2Key,
         contentType,
         fileSize: fileSize ? parseInt(fileSize) : null,
-        uploadedBy: req.user.id
+        uploadedBy: req.user.id,
+        playerTags: playerTagIds?.length ? {
+          create: playerTagIds.map(pid => ({ playerId: pid }))
+        } : undefined,
+        categoryTags: categoryTagIds?.length ? {
+          create: categoryTagIds.map(cid => ({ teamCategoryId: cid }))
+        } : undefined
       }
     });
 
@@ -110,7 +140,7 @@ router.post('/presigned-upload', authenticate, async (req, res) => {
 
 router.post('/', authenticate, upload.single('video'), async (req, res) => {
   try {
-    const { title, description, playerId, teamId } = req.body;
+    const { title, description, playerId, teamId, playerTagIds, categoryTagIds } = req.body;
 
     if (playerId) {
       const player = await prisma.player.findUnique({ where: { id: playerId } });
@@ -124,6 +154,27 @@ router.post('/', authenticate, upload.single('video'), async (req, res) => {
       }
     }
 
+    const parsedPlayerTags = playerTagIds ? JSON.parse(playerTagIds) : [];
+    const parsedCategoryTags = categoryTagIds ? JSON.parse(categoryTagIds) : [];
+
+    if (parsedPlayerTags.length && teamId) {
+      const validPlayers = await prisma.player.findMany({
+        where: { id: { in: parsedPlayerTags }, teamId }
+      });
+      if (validPlayers.length !== parsedPlayerTags.length) {
+        return res.status(400).json({ error: '無効な選手タグが含まれています' });
+      }
+    }
+
+    if (parsedCategoryTags.length && teamId) {
+      const validCats = await prisma.teamCategory.findMany({
+        where: { id: { in: parsedCategoryTags }, teamId }
+      });
+      if (validCats.length !== parsedCategoryTags.length) {
+        return res.status(400).json({ error: '無効なカテゴリータグが含まれています' });
+      }
+    }
+
     const video = await prisma.video.create({
       data: {
         title,
@@ -131,12 +182,19 @@ router.post('/', authenticate, upload.single('video'), async (req, res) => {
         playerId,
         teamId,
         storageKey: req.file.filename,
-        uploadedBy: req.user.id
+        uploadedBy: req.user.id,
+        playerTags: parsedPlayerTags.length ? {
+          create: parsedPlayerTags.map(pid => ({ playerId: pid }))
+        } : undefined,
+        categoryTags: parsedCategoryTags.length ? {
+          create: parsedCategoryTags.map(cid => ({ teamCategoryId: cid }))
+        } : undefined
       }
     });
 
     res.json(video);
   } catch (error) {
+    console.error('Upload video error:', error);
     res.status(500).json({ error: 'Failed to upload video' });
   }
 });
@@ -149,7 +207,7 @@ router.get('/:id', authenticate, async (req, res) => {
   try {
     const video = await prisma.video.findUnique({
       where: { id: req.params.id },
-      include: { player: { select: { id: true, name: true, teamId: true, userId: true } } }
+      include: videoInclude
     });
 
     if (!video) {
@@ -235,7 +293,7 @@ router.get('/:id/stream', authenticate, async (req, res) => {
 
 router.put('/:id', authenticate, async (req, res) => {
   try {
-    const { title, description } = req.body;
+    const { title, description, playerTagIds, categoryTagIds } = req.body;
     
     const video = await prisma.video.findUnique({
       where: { id: req.params.id },
@@ -247,23 +305,59 @@ router.put('/:id', authenticate, async (req, res) => {
     }
 
     const isUploader = video.uploadedBy === req.user.id;
-    const isCoach = video.player && hasTeamAccess(req.user, video.player.teamId, ['TEAM_MANAGER', 'COACH', 'COACH']);
+    const isCoachUser = video.player && hasTeamAccess(req.user, video.player.teamId, ['TEAM_MANAGER', 'COACH']);
     const isParent = req.user.parentPlayers?.some(pp => pp.playerId === video.playerId);
 
     if (isParent && !isUploader) {
       return res.status(403).json({ error: '保護者は自分がアップロードした動画のみ編集できます' });
     }
     
-    if (!isUploader && !isCoach) {
+    if (!isUploader && !isCoachUser && !isOperator(req.user)) {
       return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const updateData = {};
+    if (title !== undefined) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+
+    if (playerTagIds !== undefined) {
+      if (playerTagIds.length > 0 && video.teamId) {
+        const validPlayers = await prisma.player.findMany({
+          where: { id: { in: playerTagIds }, teamId: video.teamId }
+        });
+        if (validPlayers.length !== playerTagIds.length) {
+          return res.status(400).json({ error: '無効な選手タグが含まれています' });
+        }
+      }
+      await prisma.videoPlayerTag.deleteMany({ where: { videoId: video.id } });
+      if (playerTagIds.length > 0) {
+        await prisma.videoPlayerTag.createMany({
+          data: playerTagIds.map(pid => ({ videoId: video.id, playerId: pid }))
+        });
+      }
+    }
+
+    if (categoryTagIds !== undefined) {
+      if (categoryTagIds.length > 0 && video.teamId) {
+        const validCats = await prisma.teamCategory.findMany({
+          where: { id: { in: categoryTagIds }, teamId: video.teamId }
+        });
+        if (validCats.length !== categoryTagIds.length) {
+          return res.status(400).json({ error: '無効なカテゴリータグが含まれています' });
+        }
+      }
+      await prisma.videoCategoryTag.deleteMany({ where: { videoId: video.id } });
+      if (categoryTagIds.length > 0) {
+        await prisma.videoCategoryTag.createMany({
+          data: categoryTagIds.map(cid => ({ videoId: video.id, teamCategoryId: cid }))
+        });
+      }
     }
 
     const updated = await prisma.video.update({
       where: { id: req.params.id },
-      data: {
-        ...(title !== undefined && { title }),
-        ...(description !== undefined && { description })
-      }
+      data: updateData,
+      include: videoInclude
     });
 
     res.json(updated);
@@ -285,14 +379,14 @@ router.delete('/:id', authenticate, async (req, res) => {
     }
 
     const isUploader = video.uploadedBy === req.user.id;
-    const isCoach = video.player && hasTeamAccess(req.user, video.player.teamId, ['TEAM_MANAGER', 'COACH']);
+    const isCoachUser = video.player && hasTeamAccess(req.user, video.player.teamId, ['TEAM_MANAGER', 'COACH']);
     const isParent = req.user.parentPlayers?.some(pp => pp.playerId === video.playerId);
 
     if (isParent && !isUploader) {
       return res.status(403).json({ error: '保護者は自分がアップロードした動画のみ削除できます' });
     }
 
-    if (!isUploader && !isCoach) {
+    if (!isUploader && !isCoachUser && !isOperator(req.user)) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
