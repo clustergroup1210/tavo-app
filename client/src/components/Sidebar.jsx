@@ -173,7 +173,7 @@ export default function Sidebar({ isOpen, onClose }) {
   return (
     <aside
       className={clsx(
-        'fixed left-0 top-0 h-screen w-60 bg-sidebar flex flex-col z-50 transition-transform duration-300',
+        'fixed left-0 top-0 h-screen w-60 bg-sidebar flex flex-col z-[60] transition-transform duration-300',
         'lg:translate-x-0',
         isOpen ? 'translate-x-0' : '-translate-x-full'
       )}
