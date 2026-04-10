@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   UserCircle, TrendingUp, Link2, Edit2, Save, X, Target, Plus, Trash2, Camera,
-  Calendar, Ruler, Weight, MapPin, GraduationCap, Users, Footprints, Star, Zap, Upload
+  Calendar, Ruler, Weight, MapPin, GraduationCap, Users, Footprints, Star, Zap, Upload, Clock, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import PlayerMatrix from '../components/PlayerMatrix';
 import MentoringTable from '../components/MentoringTable';
@@ -20,6 +20,14 @@ export default function MyPage() {
   const [newGoal, setNewGoal] = useState({ categoryId: '', content: '' });
   const [editingGoalId, setEditingGoalId] = useState(null);
   const [editingGoalContent, setEditingGoalContent] = useState('');
+  const [personalEvents, setPersonalEvents] = useState([]);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [eventForm, setEventForm] = useState({
+    title: '', description: '', startDate: '', startTime: '09:00',
+    endDate: '', endTime: '10:00', allDay: false, location: ''
+  });
   const passportInputRef = useRef(null);
   const photoInputRef = useRef(null);
   const isParentView = isParent();
@@ -223,6 +231,108 @@ export default function MyPage() {
       console.error('Failed to delete goal:', error);
     }
   };
+
+  useEffect(() => {
+    fetchPersonalEvents();
+  }, [calendarMonth]);
+
+  const fetchPersonalEvents = async () => {
+    try {
+      const month = calendarMonth.getMonth() + 1;
+      const year = calendarMonth.getFullYear();
+      const res = await fetch(`/api/calendar/personal?month=${month}&year=${year}`, { credentials: 'include' });
+      const data = await res.json();
+      setPersonalEvents(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to fetch personal events:', error);
+    }
+  };
+
+  const openNewEvent = () => {
+    setEditingEvent(null);
+    const today = new Date().toISOString().split('T')[0];
+    setEventForm({
+      title: '', description: '', startDate: today, startTime: '09:00',
+      endDate: today, endTime: '10:00', allDay: false, location: ''
+    });
+    setShowEventModal(true);
+  };
+
+  const openEditEvent = (event) => {
+    setEditingEvent(event);
+    const start = new Date(event.startDate);
+    const end = event.endDate ? new Date(event.endDate) : start;
+    setEventForm({
+      title: event.title, description: event.description || '',
+      startDate: start.toISOString().split('T')[0],
+      startTime: start.toTimeString().slice(0, 5),
+      endDate: end.toISOString().split('T')[0],
+      endTime: end.toTimeString().slice(0, 5),
+      allDay: event.allDay, location: event.location || ''
+    });
+    setShowEventModal(true);
+  };
+
+  const handleSaveEvent = async () => {
+    if (!eventForm.title.trim() || !eventForm.startDate) return;
+    try {
+      const startDt = eventForm.allDay
+        ? new Date(eventForm.startDate)
+        : new Date(`${eventForm.startDate}T${eventForm.startTime}`);
+      const endDt = eventForm.allDay
+        ? new Date(eventForm.endDate || eventForm.startDate)
+        : new Date(`${eventForm.endDate || eventForm.startDate}T${eventForm.endTime}`);
+
+      const payload = {
+        title: eventForm.title, description: eventForm.description,
+        startDate: startDt.toISOString(), endDate: endDt.toISOString(),
+        allDay: eventForm.allDay, eventType: 'personal',
+        location: eventForm.location, isPersonal: true
+      };
+
+      let res;
+      if (editingEvent) {
+        res = await fetch(`/api/calendar/${editingEvent.id}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', body: JSON.stringify(payload)
+        });
+      } else {
+        res = await fetch('/api/calendar', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', body: JSON.stringify(payload)
+        });
+      }
+
+      if (res.ok) {
+        setShowEventModal(false);
+        fetchPersonalEvents();
+      }
+    } catch (error) {
+      console.error('Failed to save event:', error);
+    }
+  };
+
+  const handleDeleteEvent = async (eventId) => {
+    if (!confirm('この予定を削除しますか？')) return;
+    try {
+      await fetch(`/api/calendar/${eventId}`, { method: 'DELETE', credentials: 'include' });
+      fetchPersonalEvents();
+    } catch (error) {
+      console.error('Failed to delete event:', error);
+    }
+  };
+
+  const formatEventDate = (dateStr) => {
+    const d = new Date(dateStr);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  };
+
+  const formatEventTime = (dateStr) => {
+    const d = new Date(dateStr);
+    return d.toTimeString().slice(0, 5);
+  };
+
+  const calendarMonthLabel = `${calendarMonth.getFullYear()}年${calendarMonth.getMonth() + 1}月`;
 
   const goalsByCategory = goalCategories.map(cat => ({
     ...cat,
@@ -540,6 +650,96 @@ export default function MyPage() {
         )}
       </div>
 
+      {!isParentView && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900">個人カレンダー</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1))}
+                  className="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-xs sm:text-sm font-medium text-gray-700 min-w-[80px] text-center">{calendarMonthLabel}</span>
+                <button
+                  onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1))}
+                  className="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+              <button
+                onClick={openNewEvent}
+                className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600"
+              >
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                追加
+              </button>
+            </div>
+          </div>
+
+          {personalEvents.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-6">この月の個人予定はありません</p>
+          ) : (
+            <div className="space-y-2">
+              {personalEvents.map((event) => {
+                const startD = new Date(event.startDate);
+                return (
+                  <div key={event.id} className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-100 rounded-lg group">
+                    <div className="flex-shrink-0 w-12 text-center">
+                      <p className="text-lg font-bold text-amber-600">{startD.getDate()}</p>
+                      <p className="text-[10px] text-amber-500">{['日','月','火','水','木','金','土'][startD.getDay()]}</p>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{event.title}</p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        {event.allDay ? (
+                          <span className="text-[11px] text-amber-600">終日</span>
+                        ) : (
+                          <span className="flex items-center gap-0.5 text-[11px] text-gray-500">
+                            <Clock className="w-3 h-3" />
+                            {formatEventTime(event.startDate)}
+                            {event.endDate && ` - ${formatEventTime(event.endDate)}`}
+                          </span>
+                        )}
+                        {event.location && (
+                          <span className="flex items-center gap-0.5 text-[11px] text-gray-500">
+                            <MapPin className="w-3 h-3" />
+                            {event.location}
+                          </span>
+                        )}
+                      </div>
+                      {event.description && (
+                        <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">{event.description}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => openEditEvent(event)}
+                        className="p-1 text-gray-400 hover:text-amber-600 rounded hover:bg-amber-100"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteEvent(event.id)}
+                        className="p-1 text-gray-400 hover:text-red-600 rounded hover:bg-red-100"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       <PlayerMatrix playerId={playerData.id} />
 
       <MentoringTable playerId={playerData.id} isSelf={!isParent()} isCoach={false} />
@@ -686,6 +886,122 @@ export default function MyPage() {
               >
                 {saving ? '保存中...' : '保存'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEventModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {editingEvent ? '予定を編集' : '個人予定を追加'}
+              </h3>
+              <button onClick={() => setShowEventModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">タイトル</label>
+                <input
+                  type="text"
+                  value={eventForm.title}
+                  onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                  placeholder="予定のタイトル"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="personalAllDay"
+                  checked={eventForm.allDay}
+                  onChange={(e) => setEventForm({ ...eventForm, allDay: e.target.checked })}
+                  className="rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                />
+                <label htmlFor="personalAllDay" className="text-sm text-gray-600">終日</label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">開始日</label>
+                  <input
+                    type="date"
+                    value={eventForm.startDate}
+                    onChange={(e) => setEventForm({ ...eventForm, startDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+                {!eventForm.allDay && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">開始時間</label>
+                    <input
+                      type="time"
+                      value={eventForm.startTime}
+                      onChange={(e) => setEventForm({ ...eventForm, startTime: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">終了日</label>
+                  <input
+                    type="date"
+                    value={eventForm.endDate}
+                    onChange={(e) => setEventForm({ ...eventForm, endDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+                {!eventForm.allDay && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">終了時間</label>
+                    <input
+                      type="time"
+                      value={eventForm.endTime}
+                      onChange={(e) => setEventForm({ ...eventForm, endTime: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">場所</label>
+                <input
+                  type="text"
+                  value={eventForm.location}
+                  onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                  placeholder="場所（任意）"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">メモ</label>
+                <textarea
+                  value={eventForm.description}
+                  onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                  placeholder="詳細メモ（任意）"
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowEventModal(false)}
+                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleSaveEvent}
+                  disabled={!eventForm.title.trim() || !eventForm.startDate}
+                  className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50"
+                >
+                  {editingEvent ? '更新' : '追加'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

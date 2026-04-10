@@ -10,6 +10,7 @@ const eventTypeColors = {
   match: { bg: 'bg-red-500', light: 'bg-red-100 text-red-800', border: 'border-red-500', dot: 'bg-red-500' },
   meeting: { bg: 'bg-purple-500', light: 'bg-purple-100 text-purple-800', border: 'border-purple-500', dot: 'bg-purple-500' },
   event: { bg: 'bg-blue-500', light: 'bg-blue-100 text-blue-800', border: 'border-blue-500', dot: 'bg-blue-500' },
+  personal: { bg: 'bg-amber-500', light: 'bg-amber-100 text-amber-800', border: 'border-amber-500', dot: 'bg-amber-500' },
   other: { bg: 'bg-gray-400', light: 'bg-gray-100 text-gray-700', border: 'border-gray-400', dot: 'bg-gray-400' }
 };
 
@@ -18,6 +19,7 @@ const eventTypeLabels = {
   practice: '練習',
   match: '試合',
   meeting: 'ミーティング',
+  personal: '個人予定',
   other: 'その他'
 };
 
@@ -111,7 +113,11 @@ function EventDetailModal({ event, onClose, onEdit, onDelete, canEdit }) {
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
           <h3 className="text-[15px] font-bold text-gray-900">予定の詳細</h3>
           <div className="flex items-center gap-2">
-            {event.categoryTargets?.length > 0 ? (
+            {event.isPersonal ? (
+              <span className="px-2.5 py-1 text-[11px] font-medium rounded bg-amber-500 text-white">
+                個人予定
+              </span>
+            ) : event.categoryTargets?.length > 0 ? (
               event.categoryTargets.map(ct => (
                 <span key={ct.id} className="px-2.5 py-1 text-[11px] font-medium rounded bg-blue-600 text-white">
                   {ct.teamCategory?.name}
@@ -234,7 +240,7 @@ function EventListItem({ event, onClick }) {
           <span className={`px-2 py-0.5 text-[10px] font-medium rounded ${colors.light}`}>
             {eventTypeLabels[event.eventType] || event.eventType}
           </span>
-          {event.categoryTargets?.length > 0 ? (
+          {event.isPersonal ? null : event.categoryTargets?.length > 0 ? (
             event.categoryTargets.map(ct => (
               <span key={ct.id} className="px-1.5 py-0.5 text-[10px] rounded bg-purple-50 text-purple-700 font-medium">
                 {ct.teamCategory?.name}
@@ -267,7 +273,7 @@ function EventListItem({ event, onClick }) {
 }
 
 export default function Calendar() {
-  const { currentTeam, isCoach, isOperator } = useAuth();
+  const { currentTeam, isCoach, isOperator, user } = useAuth();
   const [events, setEvents] = useState([]);
   const [teamCategories, setTeamCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -477,7 +483,7 @@ export default function Calendar() {
       endDate: dateStr,
       endTime: '10:00',
       allDay: false,
-      eventType: 'event',
+      eventType: canCreate ? 'event' : 'personal',
       location: '',
       categoryIds: []
     });
@@ -504,7 +510,9 @@ export default function Calendar() {
   };
 
   const handleSubmit = async () => {
-    if (!currentTeamId && !isOperator()) {
+    const isPersonalEvent = form.eventType === 'personal';
+    
+    if (!isPersonalEvent && !currentTeamId && !isOperator()) {
       alert('チームが選択されていません。サイドバーからチームを選択してください。');
       return;
     }
@@ -518,7 +526,7 @@ export default function Calendar() {
         : new Date(`${form.endDate}T${form.endTime}`);
 
       const payload = {
-        teamId: currentTeamId,
+        teamId: isPersonalEvent ? null : currentTeamId,
         title: form.title,
         description: form.description,
         startDate: startDateTime.toISOString(),
@@ -526,7 +534,8 @@ export default function Calendar() {
         allDay: form.allDay,
         eventType: form.eventType,
         location: form.location,
-        categoryIds: form.categoryIds
+        categoryIds: isPersonalEvent ? [] : form.categoryIds,
+        isPersonal: isPersonalEvent
       };
 
       let res;
@@ -789,15 +798,13 @@ export default function Calendar() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-800">カレンダー</h1>
-        {canCreate && (
-          <button
-            onClick={openCreateModal}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            予定を追加
-          </button>
-        )}
+        <button
+          onClick={openCreateModal}
+          className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
+        >
+          <Plus className="w-4 h-4" />
+          予定を追加
+        </button>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -858,7 +865,7 @@ export default function Calendar() {
           onClose={() => setDetailEvent(null)}
           onEdit={openEditModal}
           onDelete={handleDelete}
-          canEdit={canCreate}
+          canEdit={canCreate || (detailEvent.isPersonal && detailEvent.createdBy === user?.id)}
         />
       )}
 
@@ -893,11 +900,12 @@ export default function Calendar() {
                   onChange={(e) => setForm({ ...form, eventType: e.target.value })}
                   className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                 >
-                  <option value="event">イベント</option>
-                  <option value="practice">練習</option>
-                  <option value="match">試合</option>
-                  <option value="meeting">ミーティング</option>
-                  <option value="other">その他</option>
+                  <option value="personal">個人予定</option>
+                  {canCreate && <option value="event">イベント</option>}
+                  {canCreate && <option value="practice">練習</option>}
+                  {canCreate && <option value="match">試合</option>}
+                  {canCreate && <option value="meeting">ミーティング</option>}
+                  {canCreate && <option value="other">その他</option>}
                 </select>
               </div>
 
@@ -980,7 +988,7 @@ export default function Calendar() {
                 />
               </div>
 
-              <div>
+              {form.eventType !== 'personal' && <div>
                 <label className="block text-[11px] font-medium text-gray-500 mb-1.5">
                   対象カテゴリー
                 </label>
@@ -1009,7 +1017,7 @@ export default function Calendar() {
                     カテゴリーが未設定のため全員に表示されます
                   </p>
                 )}
-              </div>
+              </div>}
 
               <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
                 <button

@@ -92,9 +92,12 @@ router.get('/my', authenticate, async (req, res) => {
       }
     }
     
-    const orFilters = [{ teamId: { in: userTeamIds } }];
+    const orFilters = [
+      { teamId: { in: userTeamIds }, isPersonal: false },
+      { isPersonal: true, createdBy: user.id }
+    ];
     if (userOrgIds.length > 0) {
-      orFilters.push({ organizationId: { in: userOrgIds }, teamId: null });
+      orFilters.push({ organizationId: { in: userOrgIds }, teamId: null, isPersonal: false });
     }
     let where = { OR: orFilters };
     
@@ -120,6 +123,10 @@ router.get('/my', authenticate, async (req, res) => {
     });
     
     const filteredEvents = events.filter(event => {
+      if (event.isPersonal) {
+        return true;
+      }
+      
       if (event.categoryTargets.length === 0) {
         return true;
       }
@@ -146,9 +153,56 @@ router.get('/my', authenticate, async (req, res) => {
   }
 });
 
+router.get('/personal', authenticate, async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    
+    let where = { isPersonal: true, createdBy: req.user.id };
+    
+    if (month && year) {
+      const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+      const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+      where.startDate = { gte: startDate, lte: endDate };
+    }
+    
+    const events = await prisma.calendarEvent.findMany({
+      where,
+      include: {
+        author: { select: { id: true, name: true } }
+      },
+      orderBy: { startDate: 'asc' }
+    });
+    
+    res.json(events);
+  } catch (error) {
+    console.error('Get personal calendar events error:', error);
+    res.status(500).json({ error: 'Failed to fetch personal events' });
+  }
+});
+
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { teamId, organizationId, title, description, startDate, endDate, allDay, eventType, location, categoryIds } = req.body;
+    const { teamId, organizationId, title, description, startDate, endDate, allDay, eventType, location, categoryIds, isPersonal } = req.body;
+    
+    if (isPersonal) {
+      const event = await prisma.calendarEvent.create({
+        data: {
+          title,
+          description,
+          startDate: new Date(startDate),
+          endDate: endDate ? new Date(endDate) : null,
+          allDay: allDay || false,
+          eventType: eventType || 'personal',
+          location,
+          isPersonal: true,
+          createdBy: req.user.id
+        },
+        include: {
+          author: { select: { id: true, name: true } }
+        }
+      });
+      return res.status(201).json(event);
+    }
     
     const canCreate = teamId 
       ? (hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH']) || isOperator(req.user))
@@ -273,9 +327,11 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Event not found' });
     }
     
-    const canEdit = event.teamId 
-      ? (hasTeamAccess(req.user, event.teamId, ['TEAM_MANAGER', 'COACH']) || isOperator(req.user))
-      : isOperator(req.user);
+    const canEdit = event.isPersonal 
+      ? event.createdBy === req.user.id
+      : (event.teamId 
+        ? (hasTeamAccess(req.user, event.teamId, ['TEAM_MANAGER', 'COACH']) || isOperator(req.user))
+        : isOperator(req.user));
     
     if (!canEdit) {
       return res.status(403).json({ error: 'Access denied' });
@@ -350,9 +406,11 @@ router.delete('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Event not found' });
     }
     
-    const canDelete = event.teamId 
-      ? (hasTeamAccess(req.user, event.teamId, ['TEAM_MANAGER', 'COACH']) || isOperator(req.user))
-      : isOperator(req.user);
+    const canDelete = event.isPersonal
+      ? event.createdBy === req.user.id
+      : (event.teamId 
+        ? (hasTeamAccess(req.user, event.teamId, ['TEAM_MANAGER', 'COACH']) || isOperator(req.user))
+        : isOperator(req.user));
     
     if (!canDelete) {
       return res.status(403).json({ error: 'Access denied' });
