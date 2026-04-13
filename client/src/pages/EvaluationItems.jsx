@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, Edit2, ChevronDown, ChevronRight, Download, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react';
 
+const LEVEL_LABELS = ['大項目', '中項目', '小項目'];
+const LEVEL_COLORS = [
+  'border-l-4 border-l-primary-500 bg-white',
+  'border-l-4 border-l-blue-300 bg-gray-50/50',
+  'bg-white',
+];
+
 export default function EvaluationItems() {
   const { currentTeam, isOperator, isTeamAdmin } = useAuth();
   const [items, setItems] = useState([]);
@@ -13,6 +20,7 @@ export default function EvaluationItems() {
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [importing, setImporting] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
+  const [addLevel, setAddLevel] = useState(0);
   const [newItem, setNewItem] = useState({
     name: '',
     description: '',
@@ -88,6 +96,52 @@ export default function EvaluationItems() {
     }
   };
 
+  const getNextSortOrder = (parentId) => {
+    const findSiblings = (itemList, pid) => {
+      if (!pid) return itemList;
+      for (const item of itemList) {
+        if (item.id === pid) return item.children || [];
+        if (item.children?.length) {
+          const found = findSiblings(item.children, pid);
+          if (found) return found;
+        }
+      }
+      return [];
+    };
+    const siblings = findSiblings(items, parentId);
+    if (siblings.length === 0) return 0;
+    return Math.max(...siblings.map(s => s.sortOrder || 0)) + 1;
+  };
+
+  const getParentName = (parentId) => {
+    const findItem = (itemList) => {
+      for (const item of itemList) {
+        if (item.id === parentId) return item.name;
+        if (item.children?.length) {
+          const found = findItem(item.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    return findItem(items);
+  };
+
+  const getItemLevel = (item) => {
+    if (!item.parentId) return 0;
+    const findLevel = (itemList, targetId, level = 0) => {
+      for (const i of itemList) {
+        if (i.id === targetId) return level;
+        if (i.children?.length) {
+          const found = findLevel(i.children, targetId, level + 1);
+          if (found !== -1) return found;
+        }
+      }
+      return -1;
+    };
+    return findLevel(items, item.parentId) + 1;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -123,10 +177,13 @@ export default function EvaluationItems() {
   const resetForm = () => {
     setNewItem({ name: '', description: '', parentId: null, maxScore: 5, sortOrder: 0 });
     setEditingItem(null);
+    setAddLevel(0);
   };
 
   const handleEdit = (item) => {
     setEditingItem(item);
+    const level = getItemLevel(item);
+    setAddLevel(level);
     setNewItem({
       name: item.name,
       description: item.description || '',
@@ -134,6 +191,29 @@ export default function EvaluationItems() {
       maxScore: item.maxScore || 5,
       sortOrder: item.sortOrder,
     });
+    setShowModal(true);
+  };
+
+  const handleAddChild = (parentItem, parentLevel) => {
+    resetForm();
+    const childLevel = parentLevel + 1;
+    setAddLevel(childLevel);
+    setNewItem(prev => ({
+      ...prev,
+      parentId: parentItem.id,
+      sortOrder: getNextSortOrder(parentItem.id),
+    }));
+    setShowModal(true);
+  };
+
+  const handleAddTopLevel = () => {
+    resetForm();
+    setAddLevel(0);
+    setNewItem(prev => ({
+      ...prev,
+      parentId: null,
+      sortOrder: getNextSortOrder(null),
+    }));
     setShowModal(true);
   };
 
@@ -158,12 +238,42 @@ export default function EvaluationItems() {
     setExpandedItems(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const displayItems = items;
-  const totalActive = items.reduce((sum, cat) => {
-    if (!cat.isActive) return sum;
-    return sum + 1 + (cat.children?.filter(c => c.isActive)?.length || 0);
-  }, 0);
-  const totalAll = items.reduce((sum, cat) => sum + 1 + (cat.children?.length || 0), 0);
+  const countItems = (itemList, depth = 0) => {
+    let total = 0;
+    let active = 0;
+    for (const item of itemList) {
+      total++;
+      if (item.isActive) active++;
+      if (item.children?.length) {
+        const sub = countItems(item.children, depth + 1);
+        total += sub.total;
+        active += sub.active;
+      }
+    }
+    return { total, active };
+  };
+
+  const { total: totalAll, active: totalActive } = countItems(items);
+
+  const getAllParentOptions = () => {
+    const options = [];
+    const collect = (itemList, level, prefix = '') => {
+      for (const item of itemList) {
+        if (level < 2) {
+          options.push({
+            id: item.id,
+            name: prefix ? `${prefix} > ${item.name}` : item.name,
+            level,
+          });
+        }
+        if (item.children?.length && level < 1) {
+          collect(item.children, level + 1, item.name);
+        }
+      }
+    };
+    collect(items, 0);
+    return options;
+  };
 
   const renderItems = (itemList, level = 0) => {
     return itemList.map((item) => {
@@ -173,7 +283,7 @@ export default function EvaluationItems() {
       return (
         <div key={item.id}>
           <div
-            className={`flex items-center justify-between py-3 px-4 hover:bg-gray-50 border-b border-gray-100 ${!item.isActive ? 'opacity-50 bg-gray-50' : ''}`}
+            className={`flex items-center justify-between py-3 px-4 hover:bg-gray-50/80 border-b border-gray-100 ${!item.isActive ? 'opacity-50 bg-gray-50' : ''} ${level === 0 ? 'border-l-4 border-l-primary-500' : level === 1 ? 'border-l-4 border-l-blue-300' : ''}`}
             style={{ paddingLeft: 16 + level * 24 }}
           >
             <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -190,16 +300,23 @@ export default function EvaluationItems() {
               )}
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
+                    level === 0 ? 'bg-primary-100 text-primary-700' :
+                    level === 1 ? 'bg-blue-100 text-blue-700' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>
+                    {LEVEL_LABELS[level] || '項目'}
+                  </span>
                   <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
                   {!item.isActive && (
                     <span className="text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded shrink-0">無効</span>
                   )}
-                  {level > 0 && item.maxScore && (
+                  {level === 2 && item.maxScore && (
                     <span className="text-xs text-gray-400 shrink-0">MAX:{item.maxScore}</span>
                   )}
                 </div>
                 {item.description && (
-                  <p className="text-xs text-gray-500 truncate">{item.description}</p>
+                  <p className="text-xs text-gray-500 truncate mt-0.5">{item.description}</p>
                 )}
               </div>
             </div>
@@ -219,15 +336,11 @@ export default function EvaluationItems() {
                 >
                   <Edit2 className="w-4 h-4" />
                 </button>
-                {level === 0 && (
+                {level < 2 && (
                   <button
-                    onClick={() => {
-                      resetForm();
-                      setNewItem(prev => ({ ...prev, parentId: item.id }));
-                      setShowModal(true);
-                    }}
-                    className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-                    title="子項目追加"
+                    onClick={() => handleAddChild(item, level)}
+                    className="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-primary-50"
+                    title={`${LEVEL_LABELS[level + 1]}を追加`}
                   >
                     <Plus className="w-4 h-4" />
                   </button>
@@ -239,6 +352,20 @@ export default function EvaluationItems() {
         </div>
       );
     });
+  };
+
+  const getModalTitle = () => {
+    if (editingItem) {
+      return `${LEVEL_LABELS[addLevel] || '項目'}を編集`;
+    }
+    return `${LEVEL_LABELS[addLevel] || '項目'}を追加`;
+  };
+
+  const isLeafLevel = () => {
+    if (editingItem) {
+      return addLevel >= 2;
+    }
+    return addLevel >= 2;
   };
 
   if (loading) {
@@ -270,18 +397,32 @@ export default function EvaluationItems() {
               無効項目も表示
             </label>
             <button
-              onClick={() => {
-                resetForm();
-                setShowModal(true);
-              }}
+              onClick={handleAddTopLevel}
               className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
             >
               <Plus className="w-4 h-4" />
-              項目追加
+              大項目を追加
             </button>
           </div>
         )}
       </div>
+
+      {canManage && (
+        <div className="flex items-center gap-4 text-xs text-gray-500">
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded bg-primary-100 border border-primary-300"></span>
+            <span>大項目</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded bg-blue-100 border border-blue-300"></span>
+            <span>中項目</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded bg-gray-100 border border-gray-300"></span>
+            <span>小項目（評価対象）</span>
+          </div>
+        </div>
+      )}
 
       {items.length === 0 && canManage && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-8 text-center">
@@ -305,15 +446,13 @@ export default function EvaluationItems() {
       )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        {displayItems.length > 0 ? (
-          renderItems(displayItems)
-        ) : items.length > 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            表示する項目がありません。「無効項目も表示」をオンにしてください。
-          </div>
+        {items.length > 0 ? (
+          renderItems(items)
         ) : (
           <div className="p-8 text-center text-gray-500">
-            評価項目がありません。テンプレートからインポートするか、手動で追加してください。
+            {showInactive
+              ? '評価項目がありません。テンプレートからインポートするか、手動で追加してください。'
+              : '表示する項目がありません。「無効項目も表示」をオンにしてください。'}
           </div>
         )}
       </div>
@@ -336,17 +475,92 @@ export default function EvaluationItems() {
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              {editingItem ? '項目編集' : newItem.parentId ? '子項目追加' : 'カテゴリ追加'}
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">
+              {getModalTitle()}
             </h2>
+            {!editingItem && newItem.parentId && (
+              <p className="text-xs text-gray-500 mb-4">
+                親項目: <span className="font-medium text-gray-700">{getParentName(newItem.parentId)}</span>
+              </p>
+            )}
+            {!editingItem && !newItem.parentId && (
+              <p className="text-xs text-gray-500 mb-4">
+                最上位の評価カテゴリを作成します
+              </p>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
+              {!editingItem && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">追加する階層</label>
+                  <div className="flex gap-2">
+                    {LEVEL_LABELS.map((label, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setAddLevel(idx);
+                          if (idx === 0) {
+                            setNewItem(prev => ({ ...prev, parentId: null, sortOrder: getNextSortOrder(null) }));
+                          } else {
+                            setNewItem(prev => ({ ...prev, parentId: null, sortOrder: 0 }));
+                          }
+                        }}
+                        className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition ${
+                          addLevel === idx
+                            ? 'bg-primary-50 border-primary-300 text-primary-700'
+                            : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!editingItem && addLevel > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {addLevel === 1 ? '所属する大項目' : '所属する中項目'}
+                  </label>
+                  <select
+                    value={newItem.parentId || ''}
+                    onChange={(e) => {
+                      const pid = e.target.value || null;
+                      setNewItem(prev => ({
+                        ...prev,
+                        parentId: pid,
+                        sortOrder: getNextSortOrder(pid),
+                      }));
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                    required
+                  >
+                    <option value="">選択してください</option>
+                    {addLevel === 1 && items.map(item => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                    {addLevel === 2 && items.flatMap(parent =>
+                      (parent.children || []).map(child => (
+                        <option key={child.id} value={child.id}>
+                          {parent.name} &gt; {child.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">項目名</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {LEVEL_LABELS[addLevel] || '項目'}名
+                </label>
                 <input
                   type="text"
                   value={newItem.name}
                   onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder={`${LEVEL_LABELS[addLevel] || '項目'}の名前を入力`}
                   required
                 />
               </div>
@@ -357,9 +571,10 @@ export default function EvaluationItems() {
                   onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
                   rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="任意"
                 />
               </div>
-              {newItem.parentId && (
+              {isLeafLevel() && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">最大スコア</label>
                   <input
@@ -372,15 +587,6 @@ export default function EvaluationItems() {
                   />
                 </div>
               )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">表示順</label>
-                <input
-                  type="number"
-                  value={newItem.sortOrder}
-                  onChange={(e) => setNewItem({ ...newItem, sortOrder: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
-              </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
@@ -396,7 +602,7 @@ export default function EvaluationItems() {
                   type="submit"
                   className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
                 >
-                  保存
+                  {editingItem ? '保存' : '追加'}
                 </button>
               </div>
             </form>
