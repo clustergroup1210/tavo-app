@@ -39,6 +39,8 @@ import NotificationSettings from './pages/NotificationSettings';
 import PlayerDashboard from './pages/PlayerDashboard';
 import AccountSettings from './pages/AccountSettings';
 import EvaluationMatrix from './pages/EvaluationMatrix';
+import AdminSystemSettings from './pages/AdminSystemSettings';
+import AdminNotificationManagement from './pages/AdminNotificationManagement';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -125,8 +127,8 @@ export default function App() {
           <Route path="/admin/users" element={<AdminUserManagement />} />
           <Route path="/admin/organizations" element={<Organizations />} />
           <Route path="/admin/master" element={<MasterSettings />} />
-          <Route path="/admin/notifications" element={<Placeholder />} />
-          <Route path="/admin/settings" element={<Placeholder />} />
+          <Route path="/admin/notifications" element={<AdminNotificationManagement />} />
+          <Route path="/admin/settings" element={<AdminSystemSettings />} />
         </Route>
       </Route>
       

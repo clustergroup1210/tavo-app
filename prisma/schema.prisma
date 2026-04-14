@@ -585,22 +585,29 @@ enum NotificationType {
   CALENDAR
   ANNOUNCEMENT
   JOIN_REQUEST
+  BROADCAST
 }
 
 model Notification {
-  id        String           @id @default(uuid())
-  userId    String
-  type      NotificationType
-  title     String
-  message   String
-  linkUrl   String?
-  isRead    Boolean          @default(false)
-  createdAt DateTime         @default(now())
+  id             String           @id @default(uuid())
+  userId         String
+  type           NotificationType
+  title          String
+  message        String
+  linkUrl        String?
+  isRead         Boolean          @default(false)
+  broadcastId    String?
+  targetType     String?
+  targetTeamName String?
+  senderName     String?
+  createdAt      DateTime         @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead])
   @@index([createdAt])
+  @@index([type])
+  @@index([broadcastId])
 }
 
 model NotificationSetting {

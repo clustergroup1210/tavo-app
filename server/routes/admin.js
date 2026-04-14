@@ -2,6 +2,27 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const { authenticate } = require('../middleware/auth');
+const fs = require('fs');
+const path = require('path');
+
+const SETTINGS_FILE = path.join(__dirname, '..', 'data', 'system-settings.json');
+
+function readSystemSettings() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+    }
+  } catch (e) {}
+  return {};
+}
+
+function writeSystemSettings(settings) {
+  const dir = path.dirname(SETTINGS_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf8');
+}
 
 const requireOperator = (req, res, next) => {
   const isOperator = req.user.organizations?.some(o => 
@@ -170,6 +191,169 @@ router.delete('/teams/:id', authenticate, requireOperator, async (req, res) => {
   } catch (error) {
     console.error('Failed to delete team:', error);
     res.status(500).json({ error: 'Failed to delete team' });
+  }
+});
+
+router.get('/system-settings', authenticate, requireOperator, async (req, res) => {
+  try {
+    res.json(readSystemSettings());
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch system settings' });
+  }
+});
+
+router.put('/system-settings', authenticate, requireOperator, async (req, res) => {
+  try {
+    const current = readSystemSettings();
+    const updated = { ...current, ...req.body, updatedAt: new Date().toISOString() };
+    writeSystemSettings(updated);
+    res.json(updated);
+  } catch (error) {
+    console.error('Failed to save system settings:', error);
+    res.status(500).json({ error: 'Failed to save system settings' });
+  }
+});
+
+router.get('/system-stats', authenticate, requireOperator, async (req, res) => {
+  try {
+    const [totalTeams, totalUsers, totalPlayers, totalEvaluations, totalVideos, totalNotifications, totalAnnouncements, totalCalendarEvents, totalGoals, totalTasks] = await Promise.all([
+      prisma.team.count({ where: { parentId: null } }),
+      prisma.user.count(),
+      prisma.player.count(),
+      prisma.evaluation.count(),
+      prisma.video.count(),
+      prisma.notification.count(),
+      prisma.announcement.count(),
+      prisma.calendarEvent.count(),
+      prisma.goal.count(),
+      prisma.task.count(),
+    ]);
+    res.json({ totalTeams, totalUsers, totalPlayers, totalEvaluations, totalVideos, totalNotifications, totalAnnouncements, totalCalendarEvents, totalGoals, totalTasks });
+  } catch (error) {
+    console.error('Failed to fetch system stats:', error);
+    res.status(500).json({ error: 'Failed to fetch system stats' });
+  }
+});
+
+router.get('/notification-stats', authenticate, requireOperator, async (req, res) => {
+  try {
+    const [totalNotifications, readNotifications, usersWithSettings] = await Promise.all([
+      prisma.notification.count(),
+      prisma.notification.count({ where: { isRead: true } }),
+      prisma.notificationSetting.count(),
+    ]);
+    const readRate = totalNotifications > 0 ? Math.round((readNotifications / totalNotifications) * 100) : 0;
+    res.json({ totalNotifications, readRate, usersWithSettings });
+  } catch (error) {
+    console.error('Failed to fetch notification stats:', error);
+    res.status(500).json({ error: 'Failed to fetch notification stats' });
+  }
+});
+
+router.get('/recent-notifications', authenticate, requireOperator, async (req, res) => {
+  try {
+    const broadcasts = await prisma.$queryRaw`
+      SELECT 
+        "broadcastId",
+        MIN(id) as id,
+        MIN(title) as title,
+        MIN(message) as message,
+        MIN("createdAt") as "createdAt",
+        MIN("targetType") as "targetType",
+        MIN("targetTeamName") as "targetTeamName",
+        MIN("senderName") as "senderName",
+        COUNT(*)::int as "recipientCount"
+      FROM "Notification"
+      WHERE type = 'BROADCAST' AND "broadcastId" IS NOT NULL
+      GROUP BY "broadcastId"
+      ORDER BY MIN("createdAt") DESC
+      LIMIT 20
+    `;
+    res.json(broadcasts);
+  } catch (error) {
+    console.error('Failed to fetch recent notifications:', error);
+    res.json([]);
+  }
+});
+
+router.post('/broadcast-notification', authenticate, requireOperator, async (req, res) => {
+  try {
+    const { title, message, targetType, targetTeamId } = req.body;
+    if (!title || !message) {
+      return res.status(400).json({ error: 'タイトルとメッセージは必須です' });
+    }
+
+    const { v4: uuidv4 } = require('uuid');
+    const broadcastId = uuidv4();
+    let targetUserIds;
+    let targetTeamName = null;
+
+    if (targetType === 'team' && targetTeamId) {
+      const team = await prisma.team.findUnique({
+        where: { id: targetTeamId },
+        select: { name: true }
+      });
+      targetTeamName = team?.name;
+
+      const userTeams = await prisma.userTeam.findMany({
+        where: { teamId: targetTeamId },
+        select: { userId: true },
+        distinct: ['userId'],
+      });
+      targetUserIds = userTeams.map(ut => ut.userId);
+    } else {
+      const users = await prisma.user.findMany({ select: { id: true } });
+      targetUserIds = users.map(u => u.id);
+    }
+
+    const uniqueUserIds = [...new Set(targetUserIds)];
+
+    if (uniqueUserIds.length === 0) {
+      return res.status(400).json({ error: '対象ユーザーがいません' });
+    }
+
+    await prisma.notification.createMany({
+      data: uniqueUserIds.map(userId => ({
+        userId,
+        type: 'BROADCAST',
+        title,
+        message,
+        isRead: false,
+        broadcastId,
+        targetType: targetType || 'all',
+        targetTeamName: targetTeamName,
+        senderName: req.user.name || '管理者',
+      })),
+    });
+
+    res.json({ count: uniqueUserIds.length });
+  } catch (error) {
+    console.error('Failed to send broadcast notification:', error);
+    res.status(500).json({ error: '通知の送信に失敗しました' });
+  }
+});
+
+router.delete('/notifications/:id', authenticate, requireOperator, async (req, res) => {
+  try {
+    const notification = await prisma.notification.findUnique({
+      where: { id: req.params.id },
+    });
+    if (!notification) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+
+    if (notification.type === 'BROADCAST' && notification.broadcastId) {
+      await prisma.notification.deleteMany({
+        where: { broadcastId: notification.broadcastId },
+      });
+    } else {
+      await prisma.notification.delete({ where: { id: req.params.id } });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete notification:', error);
+    res.status(500).json({ error: 'Failed to delete notification' });
   }
 });
 

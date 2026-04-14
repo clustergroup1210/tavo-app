@@ -1,5 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const fs = require('fs');
+const path = require('path');
 
 const typeToSettingMap = {
   EVALUATION: 'notifyEvaluation',
@@ -10,14 +12,34 @@ const typeToSettingMap = {
   ANNOUNCEMENT: 'notifyAnnouncement'
 };
 
+function getSystemDefaults() {
+  try {
+    const settingsFile = path.join(__dirname, '..', 'data', 'system-settings.json');
+    if (fs.existsSync(settingsFile)) {
+      const settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+      return {
+        notifyEvaluation: settings.defaultNotifyEvaluation ?? true,
+        notifySelfEvaluation: settings.defaultNotifySelfEvaluation ?? true,
+        notifyTask: settings.defaultNotifyTask ?? true,
+        notifyComment: settings.defaultNotifyComment ?? true,
+        notifyCalendar: settings.defaultNotifyCalendar ?? true,
+        notifyAnnouncement: settings.defaultNotifyAnnouncement ?? true,
+        enableEmail: settings.defaultEnableEmail ?? true,
+      };
+    }
+  } catch (e) {}
+  return {};
+}
+
 async function getOrCreateSettings(userId) {
   let settings = await prisma.notificationSetting.findUnique({
     where: { userId }
   });
   
   if (!settings) {
+    const defaults = getSystemDefaults();
     settings = await prisma.notificationSetting.create({
-      data: { userId }
+      data: { userId, ...defaults }
     });
   }
   
