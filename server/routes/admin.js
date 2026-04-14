@@ -4,6 +4,20 @@ const prisma = require('../lib/prisma');
 const { authenticate } = require('../middleware/auth');
 const fs = require('fs');
 const path = require('path');
+const multer = require('multer');
+const Papa = require('papaparse');
+
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+      cb(null, true);
+    } else {
+      cb(new Error('CSVファイルのみアップロードできます'), false);
+    }
+  }
+});
 
 const SETTINGS_FILE = path.join(__dirname, '..', 'data', 'system-settings.json');
 
@@ -330,6 +344,116 @@ router.post('/broadcast-notification', authenticate, requireOperator, async (req
   } catch (error) {
     console.error('Failed to send broadcast notification:', error);
     res.status(500).json({ error: '通知の送信に失敗しました' });
+  }
+});
+
+router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single('file'), async (req, res) => {
+  try {
+    const isSuperAdmin = req.user.organizations?.some(o => o.role === 'SUPER_ADMIN');
+    if (!isSuperAdmin) {
+      const isAdmin = req.user.organizations?.some(o => ['ADMIN', 'OPERATOR'].includes(o.role));
+      if (!isAdmin) {
+        return res.status(403).json({ error: 'この操作にはスーパー管理者権限が必要です' });
+      }
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'CSVファイルが選択されていません' });
+    }
+
+    const csvText = req.file.buffer.toString('utf-8').replace(/^\uFEFF/, '');
+    const parsed = Papa.parse(csvText, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (h) => h.trim(),
+    });
+
+    if (parsed.errors.length > 0 && parsed.data.length === 0) {
+      return res.status(400).json({
+        error: 'CSVの解析に失敗しました',
+        details: parsed.errors.slice(0, 5).map(e => e.message),
+      });
+    }
+
+    const userOrg = req.user.organizations?.[0];
+    let orgId;
+    if (userOrg) {
+      orgId = userOrg.organizationId;
+    } else {
+      let defaultOrg = await prisma.organization.findFirst();
+      if (!defaultOrg) {
+        defaultOrg = await prisma.organization.create({ data: { name: 'Default Organization' } });
+      }
+      orgId = defaultOrg.id;
+    }
+
+    const results = { success: 0, skipped: 0, errors: [] };
+    const validRows = [];
+
+    for (let i = 0; i < parsed.data.length; i++) {
+      const row = parsed.data[i];
+      const teamName = (row.name || row['チーム名'] || '').trim();
+
+      if (!teamName) {
+        results.skipped++;
+        results.errors.push({ row: i + 2, reason: 'チーム名が空です' });
+        continue;
+      }
+
+      validRows.push({
+        name: teamName,
+        description: (row.description || row['説明'] || row.category || row['カテゴリー'] || '').trim() || null,
+        organizationId: orgId,
+      });
+    }
+
+    if (validRows.length === 0) {
+      return res.json({
+        success: 0,
+        skipped: results.skipped,
+        errors: results.errors,
+        message: '有効なデータがありませんでした',
+      });
+    }
+
+    const existingTeams = await prisma.team.findMany({
+      where: {
+        organizationId: orgId,
+        name: { in: validRows.map(r => r.name) },
+        parentId: null,
+      },
+      select: { name: true },
+    });
+    const existingNames = new Set(existingTeams.map(t => t.name));
+
+    const newRows = [];
+    for (const row of validRows) {
+      if (existingNames.has(row.name)) {
+        results.skipped++;
+        results.errors.push({ row: 0, reason: `「${row.name}」は既に登録済みです` });
+      } else {
+        newRows.push(row);
+      }
+    }
+
+    if (newRows.length > 0) {
+      const created = await prisma.team.createMany({
+        data: newRows,
+        skipDuplicates: true,
+      });
+      results.success = created.count;
+    }
+
+    res.json({
+      success: results.success,
+      skipped: results.skipped,
+      total: parsed.data.length,
+      errors: results.errors.slice(0, 20),
+      message: `${results.success}件のチームを登録しました`,
+    });
+  } catch (error) {
+    console.error('CSV import error:', error);
+    res.status(500).json({ error: 'CSVインポートに失敗しました' });
   }
 });
 

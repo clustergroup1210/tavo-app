@@ -32,7 +32,7 @@ The system is built on a team-centric display and robust role-based access contr
     -   **Announcements System**: Supports priority levels, publish/draft status, expiration dates, and category-based targeting.
 -   **Public Appeal URL**: Allows players/coaches to generate public profiles with secure tokens, displaying player info and evaluation data.
 -   **Invitation URL System**: Team-based invitation system for players, parents, and staff with role-specific flows.
--   **System Administration**: Dedicated operator dashboard with system-wide statistics, team/user management, team impersonation, system settings (maintenance mode, upload limits, session timeout, registration controls), and notification management (broadcast notifications, default notification settings, notification history).
+-   **System Administration**: Dedicated operator dashboard with system-wide statistics, team/user management, team impersonation, system settings (maintenance mode, upload limits, session timeout, registration controls), notification management (broadcast notifications, default notification settings, notification history), and CSV bulk team import with template download, drag-and-drop upload, duplicate detection, and detailed result reporting.
 -   **Data Visibility**: Implements comprehensive time-series filtering based on player-team membership periods for evaluations, videos, goals, and player notes, ensuring data access aligns with tenure.
 -   **Parent Team Inheritance**: Enables sub-teams to inherit evaluation items and rounds from parent teams.
 -   **Player Transfer System**: Manages player transfers while preserving data ownership (evaluations, goals, videos follow the player) and tracking transfer history with snapshots.

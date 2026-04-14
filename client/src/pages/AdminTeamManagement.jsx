@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Users, ExternalLink, Search, Plus, X, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { Building2, Users, ExternalLink, Search, Plus, X, MoreVertical, Pencil, Trash2, Upload, FileText, CheckCircle, AlertCircle, Download } from 'lucide-react';
 
 export default function AdminTeamManagement() {
   const navigate = useNavigate();
@@ -20,6 +20,12 @@ export default function AdminTeamManagement() {
   const [editing, setEditing] = useState(false);
   const [deleteConfirmPassword, setDeleteConfirmPassword] = useState('');
   const menuRef = useRef(null);
+
+  const [showCsvModal, setShowCsvModal] = useState(false);
+  const [csvFile, setCsvFile] = useState(null);
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvResult, setCsvResult] = useState(null);
+  const csvInputRef = useRef(null);
 
   useEffect(() => {
     fetchTeams();
@@ -150,6 +156,46 @@ export default function AdminTeamManagement() {
     }
   };
 
+  const handleCsvImport = async () => {
+    if (!csvFile) return;
+    setCsvImporting(true);
+    setCsvResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', csvFile);
+      const res = await fetch('/api/admin/teams/import-csv', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCsvResult({ type: 'success', ...data });
+        if (data.success > 0) {
+          fetchTeams();
+        }
+      } else {
+        setCsvResult({ type: 'error', message: data.error || 'インポートに失敗しました', details: data.details });
+      }
+    } catch (err) {
+      setCsvResult({ type: 'error', message: 'インポートに失敗しました' });
+    } finally {
+      setCsvImporting(false);
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const bom = '\uFEFF';
+    const csv = bom + 'name,description\nサンプルチームA,U-12カテゴリー\nサンプルチームB,U-15カテゴリー\n';
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'teams_template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const filteredTeams = teams.filter(team => 
     team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     team.representativeName?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -170,14 +216,24 @@ export default function AdminTeamManagement() {
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">チーム管理</h1>
           <p className="mt-1 text-sm text-gray-500">全チームの管理と監視</p>
         </div>
-        <button 
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm sm:text-base whitespace-nowrap shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">新規チーム作成</span>
-          <span className="sm:hidden">新規</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => { setShowCsvModal(true); setCsvFile(null); setCsvResult(null); }}
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm whitespace-nowrap"
+          >
+            <Upload className="w-4 h-4" />
+            <span className="hidden sm:inline">CSV一括登録</span>
+            <span className="sm:hidden">CSV</span>
+          </button>
+          <button 
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm sm:text-base whitespace-nowrap"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">新規チーム作成</span>
+            <span className="sm:hidden">新規</span>
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -496,6 +552,143 @@ export default function AdminTeamManagement() {
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
                 {deleting ? '削除中...' : '削除する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showCsvModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Upload className="w-5 h-5 text-primary-600" />
+                CSV一括登録
+              </h3>
+              <button onClick={() => setShowCsvModal(false)} className="p-1 hover:bg-gray-100 rounded">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-700">
+              <p className="font-medium mb-1">CSVフォーマット</p>
+              <p>以下のヘッダー形式でCSVファイルを作成してください：</p>
+              <code className="block mt-1 bg-blue-100 px-2 py-1 rounded text-xs font-mono">name,description</code>
+              <p className="mt-1 text-xs text-blue-600">※「name」または「チーム名」ヘッダーに対応。文字コードはUTF-8で保存してください。</p>
+            </div>
+
+            <button
+              onClick={handleDownloadTemplate}
+              className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 mb-4"
+            >
+              <Download className="w-4 h-4" />
+              テンプレートCSVをダウンロード
+            </button>
+
+            <div
+              className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition mb-4"
+              onClick={() => csvInputRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const file = e.dataTransfer.files?.[0];
+                if (file && (file.name.endsWith('.csv') || file.type === 'text/csv')) {
+                  setCsvFile(file);
+                  setCsvResult(null);
+                }
+              }}
+            >
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={(e) => {
+                  setCsvFile(e.target.files?.[0] || null);
+                  setCsvResult(null);
+                }}
+              />
+              {csvFile ? (
+                <div className="flex items-center justify-center gap-2">
+                  <FileText className="w-6 h-6 text-primary-600" />
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-gray-900">{csvFile.name}</p>
+                    <p className="text-xs text-gray-500">{(csvFile.size / 1024).toFixed(1)} KB</p>
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setCsvFile(null); setCsvResult(null); }}
+                    className="ml-2 p-1 hover:bg-gray-100 rounded"
+                  >
+                    <X className="w-4 h-4 text-gray-400" />
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-600">クリックまたはドラッグ＆ドロップでCSVファイルを選択</p>
+                  <p className="text-xs text-gray-400 mt-1">.csv形式のファイルのみ</p>
+                </div>
+              )}
+            </div>
+
+            {csvResult && (
+              <div className={`rounded-lg p-4 mb-4 ${csvResult.type === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                {csvResult.type === 'success' ? (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                      <p className="font-medium text-green-800">{csvResult.message}</p>
+                    </div>
+                    <div className="text-sm text-green-700 space-y-0.5">
+                      <p>全{csvResult.total}行中: 成功 {csvResult.success}件 / スキップ {csvResult.skipped}件</p>
+                    </div>
+                    {csvResult.errors?.length > 0 && (
+                      <div className="mt-2 text-xs text-amber-700 bg-amber-50 rounded p-2 max-h-32 overflow-y-auto">
+                        {csvResult.errors.map((err, idx) => (
+                          <p key={idx}>{err.row > 0 ? `行${err.row}: ` : ''}{err.reason}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <AlertCircle className="w-5 h-5 text-red-600" />
+                      <p className="font-medium text-red-800">{csvResult.message}</p>
+                    </div>
+                    {csvResult.details && (
+                      <div className="text-xs text-red-600 mt-1">
+                        {csvResult.details.map((d, idx) => <p key={idx}>{d}</p>)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowCsvModal(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                閉じる
+              </button>
+              <button
+                onClick={handleCsvImport}
+                disabled={!csvFile || csvImporting}
+                className="flex items-center gap-2 px-5 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition"
+              >
+                {csvImporting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    インポート中...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    インポート実行
+                  </>
+                )}
               </button>
             </div>
           </div>
