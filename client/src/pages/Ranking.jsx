@@ -19,11 +19,14 @@ export default function Ranking() {
   const navigate = useNavigate();
   const { currentTeam } = useAuth();
   const [ranking, setRanking] = useState([]);
+  const [gkRanking, setGkRanking] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [gkCategories, setGkCategories] = useState([]);
   const [teamCategories, setTeamCategories] = useState([]);
   const [selectedTeamCategory, setSelectedTeamCategory] = useState('');
   const [selectedPosition, setSelectedPosition] = useState('');
   const [activeTab, setActiveTab] = useState('total');
+  const [rankingView, setRankingView] = useState('fp');
   const [sortBy, setSortBy] = useState('total');
   const [loading, setLoading] = useState(false);
 
@@ -47,7 +50,9 @@ export default function Ranking() {
       if (res.ok) {
         const data = await res.json();
         setRanking(data.ranking || []);
+        setGkRanking(data.gkRanking || []);
         setCategories(data.categories || []);
+        setGkCategories(data.gkCategories || []);
         setTeamCategories(data.teamCategories || []);
       }
     } catch (error) {
@@ -57,9 +62,12 @@ export default function Ranking() {
     }
   };
 
+  const activeRanking = rankingView === 'gk' ? gkRanking : ranking;
+  const activeCategories = rankingView === 'gk' ? gkCategories : categories;
+
   const sortedRanking = useMemo(() => {
-    if (!ranking.length) return [];
-    const sorted = [...ranking];
+    if (!activeRanking.length) return [];
+    const sorted = [...activeRanking];
     if (sortBy === 'total') {
       sorted.sort((a, b) => {
         const aRate = a.achievementRate !== null ? a.achievementRate : -1;
@@ -75,11 +83,11 @@ export default function Ranking() {
     }
     sorted.forEach((item, idx) => { item.rank = idx + 1; });
     return sorted;
-  }, [ranking, sortBy]);
+  }, [activeRanking, sortBy]);
 
   const activeSortLabel = sortBy === 'total'
     ? '総合'
-    : categories.find(c => c.id === sortBy)?.name || '総合';
+    : activeCategories.find(c => c.id === sortBy)?.name || '総合';
 
   const getRankBadge = (rank) => {
     if (rank === 1) return (
@@ -112,6 +120,31 @@ export default function Ranking() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 sm:p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={() => { setRankingView('fp'); setSortBy('total'); }}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              rankingView === 'fp'
+                ? 'bg-primary-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            フィールドプレイヤー
+          </button>
+          {gkRanking.length > 0 && (
+            <button
+              onClick={() => { setRankingView('gk'); setSortBy('total'); }}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                rankingView === 'gk'
+                  ? 'bg-green-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              GK
+            </button>
+          )}
+        </div>
+
         <div className="flex gap-1 sm:gap-2 mb-6 border-b border-gray-200 overflow-x-auto scrollbar-hide">
           <button
             onClick={() => { setActiveTab('total'); setSelectedTeamCategory(''); setSelectedPosition(''); }}
@@ -206,7 +239,7 @@ export default function Ranking() {
           </div>
         )}
 
-        {categories.length > 0 && (
+        {activeCategories.length > 0 && (
           <div className="mb-4 flex items-center gap-2 flex-wrap">
             <ArrowUpDown className="w-4 h-4 text-gray-400" />
             <span className="text-sm text-gray-600">ソート：</span>
@@ -220,7 +253,7 @@ export default function Ranking() {
             >
               総合
             </button>
-            {categories.map((cat) => (
+            {activeCategories.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setSortBy(cat.id)}
@@ -256,7 +289,7 @@ export default function Ranking() {
                     >
                       総合達成率{sortBy === 'total' ? ' ▼' : ''}
                     </th>
-                    {categories.map((cat) => (
+                    {activeCategories.map((cat) => (
                       <th
                         key={cat.id}
                         className={`text-center py-3 px-2 font-medium w-20 cursor-pointer hover:bg-gray-50 select-none ${sortBy === cat.id ? 'text-primary-600' : 'text-gray-600'}`}
@@ -326,7 +359,7 @@ export default function Ranking() {
                             <span className="text-xs text-gray-400">期間未登録</span>
                           )}
                         </td>
-                        {categories.map((cat) => {
+                        {activeCategories.map((cat) => {
                           const catRate = item.categoryRates?.[cat.id];
                           const isActive = sortBy === cat.id;
                           const catHasRate = catRate?.rate !== null && catRate?.rate !== undefined;

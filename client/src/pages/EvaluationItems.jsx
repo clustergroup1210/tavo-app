@@ -27,7 +27,10 @@ export default function EvaluationItems() {
     parentId: null,
     maxScore: 5,
     sortOrder: 0,
+    targetPositions: [],
   });
+
+  const POSITIONS = ['GK', 'DF', 'MF', 'FW'];
 
   const canManage = isOperator() || (currentTeam && isTeamAdmin(currentTeam.id));
 
@@ -149,6 +152,7 @@ export default function EvaluationItems() {
         ...newItem,
         maxScore: parseInt(newItem.maxScore) || 5,
         sortOrder: parseInt(newItem.sortOrder) || 0,
+        targetPositions: newItem.targetPositions || [],
       };
 
       if (editingItem) {
@@ -175,7 +179,7 @@ export default function EvaluationItems() {
   };
 
   const resetForm = () => {
-    setNewItem({ name: '', description: '', parentId: null, maxScore: 5, sortOrder: 0 });
+    setNewItem({ name: '', description: '', parentId: null, maxScore: 5, sortOrder: 0, targetPositions: [] });
     setEditingItem(null);
     setAddLevel(0);
   };
@@ -190,6 +194,7 @@ export default function EvaluationItems() {
       parentId: item.parentId,
       maxScore: item.maxScore || 5,
       sortOrder: item.sortOrder,
+      targetPositions: item.targetPositions || [],
     });
     setShowModal(true);
   };
@@ -310,6 +315,11 @@ export default function EvaluationItems() {
                   <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
                   {!item.isActive && (
                     <span className="text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded shrink-0">無効</span>
+                  )}
+                  {item.targetPositions && item.targetPositions.length > 0 && (
+                    <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded shrink-0">
+                      {item.targetPositions.join('/')}
+                    </span>
                   )}
                   {level === 2 && item.maxScore && (
                     <span className="text-xs text-gray-400 shrink-0">MAX:{item.maxScore}</span>
@@ -587,6 +597,34 @@ export default function EvaluationItems() {
                   />
                 </div>
               )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  対象ポジション
+                  <span className="text-xs text-gray-400 ml-1">（未選択＝全ポジション共通）</span>
+                </label>
+                <div className="flex gap-2">
+                  {POSITIONS.map(pos => (
+                    <button
+                      key={pos}
+                      type="button"
+                      onClick={() => {
+                        const current = newItem.targetPositions || [];
+                        const updated = current.includes(pos)
+                          ? current.filter(p => p !== pos)
+                          : [...current, pos];
+                        setNewItem({ ...newItem, targetPositions: updated });
+                      }}
+                      className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition ${
+                        (newItem.targetPositions || []).includes(pos)
+                          ? 'bg-amber-50 border-amber-300 text-amber-700'
+                          : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {pos}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"

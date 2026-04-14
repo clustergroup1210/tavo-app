@@ -1165,7 +1165,7 @@ router.get('/ranking', authenticate, async (req, res) => {
       }),
       prisma.evaluationItem.findMany({
         where: { teamId: { in: itemTeamIds }, isActive: true, parentId: { not: null } },
-        include: { parent: true },
+        include: { parent: { include: { parent: true } } },
         orderBy: { sortOrder: 'asc' }
       }),
       prisma.teamCategory.findMany({
@@ -1187,20 +1187,46 @@ router.get('/ranking', authenticate, async (req, res) => {
       select: { playerId: true, itemId: true, score: true }
     });
 
-    const categoryItems = {};
-    let monthlyMaxScoreTotal = 0;
+    const allItemsById = {};
     leafItems.forEach(item => {
-      const catName = item.parent?.name || 'その他';
-      const catId = item.parentId;
-      if (!categoryItems[catId]) {
-        categoryItems[catId] = { id: catId, name: catName, items: [], monthlyMax: 0 };
+      allItemsById[item.id] = item;
+      if (item.parent) {
+        allItemsById[item.parent.id] = item.parent;
+        if (item.parent.parent) {
+          allItemsById[item.parent.parent.id] = item.parent.parent;
+        }
       }
-      categoryItems[catId].items.push(item);
-      categoryItems[catId].monthlyMax += (item.maxScore || 5);
-      monthlyMaxScoreTotal += (item.maxScore || 5);
     });
 
-    const categories = Object.values(categoryItems);
+    const isPositionAllowed = (item, pos) => {
+      if (item.targetPositions && item.targetPositions.length > 0) {
+        if (!item.targetPositions.includes(pos)) return false;
+      }
+      if (item.parentId && allItemsById[item.parentId]) {
+        return isPositionAllowed(allItemsById[item.parentId], pos);
+      }
+      return true;
+    };
+
+    const filterItemsForPosition = (pos) => {
+      return leafItems.filter(item => isPositionAllowed(item, pos));
+    };
+
+    const buildCategoryInfo = (filteredItems) => {
+      const catItems = {};
+      let maxTotal = 0;
+      filteredItems.forEach(item => {
+        const catName = item.parent?.name || 'その他';
+        const catId = item.parentId;
+        if (!catItems[catId]) {
+          catItems[catId] = { id: catId, name: catName, items: [], monthlyMax: 0 };
+        }
+        catItems[catId].items.push(item);
+        catItems[catId].monthlyMax += (item.maxScore || 5);
+        maxTotal += (item.maxScore || 5);
+      });
+      return { categories: Object.values(catItems), monthlyMaxScoreTotal: maxTotal };
+    };
 
     const evalByPlayer = {};
     evaluations.forEach(e => {
@@ -1209,6 +1235,10 @@ router.get('/ranking', authenticate, async (req, res) => {
     });
 
     const ranking = players.map(player => {
+      const playerItems = filterItemsForPosition(player.position);
+      const playerItemIds = new Set(playerItems.map(i => i.id));
+      const { categories: playerCategories, monthlyMaxScoreTotal } = buildCategoryInfo(playerItems);
+
       const hasPeriod = !!(player.joinedAt && player.graduationDate);
       let totalMonths = null;
       let careerDenominator = 0;
@@ -1220,14 +1250,14 @@ router.get('/ranking', authenticate, async (req, res) => {
         careerDenominator = totalMonths * monthlyMaxScoreTotal;
       }
 
-      const playerEvals = evalByPlayer[player.id] || [];
+      const playerEvals = (evalByPlayer[player.id] || []).filter(e => playerItemIds.has(e.itemId));
       let totalActual = 0;
       const catActuals = {};
-      categories.forEach(cat => { catActuals[cat.id] = 0; });
+      playerCategories.forEach(cat => { catActuals[cat.id] = 0; });
 
       playerEvals.forEach(e => {
         totalActual += e.score;
-        const item = leafItems.find(i => i.id === e.itemId);
+        const item = playerItems.find(i => i.id === e.itemId);
         if (item && catActuals[item.parentId] !== undefined) {
           catActuals[item.parentId] += e.score;
         }
@@ -1238,7 +1268,7 @@ router.get('/ranking', authenticate, async (req, res) => {
         : null;
 
       const categoryRates = {};
-      categories.forEach(cat => {
+      playerCategories.forEach(cat => {
         if (hasPeriod && totalMonths) {
           const catDenom = totalMonths * cat.monthlyMax;
           categoryRates[cat.id] = {
@@ -1272,16 +1302,33 @@ router.get('/ranking', authenticate, async (req, res) => {
       };
     });
 
-    ranking.sort((a, b) => {
+    const gkRanking = ranking.filter(r => r.player.position === 'GK');
+    const fpRanking = ranking.filter(r => r.player.position !== 'GK');
+
+    fpRanking.sort((a, b) => {
       const aRate = a.achievementRate !== null ? a.achievementRate : -1;
       const bRate = b.achievementRate !== null ? b.achievementRate : -1;
       return bRate - aRate;
     });
-    ranking.forEach((item, idx) => { item.rank = idx + 1; });
+    fpRanking.forEach((item, idx) => { item.rank = idx + 1; });
+
+    gkRanking.sort((a, b) => {
+      const aRate = a.achievementRate !== null ? a.achievementRate : -1;
+      const bRate = b.achievementRate !== null ? b.achievementRate : -1;
+      return bRate - aRate;
+    });
+    gkRanking.forEach((item, idx) => { item.rank = idx + 1; });
+
+    const fpItems = filterItemsForPosition('FW');
+    const gkItems = filterItemsForPosition('GK');
+    const fpCategoryInfo = buildCategoryInfo(fpItems);
+    const gkCategoryInfo = buildCategoryInfo(gkItems);
 
     res.json({
-      ranking,
-      categories: categories.map(c => ({ id: c.id, name: c.name })),
+      ranking: fpRanking,
+      gkRanking,
+      categories: fpCategoryInfo.categories.map(c => ({ id: c.id, name: c.name })),
+      gkCategories: gkCategoryInfo.categories.map(c => ({ id: c.id, name: c.name })),
       teamCategories
     });
   } catch (error) {
