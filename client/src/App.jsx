@@ -41,6 +41,7 @@ import AccountSettings from './pages/AccountSettings';
 import EvaluationMatrix from './pages/EvaluationMatrix';
 import AdminSystemSettings from './pages/AdminSystemSettings';
 import AdminNotificationManagement from './pages/AdminNotificationManagement';
+import TeamSettings from './pages/TeamSettings';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -152,7 +153,7 @@ export default function App() {
           <Route path="/announcements" element={<Announcements />} />
           <Route path="/permissions" element={<Placeholder />} />
           <Route path="/master" element={<MasterSettings />} />
-          <Route path="/settings" element={<Placeholder />} />
+          <Route path="/settings" element={<TeamSettings />} />
           <Route path="/goal-categories" element={<GoalCategoryManagement />} />
           <Route path="/staff" element={<StaffManagement />} />
           <Route path="/coach-assignments" element={<CoachAssignmentManagement />} />

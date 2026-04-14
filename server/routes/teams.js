@@ -156,6 +156,35 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
+router.get('/:id/stats', authenticate, async (req, res) => {
+  try {
+    const teamId = req.params.id;
+    const team = await prisma.team.findUnique({
+      where: { id: teamId },
+      include: { children: { select: { id: true } } }
+    });
+    if (!team) return res.status(404).json({ error: 'Team not found' });
+
+    const allTeamIds = [teamId, ...team.children.map(c => c.id)];
+
+    const [playerCount, evaluationItemCount, roundCount, evaluationCount, videoCount, calendarEventCount, announcementCount, goalCategoryCount] = await Promise.all([
+      prisma.player.count({ where: { teamId: { in: allTeamIds } } }),
+      prisma.evaluationItem.count({ where: { teamId: { in: allTeamIds } } }),
+      prisma.evaluationRound.count({ where: { teamId: { in: allTeamIds } } }),
+      prisma.evaluation.count({ where: { player: { teamId: { in: allTeamIds } } } }),
+      prisma.video.count({ where: { teamId: { in: allTeamIds } } }),
+      prisma.calendarEvent.count({ where: { teamId: { in: allTeamIds } } }),
+      prisma.announcement.count({ where: { teamId: { in: allTeamIds } } }),
+      prisma.goalCategory.count({ where: { teamId: { in: allTeamIds } } }),
+    ]);
+
+    res.json({ playerCount, evaluationItemCount, roundCount, evaluationCount, videoCount, calendarEventCount, announcementCount, goalCategoryCount });
+  } catch (error) {
+    console.error('Failed to fetch team stats:', error);
+    res.status(500).json({ error: 'Failed to fetch team stats' });
+  }
+});
+
 router.put('/:id', authenticate, async (req, res) => {
   try {
     const { name, description } = req.body;
