@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Settings, Save, Building2, Upload, Image, Users, Shield,
@@ -417,9 +418,9 @@ export default function TeamSettings() {
               ].map((link) => {
                 const Icon = link.icon;
                 return (
-                  <a
+                  <Link
                     key={link.path}
-                    href={link.path}
+                    to={link.path}
                     className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition"
                   >
                     <div className="p-2 bg-primary-50 rounded-lg flex-shrink-0">
@@ -429,7 +430,7 @@ export default function TeamSettings() {
                       <p className="text-sm font-medium text-gray-900">{link.label}</p>
                       <p className="text-xs text-gray-500">{link.desc}</p>
                     </div>
-                  </a>
+                  </Link>
                 );
               })}
             </div>
