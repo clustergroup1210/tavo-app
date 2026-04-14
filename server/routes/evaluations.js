@@ -135,17 +135,23 @@ router.get('/items', authenticate, async (req, res) => {
       orderBy: { sortOrder: 'asc' }
     });
 
-    const filterByPosition = (items) => {
-      if (!position) return items;
-      return items.filter(item => {
-        if (!item.targetPositions || item.targetPositions.length === 0) return true;
-        return item.targetPositions.includes(position);
-      });
+    const itemsById = {};
+    items.forEach(item => { itemsById[item.id] = item; });
+
+    const isPositionAllowed = (item, pos) => {
+      if (item.targetPositions && item.targetPositions.length > 0) {
+        if (!item.targetPositions.includes(pos)) return false;
+      }
+      if (item.parentId && itemsById[item.parentId]) {
+        return isPositionAllowed(itemsById[item.parentId], pos);
+      }
+      return true;
     };
 
     const buildHierarchy = (items, parentId = null) => {
-      return filterByPosition(items)
+      return items
         .filter(item => item.parentId === parentId)
+        .filter(item => !position || isPositionAllowed(item, position))
         .map(item => ({
           ...item,
           children: buildHierarchy(items, item.id)
@@ -306,17 +312,23 @@ router.get('/history/:playerId', authenticate, async (req, res) => {
       scoreMap[key] = e.score;
     });
 
-    const filterByPosition = (items) => {
-      if (!player.position) return items;
-      return items.filter(item => {
-        if (!item.targetPositions || item.targetPositions.length === 0) return true;
-        return item.targetPositions.includes(player.position);
-      });
+    const itemsById = {};
+    allItems.forEach(item => { itemsById[item.id] = item; });
+
+    const isPositionAllowed = (item, pos) => {
+      if (item.targetPositions && item.targetPositions.length > 0) {
+        if (!item.targetPositions.includes(pos)) return false;
+      }
+      if (item.parentId && itemsById[item.parentId]) {
+        return isPositionAllowed(itemsById[item.parentId], pos);
+      }
+      return true;
     };
 
     const buildHierarchy = (items, parentId = null) => {
-      return filterByPosition(items)
+      return items
         .filter(item => item.parentId === parentId)
+        .filter(item => !player.position || isPositionAllowed(item, player.position))
         .map(item => ({
           id: item.id,
           name: item.name,
@@ -402,20 +414,26 @@ router.get('/form/:playerId', authenticate, async (req, res) => {
       orderBy: { sortOrder: 'asc' }
     });
 
-    const filterByPosition = (items) => {
-      if (!player.position) return items;
-      return items.filter(item => {
-        if (!item.targetPositions || item.targetPositions.length === 0) return true;
-        return item.targetPositions.includes(player.position);
-      });
+    const itemsById = {};
+    allItems.forEach(item => { itemsById[item.id] = item; });
+
+    const isPositionAllowed = (item, pos) => {
+      if (item.targetPositions && item.targetPositions.length > 0) {
+        if (!item.targetPositions.includes(pos)) return false;
+      }
+      if (item.parentId && itemsById[item.parentId]) {
+        return isPositionAllowed(itemsById[item.parentId], pos);
+      }
+      return true;
     };
 
-    const buildHierarchy = (items, parentId = null) => {
-      return filterByPosition(items)
+    const buildHierarchy = (allList, parentId = null) => {
+      return allList
         .filter(item => item.parentId === parentId)
+        .filter(item => !player.position || isPositionAllowed(item, player.position))
         .map(item => ({
           ...item,
-          children: buildHierarchy(items, item.id)
+          children: buildHierarchy(allList, item.id)
         }));
     };
 
