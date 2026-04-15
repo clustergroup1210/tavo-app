@@ -111,6 +111,52 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
+router.get('/evaluable-players', authenticate, async (req, res) => {
+  try {
+    const { teamId } = req.query;
+    if (!teamId) return res.status(400).json({ error: 'teamId is required' });
+
+    const isOp = req.user.organizations?.some(o =>
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'EXTERNAL'].includes(o.role)
+    );
+
+    const teamRole = req.user.teams?.find(t => t.teamId === teamId);
+
+    if (isOp || teamRole?.role === 'TEAM_MANAGER') {
+      return res.json({ all: true, playerIds: [] });
+    }
+
+    if (['COACH', 'GUEST_COACH'].includes(teamRole?.role)) {
+      const team = await prisma.team.findUnique({
+        where: { id: teamId },
+        select: { headCoachId: true }
+      });
+
+      if (team?.headCoachId === req.user.id) {
+        return res.json({ all: true, playerIds: [] });
+      }
+
+      const childTeams = await prisma.team.findMany({
+        where: { parentId: teamId },
+        select: { id: true }
+      });
+      const allTeamIds = [teamId, ...childTeams.map(t => t.id)];
+
+      const assignments = await prisma.coachAssignment.findMany({
+        where: { coachId: req.user.id, teamId: { in: allTeamIds } },
+        select: { playerId: true }
+      });
+
+      return res.json({ all: false, playerIds: assignments.map(a => a.playerId) });
+    }
+
+    res.json({ all: false, playerIds: [] });
+  } catch (error) {
+    console.error('Evaluable players error:', error);
+    res.status(500).json({ error: 'Failed to fetch evaluable players' });
+  }
+});
+
 router.get('/items', authenticate, async (req, res) => {
   try {
     const { teamId, position, includeInactive } = req.query;
@@ -462,9 +508,8 @@ router.get('/form/:playerId', authenticate, async (req, res) => {
       });
     }
 
-    const isCoach = hasTeamAccess(req.user, player.teamId, [
-      'TEAM_MANAGER', 'COACH', 'COACH', 'GUEST_COACH'
-    ]) || isOperator(req.user);
+    const canEval = await canEvaluatePlayer(req.user, req.params.playerId, player.teamId);
+    const isCoach = canEval;
     const isSelf = player.userId === req.user.id;
 
     res.json({

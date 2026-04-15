@@ -24,6 +24,7 @@ const getScoreBg = (score) => {
 export default function EvaluationEntry() {
   const { currentTeam, user, isCoach, isPlayer, isParent, playerData } = useAuth();
   const [players, setPlayers] = useState([]);
+  const [evaluableInfo, setEvaluableInfo] = useState({ all: true, playerIds: [] });
   const [teamCategories, setTeamCategories] = useState([]);
   const [filterCategory, setFilterCategory] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState('');
@@ -90,15 +91,20 @@ export default function EvaluationEntry() {
 
     if (!isPlayer()) {
       try {
-        const [playersRes, categoriesRes] = await Promise.all([
+        const [playersRes, categoriesRes, evaluableRes] = await Promise.all([
           fetch(`/api/players?teamId=${teamId}&includeChildren=true`, { credentials: 'include' }),
           fetch(`/api/team-categories?teamId=${teamId}`, { credentials: 'include' }),
+          fetch(`/api/evaluations/evaluable-players?teamId=${teamId}`, { credentials: 'include' }),
         ]);
         const playersData = await playersRes.json();
         setPlayers(Array.isArray(playersData) ? playersData : []);
         if (categoriesRes.ok) {
           const catData = await categoriesRes.json();
           setTeamCategories(Array.isArray(catData) ? catData : []);
+        }
+        if (evaluableRes.ok) {
+          const evalData = await evaluableRes.json();
+          setEvaluableInfo(evalData);
         }
       } catch (error) {
         console.error('Failed to fetch base data:', error);
@@ -298,6 +304,11 @@ export default function EvaluationEntry() {
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
   const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
 
+  const canEvaluatePlayerId = (pid) => {
+    if (evaluableInfo.all) return true;
+    return evaluableInfo.playerIds.includes(pid);
+  };
+
   const filteredPlayers = players.filter(p => !filterCategory || p.teamCategoryId === filterCategory);
 
   const selectedPlayerObj = players.find(p => p.id === selectedPlayer) || (isSelfEval && playerData ? playerData : null);
@@ -340,13 +351,25 @@ export default function EvaluationEntry() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 >
                   <option value="">選択してください</option>
-                  {filteredPlayers.map(player => (
-                    <option key={player.id} value={player.id}>
-                      {player.number ? `#${player.number} ` : ''}{player.name}
-                      {player.teamCategory ? ` (${player.teamCategory.name})` : ''}
-                    </option>
-                  ))}
+                  {filteredPlayers
+                    .filter(p => canEvaluatePlayerId(p.id))
+                    .map(player => (
+                      <option key={player.id} value={player.id}>
+                        {player.number ? `#${player.number} ` : ''}{player.name}
+                        {player.teamCategory ? ` (${player.teamCategory.name})` : ''}
+                      </option>
+                    ))}
                 </select>
+                {!evaluableInfo.all && evaluableInfo.playerIds.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-600">
+                    担当選手が割り当てられていません。チーム管理者に指導者体制の設定を依頼してください。
+                  </p>
+                )}
+                {!evaluableInfo.all && evaluableInfo.playerIds.length > 0 && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    担当選手のみ表示されています（{evaluableInfo.playerIds.length}名）
+                  </p>
+                )}
               </div>
             </>
           )}
