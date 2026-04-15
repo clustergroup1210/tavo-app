@@ -102,7 +102,7 @@ export default function AdminUserManagement() {
 
   const fetchTeams = async () => {
     try {
-      const res = await fetch('/api/admin/teams', { credentials: 'include' });
+      const res = await fetch('/api/admin/teams-all', { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setTeams(data);
@@ -297,11 +297,24 @@ export default function AdminUserManagement() {
     setEditForm({ ...editForm, teamRoles: newRoles });
   };
 
+  const getTeamIdsWithDescendants = (selectedId) => {
+    if (!selectedId) return null;
+    const ids = new Set([selectedId]);
+    teams.forEach(t => {
+      if (t.parentId === selectedId) ids.add(t.id);
+    });
+    return ids;
+  };
+
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email?.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesTeam = !teamFilter || user.teams?.some(t => t.teamId === teamFilter);
+    const teamIds = getTeamIdsWithDescendants(teamFilter);
+    const matchesTeam = !teamIds || 
+      user.teams?.some(t => teamIds.has(t.teamId)) ||
+      user.players?.some(p => teamIds.has(p.teamId)) ||
+      user.parentPlayers?.some(pp => pp.player?.teamId && teamIds.has(pp.player.teamId));
     
     return matchesSearch && matchesTeam;
   });
@@ -312,25 +325,37 @@ export default function AdminUserManagement() {
     inv.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const getRoleBadge = (user) => {
-    if (user.organizations?.some(o => ['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'EXTERNAL'].includes(o.role))) {
-      const orgRole = user.organizations.find(o => ['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'EXTERNAL'].includes(o.role))?.role;
-      const labels = { SUPER_ADMIN: 'スーパー管理者', ADMIN: '管理者', OPERATOR: 'オペレーター', EXTERNAL: '外部ユーザー' };
-      return { label: labels[orgRole] || 'オペレーター', color: 'bg-purple-100 text-purple-700' };
-    }
+  const getRoleBadges = (user) => {
+    const badges = [];
+    const roleLabels = { SUPER_ADMIN: 'スーパー管理者', ADMIN: '管理者', OPERATOR: 'オペレーター', EXTERNAL: '外部ユーザー' };
+    
+    user.organizations?.forEach(o => {
+      if (roleLabels[o.role]) {
+        badges.push({ label: roleLabels[o.role], color: 'bg-purple-100 text-purple-700' });
+      }
+    });
+    
     if (user.teams?.some(t => t.role === 'TEAM_MANAGER')) {
-      return { label: 'チーム管理者', color: 'bg-blue-100 text-blue-700' };
+      badges.push({ label: 'チーム管理者', color: 'bg-blue-100 text-blue-700' });
     }
     if (user.teams?.some(t => ['COACH', 'GUEST_COACH'].includes(t.role))) {
-      return { label: 'コーチ', color: 'bg-green-100 text-green-700' };
+      badges.push({ label: 'コーチ', color: 'bg-green-100 text-green-700' });
     }
-    if (user.players?.length > 0) {
-      return { label: '選手', color: 'bg-orange-100 text-orange-700' };
+    if (user.teams?.some(t => t.role === 'PLAYER') || user.players?.length > 0) {
+      badges.push({ label: '選手', color: 'bg-orange-100 text-orange-700' });
     }
     if (user.parentPlayers?.length > 0) {
-      return { label: '保護者', color: 'bg-pink-100 text-pink-700' };
+      badges.push({ label: '保護者', color: 'bg-pink-100 text-pink-700' });
     }
-    return { label: '未割当', color: 'bg-gray-100 text-gray-600' };
+    
+    if (badges.length === 0) {
+      badges.push({ label: '未割当', color: 'bg-gray-100 text-gray-600' });
+    }
+    return badges;
+  };
+
+  const getRoleBadge = (user) => {
+    return getRoleBadges(user)[0];
   };
 
   const getInviteRoleLabel = (role) => {
@@ -426,9 +451,15 @@ export default function AdminUserManagement() {
                   className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 >
                   <option value="">すべてのチーム</option>
-                  {teams.map(team => (
-                    <option key={team.id} value={team.id}>{team.name}</option>
-                  ))}
+                  {teams.filter(t => !t.parentId).map(parent => {
+                    const children = teams.filter(t => t.parentId === parent.id);
+                    return [
+                      <option key={parent.id} value={parent.id}>{parent.name}</option>,
+                      ...children.map(child => (
+                        <option key={child.id} value={child.id}>　└ {child.name}</option>
+                      ))
+                    ];
+                  })}
                 </select>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -471,7 +502,9 @@ export default function AdminUserManagement() {
               <tbody className="divide-y divide-gray-200">
                 {filteredUsers.length > 0 ? (
                   filteredUsers.map((user) => {
-                    const roleBadge = getRoleBadge(user);
+                    const badges = getRoleBadges(user);
+                    const teamRoleLabels = { TEAM_MANAGER: '管理者', COACH: 'コーチ', GUEST_COACH: 'ゲスト', PLAYER: '選手' };
+                    const userTeamIds = new Set(user.teams?.map(t => t.teamId) || []);
                     return (
                       <tr key={user.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -490,22 +523,23 @@ export default function AdminUserManagement() {
                             {user.email}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <td className="px-6 py-4 text-sm text-gray-600">
                           {user.teams?.length > 0 || user.players?.length > 0 || user.parentPlayers?.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
                               {user.teams?.map((ut) => (
                                 <span key={ut.teamId} className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded">
                                   {ut.team?.name || ut.teamId}
+                                  <span className="ml-1 text-gray-400">({teamRoleLabels[ut.role] || ut.role})</span>
                                 </span>
                               ))}
-                              {user.players?.map((player) => (
+                              {user.players?.filter(p => !userTeamIds.has(p.teamId)).map((player) => (
                                 <span key={player.id} className="px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded">
-                                  {player.team?.name || '-'}
+                                  {player.team?.name || '-'} (選手)
                                 </span>
                               ))}
                               {user.parentPlayers?.map((pp) => (
                                 <span key={pp.id} className="px-2 py-0.5 text-xs bg-pink-100 text-pink-700 rounded">
-                                  {pp.player?.team?.name || '-'}
+                                  {pp.player?.name || '-'} ({pp.player?.team?.name || '-'})
                                 </span>
                               ))}
                             </div>
@@ -514,9 +548,13 @@ export default function AdminUserManagement() {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${roleBadge.color}`}>
-                            {roleBadge.label}
-                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {badges.map((badge, idx) => (
+                              <span key={idx} className={`px-2.5 py-1 text-xs font-medium rounded-full ${badge.color}`}>
+                                {badge.label}
+                              </span>
+                            ))}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(user.createdAt).toLocaleDateString('ja-JP')}
@@ -547,7 +585,9 @@ export default function AdminUserManagement() {
           <div className="md:hidden divide-y divide-gray-200">
             {filteredUsers.length > 0 ? (
               filteredUsers.map((user) => {
-                const roleBadge = getRoleBadge(user);
+                const badges = getRoleBadges(user);
+                const userTeamIds = new Set(user.teams?.map(t => t.teamId) || []);
+                const teamRoleLabels = { TEAM_MANAGER: '管理者', COACH: 'コーチ', GUEST_COACH: 'ゲスト', PLAYER: '選手' };
                 return (
                   <div key={user.id} className="p-4 hover:bg-gray-50">
                     <div className="flex items-start justify-between gap-3">
@@ -569,18 +609,26 @@ export default function AdminUserManagement() {
                         <Edit2 className="w-4 h-4" />
                       </button>
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 pl-[52px]">
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${roleBadge.color}`}>
-                        {roleBadge.label}
-                      </span>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-[52px]">
+                      {badges.map((badge, idx) => (
+                        <span key={idx} className={`px-2 py-0.5 text-xs font-medium rounded-full ${badge.color}`}>
+                          {badge.label}
+                        </span>
+                      ))}
                       {user.teams?.map((ut) => (
                         <span key={ut.teamId} className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded">
                           {ut.team?.name || ut.teamId}
+                          <span className="ml-1 text-gray-400">({teamRoleLabels[ut.role] || ut.role})</span>
                         </span>
                       ))}
-                      {user.players?.map((player) => (
+                      {user.players?.filter(p => !userTeamIds.has(p.teamId)).map((player) => (
                         <span key={player.id} className="px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded">
-                          {player.team?.name || '-'}
+                          {player.team?.name || '-'} (選手)
+                        </span>
+                      ))}
+                      {user.parentPlayers?.map((pp) => (
+                        <span key={pp.id} className="px-2 py-0.5 text-xs bg-pink-100 text-pink-700 rounded">
+                          {pp.player?.name || '-'} ({pp.player?.team?.name || '-'})
                         </span>
                       ))}
                     </div>

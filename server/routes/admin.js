@@ -92,6 +92,19 @@ router.get('/teams', authenticate, requireOperator, async (req, res) => {
   }
 });
 
+router.get('/teams-all', authenticate, requireOperator, async (req, res) => {
+  try {
+    const teams = await prisma.team.findMany({
+      select: { id: true, name: true, parentId: true },
+      orderBy: [{ parentId: 'asc' }, { name: 'asc' }]
+    });
+    res.json(teams);
+  } catch (error) {
+    console.error('Failed to fetch all teams:', error);
+    res.status(500).json({ error: 'Failed to fetch teams' });
+  }
+});
+
 router.get('/stats', authenticate, requireOperator, async (req, res) => {
   try {
     const [totalTeams, totalPlayers, totalUsers] = await Promise.all([
