@@ -42,6 +42,8 @@ import EvaluationMatrix from './pages/EvaluationMatrix';
 import AdminSystemSettings from './pages/AdminSystemSettings';
 import AdminNotificationManagement from './pages/AdminNotificationManagement';
 import TeamSettings from './pages/TeamSettings';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -115,6 +117,8 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password/:token" element={<ResetPassword />} />
       <Route path="/invite/:token" element={<InvitePage />} />
       <Route path="/appeal/:token" element={<AppealPublic />} />
       

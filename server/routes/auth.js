@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const { authenticate, getUserRoles, JWT_SECRET } = require('../middleware/auth');
 
@@ -141,6 +142,84 @@ router.get('/me', authenticate, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get user info' });
+  }
+});
+
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'メールアドレスを入力してください' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (user) {
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const resetExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { resetToken, resetExpiresAt }
+      });
+
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : process.env.REPL_SLUG
+          ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+          : 'http://localhost:5000';
+      const resetUrl = `${baseUrl}/reset-password/${resetToken}`;
+      
+      console.log(`[PASSWORD RESET] To: ${user.email}`);
+      console.log(`[PASSWORD RESET] URL: ${resetUrl}`);
+      console.log(`[PASSWORD RESET] Token: ${resetToken}`);
+      console.log(`[PASSWORD RESET] Expires: ${resetExpiresAt.toISOString()}`);
+    }
+
+    res.json({ message: 'パスワードリセットのメールを送信しました。メールをご確認ください。' });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'パスワードリセットの処理に失敗しました' });
+  }
+});
+
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      return res.status(400).json({ error: 'トークンとパスワードが必要です' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'パスワードは6文字以上で入力してください' });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        resetToken: token,
+        resetExpiresAt: { gt: new Date() }
+      }
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'リセットリンクが無効または期限切れです。再度リセットを申請してください。' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetToken: null,
+        resetExpiresAt: null
+      }
+    });
+
+    res.json({ message: 'パスワードが正常にリセットされました。新しいパスワードでログインしてください。' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'パスワードリセットに失敗しました' });
   }
 });
 
