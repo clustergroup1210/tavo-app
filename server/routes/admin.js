@@ -77,6 +77,8 @@ router.get('/teams', authenticate, requireOperator, async (req, res) => {
         id: team.id,
         name: team.name,
         logoUrl: team.logoUrl,
+        league: team.league,
+        region: team.region,
         organization: team.organization,
         representativeName: team.users[0]?.user?.name || null,
         playerCount: totalPlayerCount,
@@ -151,10 +153,14 @@ router.get('/teams/:id', authenticate, requireOperator, async (req, res) => {
 
 router.put('/teams/:id', authenticate, requireOperator, async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, league, region } = req.body;
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (league !== undefined) updateData.league = league?.trim() || null;
+    if (region !== undefined) updateData.region = region?.trim() || null;
     const team = await prisma.team.update({
       where: { id: req.params.id },
-      data: { name }
+      data: updateData
     });
     res.json(team);
   } catch (error) {
@@ -416,6 +422,8 @@ router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single
       validRows.push({
         name: teamName,
         description: (row.description || row['説明'] || row.category || row['カテゴリー'] || '').trim() || null,
+        league: (row.league || row['リーグ'] || '').trim() || null,
+        region: (row.region || row['拠点地域'] || row['地域'] || '').trim() || null,
         organizationId: orgId,
       });
     }

@@ -1,14 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Users, ExternalLink, Search, Plus, X, MoreVertical, Pencil, Trash2, Upload, FileText, CheckCircle, AlertCircle, Download } from 'lucide-react';
+import { Building2, Users, ExternalLink, Search, Plus, X, MoreVertical, Pencil, Trash2, Upload, FileText, CheckCircle, AlertCircle, Download, Filter } from 'lucide-react';
 
 export default function AdminTeamManagement() {
   const navigate = useNavigate();
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [leagueFilter, setLeagueFilter] = useState('');
+  const [regionFilter, setRegionFilter] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamLeague, setNewTeamLeague] = useState('');
+  const [newTeamRegion, setNewTeamRegion] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -16,6 +20,8 @@ export default function AdminTeamManagement() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [editTeamName, setEditTeamName] = useState('');
+  const [editTeamLeague, setEditTeamLeague] = useState('');
+  const [editTeamRegion, setEditTeamRegion] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [deleteConfirmPassword, setDeleteConfirmPassword] = useState('');
@@ -64,10 +70,12 @@ export default function AdminTeamManagement() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name: newTeamName }),
+        body: JSON.stringify({ name: newTeamName, league: newTeamLeague || undefined, region: newTeamRegion || undefined }),
       });
       if (res.ok) {
         setNewTeamName('');
+        setNewTeamLeague('');
+        setNewTeamRegion('');
         setShowCreateModal(false);
         fetchTeams();
       } else {
@@ -88,6 +96,8 @@ export default function AdminTeamManagement() {
   const handleEditClick = (team) => {
     setSelectedTeam(team);
     setEditTeamName(team.name);
+    setEditTeamLeague(team.league || '');
+    setEditTeamRegion(team.region || '');
     setShowEditModal(true);
     setOpenMenuId(null);
   };
@@ -109,7 +119,7 @@ export default function AdminTeamManagement() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name: editTeamName }),
+        body: JSON.stringify({ name: editTeamName, league: editTeamLeague, region: editTeamRegion }),
       });
       if (res.ok) {
         setShowEditModal(false);
@@ -186,7 +196,7 @@ export default function AdminTeamManagement() {
 
   const handleDownloadTemplate = () => {
     const bom = '\uFEFF';
-    const csv = bom + 'name,description\nサンプルチームA,U-12カテゴリー\nサンプルチームB,U-15カテゴリー\n';
+    const csv = bom + 'name,description,league,region\nサンプルチームA,U-12カテゴリー,関東リーグ,東京都\nサンプルチームB,U-15カテゴリー,関西リーグ,大阪府\n';
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -196,10 +206,25 @@ export default function AdminTeamManagement() {
     URL.revokeObjectURL(url);
   };
 
-  const filteredTeams = teams.filter(team => 
-    team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    team.representativeName?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const uniqueLeagues = useMemo(() => {
+    const set = new Set(teams.map(t => t.league).filter(Boolean));
+    return [...set].sort();
+  }, [teams]);
+
+  const uniqueRegions = useMemo(() => {
+    const set = new Set(teams.map(t => t.region).filter(Boolean));
+    return [...set].sort();
+  }, [teams]);
+
+  const filteredTeams = teams.filter(team => {
+    const matchesSearch = team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      team.representativeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      team.league?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      team.region?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesLeague = !leagueFilter || team.league === leagueFilter;
+    const matchesRegion = !regionFilter || team.region === regionFilter;
+    return matchesSearch && matchesLeague && matchesRegion;
+  });
 
   if (loading) {
     return (
@@ -238,18 +263,53 @@ export default function AdminTeamManagement() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="p-4 sm:p-6 border-b border-gray-200">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <h2 className="text-lg font-semibold text-gray-900">チーム一覧</h2>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="チームを検索..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full sm:w-auto pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              />
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <h2 className="text-lg font-semibold text-gray-900">チーム一覧</h2>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="チームを検索..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full sm:w-auto pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                />
+              </div>
             </div>
+            {(uniqueLeagues.length > 0 || uniqueRegions.length > 0) && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Filter className="w-4 h-4 text-gray-400" />
+                {uniqueLeagues.length > 0 && (
+                  <select
+                    value={leagueFilter}
+                    onChange={(e) => setLeagueFilter(e.target.value)}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">すべてのリーグ</option>
+                    {uniqueLeagues.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                )}
+                {uniqueRegions.length > 0 && (
+                  <select
+                    value={regionFilter}
+                    onChange={(e) => setRegionFilter(e.target.value)}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">すべての地域</option>
+                    {uniqueRegions.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                )}
+                {(leagueFilter || regionFilter) && (
+                  <button
+                    onClick={() => { setLeagueFilter(''); setRegionFilter(''); }}
+                    className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                  >
+                    フィルター解除
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -261,16 +321,16 @@ export default function AdminTeamManagement() {
                   チーム名
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  代表者
+                  リーグ
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  拠点地域
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   選手数
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   カテゴリー数
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  作成日
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   操作
@@ -301,16 +361,20 @@ export default function AdminTeamManagement() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {team.representativeName || '-'}
+                      {team.league ? (
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{team.league}</span>
+                      ) : <span className="text-gray-400">-</span>}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {team.region ? (
+                        <span className="px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs">{team.region}</span>
+                      ) : <span className="text-gray-400">-</span>}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {team.playerCount || 0}人
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {team.categoryCount || 0}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(team.createdAt).toLocaleDateString('ja-JP')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -377,10 +441,17 @@ export default function AdminTeamManagement() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 truncate">{team.name}</p>
                     <p className="text-xs text-gray-500">{team.organization?.name}</p>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {team.league && (
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{team.league}</span>
+                      )}
+                      {team.region && (
+                        <span className="px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs">{team.region}</span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-xs text-gray-500">
                       <span>選手: {team.playerCount || 0}人</span>
                       <span>カテゴリー: {team.categoryCount || 0}</span>
-                      <span>{new Date(team.createdAt).toLocaleDateString('ja-JP')}</span>
                     </div>
                   </div>
                 </div>
@@ -431,16 +502,38 @@ export default function AdminTeamManagement() {
             </div>
             {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
             <form onSubmit={handleCreateTeam}>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">チーム名 *</label>
-                <input
-                  type="text"
-                  placeholder="チーム名を入力"
-                  value={newTeamName}
-                  onChange={(e) => setNewTeamName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  required
-                />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">チーム名 *</label>
+                  <input
+                    type="text"
+                    placeholder="チーム名を入力"
+                    value={newTeamName}
+                    onChange={(e) => setNewTeamName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">リーグ</label>
+                  <input
+                    type="text"
+                    placeholder="例: 関東リーグ"
+                    value={newTeamLeague}
+                    onChange={(e) => setNewTeamLeague(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">拠点地域</label>
+                  <input
+                    type="text"
+                    placeholder="例: 東京都"
+                    value={newTeamRegion}
+                    onChange={(e) => setNewTeamRegion(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <button
@@ -467,7 +560,7 @@ export default function AdminTeamManagement() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">チーム名を編集</h2>
+              <h2 className="text-lg font-semibold text-gray-900">チーム情報を編集</h2>
               <button 
                 onClick={() => { setShowEditModal(false); setError(''); setSelectedTeam(null); }}
                 className="p-1 hover:bg-gray-100 rounded"
@@ -477,15 +570,37 @@ export default function AdminTeamManagement() {
             </div>
             {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
             <form onSubmit={handleEditTeam}>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">チーム名 *</label>
-                <input
-                  type="text"
-                  value={editTeamName}
-                  onChange={(e) => setEditTeamName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  required
-                />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">チーム名 *</label>
+                  <input
+                    type="text"
+                    value={editTeamName}
+                    onChange={(e) => setEditTeamName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">リーグ</label>
+                  <input
+                    type="text"
+                    value={editTeamLeague}
+                    onChange={(e) => setEditTeamLeague(e.target.value)}
+                    placeholder="例: 関東リーグ"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">拠点地域</label>
+                  <input
+                    type="text"
+                    value={editTeamRegion}
+                    onChange={(e) => setEditTeamRegion(e.target.value)}
+                    placeholder="例: 東京都"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  />
+                </div>
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <button
@@ -573,8 +688,8 @@ export default function AdminTeamManagement() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-700">
               <p className="font-medium mb-1">CSVフォーマット</p>
               <p>以下のヘッダー形式でCSVファイルを作成してください：</p>
-              <code className="block mt-1 bg-blue-100 px-2 py-1 rounded text-xs font-mono">name,description</code>
-              <p className="mt-1 text-xs text-blue-600">※「name」または「チーム名」ヘッダーに対応。文字コードはUTF-8で保存してください。</p>
+              <code className="block mt-1 bg-blue-100 px-2 py-1 rounded text-xs font-mono">name,description,league,region</code>
+              <p className="mt-1 text-xs text-blue-600">※「name/チーム名」「league/リーグ」「region/拠点地域/地域」ヘッダーに対応。文字コードはUTF-8で保存してください。</p>
             </div>
 
             <button

@@ -118,7 +118,7 @@ router.get('/:id', authenticate, async (req, res) => {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { name, organizationId, description, parentId } = req.body;
+    const { name, organizationId, description, parentId, league, region } = req.body;
 
     let orgId = organizationId;
     if (parentId && !organizationId) {
@@ -142,7 +142,7 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     const team = await prisma.team.create({
-      data: { name, organizationId: orgId, description, parentId }
+      data: { name, organizationId: orgId, description, parentId, league: league?.trim() || null, region: region?.trim() || null }
     });
 
     await prisma.userTeam.create({

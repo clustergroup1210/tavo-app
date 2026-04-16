@@ -62,6 +62,8 @@ model Team {
   name           String
   logoUrl        String?
   description    String?
+  league         String?
+  region         String?
   sortOrder      Int      @default(0)
   headCoachId    String?
   createdAt      DateTime @default(now())
