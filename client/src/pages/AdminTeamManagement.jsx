@@ -755,7 +755,7 @@ export default function AdminTeamManagement() {
                       <p className="font-medium text-green-800">{csvResult.message}</p>
                     </div>
                     <div className="text-sm text-green-700 space-y-0.5">
-                      <p>全{csvResult.total}行中: 成功 {csvResult.success}件 / スキップ {csvResult.skipped}件</p>
+                      <p>全{csvResult.total}行中: 新規登録 {csvResult.success}件 / 更新 {csvResult.updated || 0}件 / スキップ {csvResult.skipped}件</p>
                     </div>
                     {csvResult.errors?.length > 0 && (
                       <div className="mt-2 text-xs text-amber-700 bg-amber-50 rounded p-2 max-h-32 overflow-y-auto">

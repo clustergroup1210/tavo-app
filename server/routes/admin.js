@@ -406,7 +406,7 @@ router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single
       orgId = defaultOrg.id;
     }
 
-    const results = { success: 0, skipped: 0, errors: [] };
+    const results = { success: 0, updated: 0, skipped: 0, errors: [] };
     const validRows = [];
 
     for (let i = 0; i < parsed.data.length; i++) {
@@ -419,18 +419,26 @@ router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single
         continue;
       }
 
+      const hasDescription = row.description !== undefined || row['説明'] !== undefined || row.category !== undefined || row['カテゴリー'] !== undefined;
+      const hasLeague = row.league !== undefined || row['リーグ'] !== undefined;
+      const hasRegion = row.region !== undefined || row['拠点地域'] !== undefined || row['地域'] !== undefined;
+
       validRows.push({
         name: teamName,
         description: (row.description || row['説明'] || row.category || row['カテゴリー'] || '').trim() || null,
         league: (row.league || row['リーグ'] || '').trim() || null,
         region: (row.region || row['拠点地域'] || row['地域'] || '').trim() || null,
         organizationId: orgId,
+        hasDescription,
+        hasLeague,
+        hasRegion,
       });
     }
 
     if (validRows.length === 0) {
       return res.json({
         success: 0,
+        updated: 0,
         skipped: results.skipped,
         errors: results.errors,
         message: '有効なデータがありませんでした',
@@ -443,17 +451,43 @@ router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single
         name: { in: validRows.map(r => r.name) },
         parentId: null,
       },
-      select: { name: true },
+      select: { id: true, name: true, description: true, league: true, region: true },
     });
-    const existingNames = new Set(existingTeams.map(t => t.name));
+    const existingByName = new Map(existingTeams.map(t => [t.name, t]));
 
     const newRows = [];
     for (const row of validRows) {
-      if (existingNames.has(row.name)) {
-        results.skipped++;
-        results.errors.push({ row: 0, reason: `「${row.name}」は既に登録済みです` });
+      const existing = existingByName.get(row.name);
+      if (existing) {
+        const updateData = {};
+        if (row.hasDescription && row.description !== existing.description) {
+          updateData.description = row.description;
+        }
+        if (row.hasLeague && row.league !== existing.league) {
+          updateData.league = row.league;
+        }
+        if (row.hasRegion && row.region !== existing.region) {
+          updateData.region = row.region;
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          try {
+            await prisma.team.update({
+              where: { id: existing.id },
+              data: updateData,
+            });
+            results.updated++;
+          } catch (err) {
+            results.skipped++;
+            results.errors.push({ row: 0, reason: `「${row.name}」の更新に失敗しました` });
+          }
+        } else {
+          results.skipped++;
+          results.errors.push({ row: 0, reason: `「${row.name}」は変更がありません` });
+        }
       } else {
-        newRows.push(row);
+        const { hasDescription, hasLeague, hasRegion, ...newRow } = row;
+        newRows.push(newRow);
       }
     }
 
@@ -465,12 +499,18 @@ router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single
       results.success = created.count;
     }
 
+    const messageParts = [];
+    if (results.success > 0) messageParts.push(`${results.success}件登録`);
+    if (results.updated > 0) messageParts.push(`${results.updated}件更新`);
+    if (results.skipped > 0) messageParts.push(`${results.skipped}件スキップ`);
+
     res.json({
       success: results.success,
+      updated: results.updated,
       skipped: results.skipped,
       total: parsed.data.length,
       errors: results.errors.slice(0, 20),
-      message: `${results.success}件のチームを登録しました`,
+      message: messageParts.length > 0 ? messageParts.join('、') : '処理対象がありませんでした',
     });
   } catch (error) {
     console.error('CSV import error:', error);
