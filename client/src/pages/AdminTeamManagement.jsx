@@ -196,7 +196,7 @@ export default function AdminTeamManagement() {
 
   const handleDownloadTemplate = () => {
     const bom = '\uFEFF';
-    const csv = bom + 'name,description,league,region\nサンプルチームA,U-12カテゴリー,関東リーグ,東京都\nサンプルチームB,U-15カテゴリー,関西リーグ,大阪府\n';
+    const csv = bom + 'name,region\nサンプルチームA,東京都\nサンプルチームB,大阪府\n';
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -688,8 +688,8 @@ export default function AdminTeamManagement() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-700">
               <p className="font-medium mb-1">CSVフォーマット</p>
               <p>以下のヘッダー形式でCSVファイルを作成してください：</p>
-              <code className="block mt-1 bg-blue-100 px-2 py-1 rounded text-xs font-mono">name,description,league,region</code>
-              <p className="mt-1 text-xs text-blue-600">※「name/team/チーム名」「league/リーグ」「region/拠点地域/地域」ヘッダーに対応。文字コードはUTF-8で保存してください。</p>
+              <code className="block mt-1 bg-blue-100 px-2 py-1 rounded text-xs font-mono">name,region</code>
+              <p className="mt-1 text-xs text-blue-600">※「name/team/チーム名」「region/拠点地域/地域」ヘッダーに対応。文字コードはUTF-8で保存してください。</p>
             </div>
 
             <button
