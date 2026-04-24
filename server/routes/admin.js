@@ -419,19 +419,19 @@ router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single
         continue;
       }
 
-      const hasDescription = row.description !== undefined || row['説明'] !== undefined || row.category !== undefined || row['カテゴリー'] !== undefined;
-      const hasLeague = row.league !== undefined || row['リーグ'] !== undefined;
-      const hasRegion = row.region !== undefined || row['拠点地域'] !== undefined || row['地域'] !== undefined;
+      const descriptionValue = (row.description || row['説明'] || row.category || row['カテゴリー'] || '').trim();
+      const leagueValue = (row.league || row['リーグ'] || '').trim();
+      const regionValue = (row.region || row['拠点地域'] || row['地域'] || '').trim();
 
       validRows.push({
         name: teamName,
-        description: (row.description || row['説明'] || row.category || row['カテゴリー'] || '').trim() || null,
-        league: (row.league || row['リーグ'] || '').trim() || null,
-        region: (row.region || row['拠点地域'] || row['地域'] || '').trim() || null,
+        description: descriptionValue || null,
+        league: leagueValue || null,
+        region: regionValue || null,
         organizationId: orgId,
-        hasDescription,
-        hasLeague,
-        hasRegion,
+        hasDescription: !!descriptionValue,
+        hasLeague: !!leagueValue,
+        hasRegion: !!regionValue,
       });
     }
 
