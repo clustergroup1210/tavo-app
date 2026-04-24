@@ -47,9 +47,20 @@ export default function AdminTeamManagement() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleAuthError = () => {
+    setError('セッションの有効期限が切れました。再度ログインしてください。');
+    setTimeout(() => {
+      navigate('/login');
+    }, 1500);
+  };
+
   const fetchTeams = async () => {
     try {
       const res = await fetch('/api/admin/teams', { credentials: 'include' });
+      if (res.status === 401) {
+        handleAuthError();
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
         setTeams(data);
@@ -72,6 +83,10 @@ export default function AdminTeamManagement() {
         credentials: 'include',
         body: JSON.stringify({ name: newTeamName, league: newTeamLeague || undefined, region: newTeamRegion || undefined }),
       });
+      if (res.status === 401) {
+        handleAuthError();
+        return;
+      }
       if (res.ok) {
         setNewTeamName('');
         setNewTeamLeague('');
@@ -121,6 +136,10 @@ export default function AdminTeamManagement() {
         credentials: 'include',
         body: JSON.stringify({ name: editTeamName, league: editTeamLeague, region: editTeamRegion }),
       });
+      if (res.status === 401) {
+        handleAuthError();
+        return;
+      }
       if (res.ok) {
         setShowEditModal(false);
         setSelectedTeam(null);
@@ -150,6 +169,10 @@ export default function AdminTeamManagement() {
         credentials: 'include',
         body: JSON.stringify({ confirmPassword: deleteConfirmPassword }),
       });
+      if (res.status === 401) {
+        handleAuthError();
+        return;
+      }
       if (res.ok) {
         setShowDeleteModal(false);
         setSelectedTeam(null);
@@ -178,6 +201,10 @@ export default function AdminTeamManagement() {
         credentials: 'include',
         body: formData,
       });
+      if (res.status === 401) {
+        handleAuthError();
+        return;
+      }
       const data = await res.json();
       if (res.ok) {
         setCsvResult({ type: 'success', ...data });
