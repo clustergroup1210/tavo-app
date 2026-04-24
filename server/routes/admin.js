@@ -411,7 +411,7 @@ router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single
 
     for (let i = 0; i < parsed.data.length; i++) {
       const row = parsed.data[i];
-      const teamName = (row.name || row['チーム名'] || '').trim();
+      const teamName = (row.team || row.name || row['チーム名'] || '').trim();
 
       if (!teamName) {
         results.skipped++;
