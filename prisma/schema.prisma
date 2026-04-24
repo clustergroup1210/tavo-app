@@ -64,6 +64,7 @@ model Team {
   description    String?
   league         String?
   region         String?
+  status         String   @default("ACTIVE")
   sortOrder      Int      @default(0)
   headCoachId    String?
   createdAt      DateTime @default(now())
@@ -78,6 +79,7 @@ model Team {
   evaluationItems   EvaluationItem[]
   evaluationRounds  EvaluationRound[]
   invitations       Invitation[]
+  teamInvitations   TeamInvitation[]
   goalCategories    GoalCategory[]
   teamCategories    TeamCategory[]
   calendarEvents    CalendarEvent[]
@@ -89,6 +91,21 @@ model Team {
 
   @@index([organizationId])
   @@index([parentId])
+  @@index([status])
+}
+
+model TeamInvitation {
+  id        String   @id @default(uuid())
+  teamId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+  @@index([token])
 }
 
 model User {

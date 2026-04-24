@@ -79,6 +79,7 @@ router.get('/teams', authenticate, requireOperator, async (req, res) => {
         logoUrl: team.logoUrl,
         league: team.league,
         region: team.region,
+        status: team.status,
         organization: team.organization,
         representativeName: team.users[0]?.user?.name || null,
         playerCount: totalPlayerCount,
@@ -429,6 +430,7 @@ router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single
         league: leagueValue || null,
         region: regionValue || null,
         organizationId: orgId,
+        status: 'PENDING',
         hasDescription: !!descriptionValue,
         hasLeague: !!leagueValue,
         hasRegion: !!regionValue,
@@ -515,6 +517,71 @@ router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single
   } catch (error) {
     console.error('CSV import error:', error);
     res.status(500).json({ error: 'CSVインポートに失敗しました' });
+  }
+});
+
+function requireSuperAdmin(req, res, next) {
+  const isSuperAdmin = (req.user?.organizations || []).some(
+    (o) => o.role === 'SUPER_ADMIN'
+  );
+  if (!isSuperAdmin) {
+    return res.status(403).json({ error: 'この操作にはSUPER_ADMIN権限が必要です' });
+  }
+  next();
+}
+
+router.post('/teams/:id/invitation', authenticate, requireSuperAdmin, async (req, res) => {
+  try {
+    const team = await prisma.team.findUnique({ where: { id: req.params.id } });
+    if (!team) {
+      return res.status(404).json({ error: 'チームが見つかりません' });
+    }
+    if (team.status !== 'PENDING') {
+      return res.status(400).json({ error: 'このチームは既に本登録済みのため、招待リンクは発行できません' });
+    }
+
+    const crypto = require('crypto');
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await prisma.teamInvitation.deleteMany({
+      where: { teamId: team.id, usedAt: null },
+    });
+
+    const invitation = await prisma.teamInvitation.create({
+      data: { teamId: team.id, token, expiresAt },
+    });
+
+    res.json({
+      id: invitation.id,
+      token: invitation.token,
+      expiresAt: invitation.expiresAt,
+      url: `/invite/team/${invitation.token}`,
+    });
+  } catch (error) {
+    console.error('Failed to create team invitation:', error);
+    res.status(500).json({ error: '招待リンクの作成に失敗しました' });
+  }
+});
+
+router.get('/teams/:id/invitation', authenticate, requireSuperAdmin, async (req, res) => {
+  try {
+    const invitation = await prisma.teamInvitation.findFirst({
+      where: { teamId: req.params.id, usedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!invitation) {
+      return res.json(null);
+    }
+    res.json({
+      id: invitation.id,
+      token: invitation.token,
+      expiresAt: invitation.expiresAt,
+      url: `/invite/team/${invitation.token}`,
+    });
+  } catch (error) {
+    console.error('Failed to fetch team invitation:', error);
+    res.status(500).json({ error: '招待リンクの取得に失敗しました' });
   }
 });
 

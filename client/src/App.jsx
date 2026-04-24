@@ -44,6 +44,7 @@ import AdminNotificationManagement from './pages/AdminNotificationManagement';
 import TeamSettings from './pages/TeamSettings';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import TeamActivation from './pages/TeamActivation';
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -120,6 +121,7 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ResetPassword />} />
       <Route path="/invite/:token" element={<InvitePage />} />
+      <Route path="/invite/team/:token" element={<TeamActivation />} />
       <Route path="/appeal/:token" element={<AppealPublic />} />
       
       <Route path="/" element={<PrivateRoute><RootRedirect /></PrivateRoute>} />

@@ -16,6 +16,9 @@ export default function AdminTeamManagement() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   const [openMenuId, setOpenMenuId] = useState(null);
+  const [invitingTeamId, setInvitingTeamId] = useState(null);
+  const [invitationModal, setInvitationModal] = useState(null);
+  const [copiedUrl, setCopiedUrl] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -189,6 +192,41 @@ export default function AdminTeamManagement() {
     }
   };
 
+  const handleCreateInvitation = async (team) => {
+    setOpenMenuId(null);
+    setInvitingTeamId(team.id);
+    try {
+      const res = await fetch(`/api/admin/teams/${team.id}/invitation`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.status === 401) {
+        handleAuthError();
+        return;
+      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '招待リンクの作成に失敗しました');
+      const fullUrl = `${window.location.origin}${data.url}`;
+      setInvitationModal({ team, url: fullUrl, expiresAt: data.expiresAt });
+      setCopiedUrl(false);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setInvitingTeamId(null);
+    }
+  };
+
+  const handleCopyInvitationUrl = async () => {
+    if (!invitationModal) return;
+    try {
+      await navigator.clipboard.writeText(invitationModal.url);
+      setCopiedUrl(true);
+      setTimeout(() => setCopiedUrl(false), 2000);
+    } catch (err) {
+      console.error('Copy failed:', err);
+    }
+  };
+
   const handleCsvImport = async () => {
     if (!csvFile) return;
     setCsvImporting(true);
@@ -348,6 +386,9 @@ export default function AdminTeamManagement() {
                   チーム名
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  状態
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   リーグ
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -387,6 +428,13 @@ export default function AdminTeamManagement() {
                         </div>
                       </div>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {team.status === 'PENDING' ? (
+                        <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-xs font-medium">仮登録</span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-xs font-medium">本登録</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {team.league ? (
                         <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{team.league}</span>
@@ -420,7 +468,17 @@ export default function AdminTeamManagement() {
                             <MoreVertical className="w-4 h-4" />
                           </button>
                           {openMenuId === team.id && (
-                            <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                            <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                              {team.status === 'PENDING' && (
+                                <button
+                                  onClick={() => handleCreateInvitation(team)}
+                                  disabled={invitingTeamId === team.id}
+                                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                  招待リンク発行
+                                </button>
+                              )}
                               <button
                                 onClick={() => handleEditClick(team)}
                                 className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -444,7 +502,7 @@ export default function AdminTeamManagement() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                     チームが見つかりません
                   </td>
                 </tr>
@@ -469,6 +527,11 @@ export default function AdminTeamManagement() {
                     <p className="font-medium text-gray-900 truncate">{team.name}</p>
                     <p className="text-xs text-gray-500">{team.organization?.name}</p>
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {team.status === 'PENDING' ? (
+                        <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-xs font-medium">仮登録</span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-xs font-medium">本登録</span>
+                      )}
                       {team.league && (
                         <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{team.league}</span>
                       )}
@@ -694,6 +757,55 @@ export default function AdminTeamManagement() {
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
                 {deleting ? '削除中...' : '削除する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {invitationModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <ExternalLink className="w-5 h-5 text-amber-600" />
+                チーム招待リンク
+              </h3>
+              <button onClick={() => setInvitationModal(null)} className="p-1 hover:bg-gray-100 rounded">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800">
+              <p className="font-medium mb-1">{invitationModal.team.name}</p>
+              <p className="text-xs">このリンクをチーム代表者にお渡しください。代表者がアカウントを作成すると、チームが本登録状態になり、選手登録などが可能になります。</p>
+            </div>
+
+            <label className="block text-sm font-medium text-gray-700 mb-1">招待URL</label>
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                value={invitationModal.url}
+                readOnly
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono bg-gray-50"
+                onFocus={(e) => e.target.select()}
+              />
+              <button
+                onClick={handleCopyInvitationUrl}
+                className={`px-4 py-2 rounded-lg font-medium text-sm ${copiedUrl ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+              >
+                {copiedUrl ? 'コピー済み' : 'コピー'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500">
+              有効期限: {new Date(invitationModal.expiresAt).toLocaleString('ja-JP')}
+            </p>
+
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setInvitationModal(null)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                閉じる
               </button>
             </div>
           </div>

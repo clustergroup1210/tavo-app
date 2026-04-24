@@ -117,6 +117,18 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    const targetTeam = await prisma.team.findUnique({
+      where: { id: teamId },
+      select: { id: true, status: true, parentId: true, parent: { select: { status: true } } },
+    });
+    if (!targetTeam) {
+      return res.status(404).json({ error: 'チームが見つかりません' });
+    }
+    const effectiveStatus = targetTeam.parentId ? (targetTeam.parent?.status || targetTeam.status) : targetTeam.status;
+    if (effectiveStatus !== 'ACTIVE') {
+      return res.status(403).json({ error: 'このチームは仮登録状態のため、選手を登録できません。チーム代表者の本登録手続きが必要です。' });
+    }
+
     const createAccount = !!(email && email.trim());
     if (createAccount) {
       const trimmedEmail = email.trim().toLowerCase();
