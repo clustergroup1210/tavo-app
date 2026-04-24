@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { UserCircle, Plus, ChevronUp, ChevronDown, Filter, X } from 'lucide-react';
 
 export default function PlayerList() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { currentTeam, isCoach, isOperator } = useAuth();
   const [players, setPlayers] = useState([]);
   const [teamCategories, setTeamCategories] = useState([]);
@@ -26,13 +27,25 @@ export default function PlayerList() {
     }
   }, [currentTeam]);
 
+  const handleAuthError = () => {
+    setCreateError('セッションの有効期限が切れました。再度ログインしてください。');
+    setTimeout(() => {
+      navigate('/login');
+    }, 1500);
+  };
+
   const fetchData = async () => {
     try {
       const [playersRes, categoriesRes] = await Promise.all([
         fetch(`/api/players?teamId=${currentTeam.id}&includeChildren=true`, { credentials: 'include' }),
         fetch(`/api/team-categories?teamId=${currentTeam.id}`, { credentials: 'include' })
       ]);
-      
+
+      if (playersRes.status === 401 || categoriesRes.status === 401) {
+        handleAuthError();
+        return;
+      }
+
       if (playersRes.ok) {
         const data = await playersRes.json();
         setPlayers(Array.isArray(data) ? data : []);
@@ -81,6 +94,10 @@ export default function PlayerList() {
         credentials: 'include',
         body: JSON.stringify(body),
       });
+      if (res.status === 401) {
+        handleAuthError();
+        return;
+      }
       if (res.ok) {
         setNewPlayer({ name: '', number: '', position: '', teamCategoryId: '', email: '', password: '', createAccount: true });
         setShowCreateModal(false);
