@@ -192,10 +192,7 @@ router.delete('/teams/:id', authenticate, requireOperator, async (req, res) => {
 
     const team = await prisma.team.findUnique({
       where: { id: teamId },
-      include: {
-        children: true,
-        _count: { select: { players: true } }
-      }
+      include: { children: true }
     });
 
     if (!team) {
@@ -206,11 +203,29 @@ router.delete('/teams/:id', authenticate, requireOperator, async (req, res) => {
       return res.status(400).json({ error: 'サブカテゴリーを含むチームは削除できません。先にサブカテゴリーを削除してください。' });
     }
 
-    if (team._count.players > 0) {
+    const activePlayerCount = await prisma.player.count({
+      where: { teamId, deletedAt: null }
+    });
+    if (activePlayerCount > 0) {
       return res.status(400).json({ error: '選手が所属しているチームは削除できません。先に選手を移動または削除してください。' });
     }
 
     await prisma.$transaction(async (tx) => {
+      const softDeletedPlayers = await tx.player.findMany({
+        where: { teamId, deletedAt: { not: null } },
+        select: { id: true }
+      });
+      const softDeletedIds = softDeletedPlayers.map(p => p.id);
+      if (softDeletedIds.length > 0) {
+        const playerFilter = { playerId: { in: softDeletedIds } };
+        await tx.evaluation.deleteMany({ where: playerFilter });
+        await tx.appealLink.deleteMany({ where: playerFilter });
+        await tx.invitation.deleteMany({ where: playerFilter });
+        await tx.goal.deleteMany({ where: playerFilter });
+        await tx.playerTeamHistory.deleteMany({ where: playerFilter });
+        await tx.video.deleteMany({ where: playerFilter });
+        await tx.player.deleteMany({ where: { id: { in: softDeletedIds } } });
+      }
       await tx.userTeam.deleteMany({ where: { teamId } });
       await tx.invitation.deleteMany({ where: { teamId } });
       await tx.evaluationItem.deleteMany({ where: { teamId } });
