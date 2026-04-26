@@ -171,7 +171,7 @@ router.get('/:id/stats', authenticate, async (req, res) => {
       prisma.player.count({ where: { teamId: { in: allTeamIds }, deletedAt: null } }),
       prisma.evaluationItem.count({ where: { teamId: { in: allTeamIds } } }),
       prisma.evaluationRound.count({ where: { teamId: { in: allTeamIds } } }),
-      prisma.evaluation.count({ where: { player: { teamId: { in: allTeamIds } } } }),
+      prisma.evaluation.count({ where: { player: { teamId: { in: allTeamIds }, deletedAt: null } } }),
       prisma.video.count({ where: { teamId: { in: allTeamIds } } }),
       prisma.calendarEvent.count({ where: { teamId: { in: allTeamIds } } }),
       prisma.announcement.count({ where: { teamId: { in: allTeamIds } } }),

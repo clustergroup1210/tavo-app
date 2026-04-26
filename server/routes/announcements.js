@@ -252,7 +252,8 @@ async function sendAnnouncementNotifications(teamId, announcement, author, categ
     const players = await prisma.player.findMany({
       where: { 
         teamId,
-        userId: { not: null }
+        userId: { not: null },
+        deletedAt: null
       },
       select: { userId: true, teamCategoryId: true }
     });

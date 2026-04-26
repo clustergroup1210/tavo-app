@@ -98,7 +98,7 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     const player = await prisma.player.findFirst({
-      where: { id: playerId, teamId }
+      where: { id: playerId, teamId, deletedAt: null }
     });
 
     if (!player) {
@@ -152,7 +152,7 @@ router.post('/bulk', authenticate, async (req, res) => {
     }
 
     const players = await prisma.player.findMany({
-      where: { id: { in: playerIds }, teamId }
+      where: { id: { in: playerIds }, teamId, deletedAt: null }
     });
 
     if (players.length !== playerIds.length) {

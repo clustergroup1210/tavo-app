@@ -55,7 +55,7 @@ router.get('/', authenticate, async (req, res) => {
       where: { teamId: { in: teamIds }, isActive: true },
       orderBy: { sortOrder: 'asc' },
       include: {
-        _count: { select: { players: true } }
+        _count: { select: { players: { where: { deletedAt: null } } } }
       }
     });
     

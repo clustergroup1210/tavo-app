@@ -76,7 +76,7 @@ router.post('/presigned-upload', authenticate, async (req, res) => {
     }
 
     if (playerId) {
-      const player = await prisma.player.findUnique({ where: { id: playerId } });
+      const player = await prisma.player.findFirst({ where: { id: playerId, deletedAt: null } });
       if (!player) return res.status(404).json({ error: '選手が見つかりません' });
 
       const canUpload = 
@@ -96,7 +96,7 @@ router.post('/presigned-upload', authenticate, async (req, res) => {
 
     if (playerTagIds?.length && teamId) {
       const validPlayers = await prisma.player.findMany({
-        where: { id: { in: playerTagIds }, teamId }
+        where: { id: { in: playerTagIds }, teamId, deletedAt: null }
       });
       if (validPlayers.length !== playerTagIds.length) {
         return res.status(400).json({ error: '無効な選手タグが含まれています' });
@@ -143,7 +143,8 @@ router.post('/', authenticate, upload.single('video'), async (req, res) => {
     const { title, description, playerId, teamId, playerTagIds, categoryTagIds } = req.body;
 
     if (playerId) {
-      const player = await prisma.player.findUnique({ where: { id: playerId } });
+      const player = await prisma.player.findFirst({ where: { id: playerId, deletedAt: null } });
+      if (!player) return res.status(404).json({ error: '選手が見つかりません' });
       const canUpload = 
         player.userId === req.user.id ||
         req.user.parentPlayers?.some(pp => pp.playerId === playerId) ||
@@ -159,7 +160,7 @@ router.post('/', authenticate, upload.single('video'), async (req, res) => {
 
     if (parsedPlayerTags.length && teamId) {
       const validPlayers = await prisma.player.findMany({
-        where: { id: { in: parsedPlayerTags }, teamId }
+        where: { id: { in: parsedPlayerTags }, teamId, deletedAt: null }
       });
       if (validPlayers.length !== parsedPlayerTags.length) {
         return res.status(400).json({ error: '無効な選手タグが含まれています' });
@@ -323,7 +324,7 @@ router.put('/:id', authenticate, async (req, res) => {
     if (playerTagIds !== undefined) {
       if (playerTagIds.length > 0 && video.teamId) {
         const validPlayers = await prisma.player.findMany({
-          where: { id: { in: playerTagIds }, teamId: video.teamId }
+          where: { id: { in: playerTagIds }, teamId: video.teamId, deletedAt: null }
         });
         if (validPlayers.length !== playerTagIds.length) {
           return res.status(400).json({ error: '無効な選手タグが含まれています' });

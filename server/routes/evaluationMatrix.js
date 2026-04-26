@@ -38,7 +38,7 @@ router.get('/:teamId', authenticate, async (req, res) => {
 
     const [players, items, rounds, evaluations, teamCategories] = await Promise.all([
       prisma.player.findMany({
-        where: { teamId: { in: playerTeamIds } },
+        where: { teamId: { in: playerTeamIds }, deletedAt: null },
         select: { id: true, name: true, number: true, teamCategoryId: true, position: true, joinedAt: true, graduationDate: true },
         orderBy: { number: 'asc' }
       }),
@@ -182,8 +182,8 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
   try {
     const { playerId } = req.params;
 
-    const player = await prisma.player.findUnique({
-      where: { id: playerId },
+    const player = await prisma.player.findFirst({
+      where: { id: playerId, deletedAt: null },
       select: { id: true, teamId: true, name: true, joinedAt: true, graduationDate: true }
     });
     if (!player) return res.status(404).json({ error: 'Player not found' });

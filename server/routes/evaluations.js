@@ -1213,7 +1213,7 @@ router.get('/ranking', authenticate, async (req, res) => {
     const childTeamIds = childTeams.map(ct => ct.id);
     const playerTeamIds = childTeamIds.length > 0 ? [teamId, ...childTeamIds] : [teamId];
 
-    const playerWhere = { teamId: { in: playerTeamIds } };
+    const playerWhere = { teamId: { in: playerTeamIds }, deletedAt: null };
     if (position) playerWhere.position = position;
     if (teamCategoryId) playerWhere.teamCategoryId = teamCategoryId;
 
