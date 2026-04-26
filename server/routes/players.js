@@ -17,10 +17,18 @@ const upload = multer({ storage });
 
 router.get('/', authenticate, async (req, res) => {
   try {
-    const { teamId, includeChildren } = req.query;
-    
+    const { teamId, includeChildren, includeGraduated, includeDeleted } = req.query;
+
+    const isOperator = req.user.organizations?.some(o =>
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
+    );
+
     const where = {};
+    let scopedTeamIds = null;
     if (teamId) {
+      if (!hasTeamAccess(req.user, teamId)) {
+        return res.status(403).json({ error: 'このチームへのアクセス権がありません' });
+      }
       if (includeChildren === 'true') {
         const team = await prisma.team.findUnique({
           where: { id: teamId },
@@ -31,22 +39,43 @@ router.get('/', authenticate, async (req, res) => {
           team.children.forEach(child => teamIds.push(child.id));
         }
         where.teamId = { in: teamIds };
+        scopedTeamIds = teamIds;
       } else {
         where.teamId = teamId;
+        scopedTeamIds = [teamId];
       }
     } else {
-      const isOperator = req.user.organizations?.some(o => 
-        ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
-      );
-      
       if (!isOperator) {
         const teamIds = req.user.teams?.map(t => t.teamId) || [];
         if (teamIds.length > 0) {
           where.teamId = { in: teamIds };
+          scopedTeamIds = teamIds;
         } else {
           where.userId = req.user.id;
         }
       }
+    }
+
+    if (includeDeleted === 'true') {
+      let canSeeDeleted = isOperator;
+      if (!canSeeDeleted && scopedTeamIds) {
+        canSeeDeleted = scopedTeamIds.every(tid =>
+          req.user.teams?.some(t => t.teamId === tid && ['TEAM_MANAGER', 'COACH'].includes(t.role))
+        );
+      }
+      if (!canSeeDeleted) {
+        where.deletedAt = null;
+      }
+    } else {
+      where.deletedAt = null;
+    }
+    if (includeGraduated !== 'true') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      where.OR = [
+        { graduationDate: null },
+        { graduationDate: { gt: today } },
+      ];
     }
 
     let players = await prisma.player.findMany({
@@ -266,6 +295,60 @@ router.put('/:id', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Update player error:', error);
     res.status(500).json({ error: 'Failed to update player' });
+  }
+});
+
+router.delete('/:id', authenticate, async (req, res) => {
+  try {
+    const player = await prisma.player.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, teamId: true, deletedAt: true },
+    });
+    if (!player) {
+      return res.status(404).json({ error: '選手が見つかりません' });
+    }
+    if (!hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH'])) {
+      return res.status(403).json({ error: 'この操作を行う権限がありません' });
+    }
+    if (player.deletedAt) {
+      return res.status(400).json({ error: 'この選手は既に削除されています' });
+    }
+
+    await prisma.player.update({
+      where: { id: req.params.id },
+      data: { deletedAt: new Date() },
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Soft delete player error:', error);
+    res.status(500).json({ error: '選手の削除に失敗しました' });
+  }
+});
+
+router.post('/:id/restore', authenticate, async (req, res) => {
+  try {
+    const player = await prisma.player.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, teamId: true, deletedAt: true },
+    });
+    if (!player) {
+      return res.status(404).json({ error: '選手が見つかりません' });
+    }
+    if (!hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH'])) {
+      return res.status(403).json({ error: 'この操作を行う権限がありません' });
+    }
+    if (!player.deletedAt) {
+      return res.status(400).json({ error: 'この選手は削除されていません' });
+    }
+
+    await prisma.player.update({
+      where: { id: req.params.id },
+      data: { deletedAt: null },
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Restore player error:', error);
+    res.status(500).json({ error: '選手の復元に失敗しました' });
   }
 });
 
