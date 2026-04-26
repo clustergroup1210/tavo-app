@@ -58,7 +58,7 @@ router.get('/:teamId', authenticate, async (req, res) => {
     });
 
     const players = await prisma.player.findMany({
-      where: { teamId },
+      where: { teamId, deletedAt: null },
       select: { id: true, name: true, number: true, position: true, photoUrl: true },
       orderBy: [{ number: 'asc' }, { name: 'asc' }]
     });

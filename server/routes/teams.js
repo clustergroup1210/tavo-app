@@ -45,10 +45,10 @@ router.get('/', authenticate, async (req, res) => {
         where: { parentId: null },
         include: { 
           organization: true, 
-          _count: { select: { players: true, users: true } },
+          _count: { select: { players: { where: { deletedAt: null } }, users: true } },
           children: {
             include: {
-              _count: { select: { players: true, users: true } }
+              _count: { select: { players: { where: { deletedAt: null } }, users: true } }
             },
             orderBy: { sortOrder: 'asc' }
           }
@@ -61,11 +61,11 @@ router.get('/', authenticate, async (req, res) => {
         where: { id: { in: teamIds }, parentId: null },
         include: { 
           organization: true, 
-          _count: { select: { players: true, users: true } },
+          _count: { select: { players: { where: { deletedAt: null } }, users: true } },
           children: {
             where: { id: { in: teamIds } },
             include: {
-              _count: { select: { players: true, users: true } }
+              _count: { select: { players: { where: { deletedAt: null } }, users: true } }
             },
             orderBy: { sortOrder: 'asc' }
           }
@@ -89,10 +89,10 @@ router.get('/:id', authenticate, async (req, res) => {
         organization: true,
         parent: true,
         children: {
-          include: { _count: { select: { players: true } } },
+          include: { _count: { select: { players: { where: { deletedAt: null } } } } },
           orderBy: { sortOrder: 'asc' }
         },
-        players: true,
+        players: { where: { deletedAt: null } },
         users: { include: { user: true } },
         evaluationItems: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } }
       }
@@ -105,7 +105,7 @@ router.get('/:id', authenticate, async (req, res) => {
     if (team.children?.length > 0 && team.players.length === 0) {
       const childTeamIds = team.children.map(c => c.id);
       const childPlayers = await prisma.player.findMany({
-        where: { teamId: { in: childTeamIds } }
+        where: { teamId: { in: childTeamIds }, deletedAt: null }
       });
       team.players = childPlayers;
     }
@@ -168,7 +168,7 @@ router.get('/:id/stats', authenticate, async (req, res) => {
     const allTeamIds = [teamId, ...team.children.map(c => c.id)];
 
     const [playerCount, evaluationItemCount, roundCount, evaluationCount, videoCount, calendarEventCount, announcementCount, goalCategoryCount] = await Promise.all([
-      prisma.player.count({ where: { teamId: { in: allTeamIds } } }),
+      prisma.player.count({ where: { teamId: { in: allTeamIds }, deletedAt: null } }),
       prisma.evaluationItem.count({ where: { teamId: { in: allTeamIds } } }),
       prisma.evaluationRound.count({ where: { teamId: { in: allTeamIds } } }),
       prisma.evaluation.count({ where: { player: { teamId: { in: allTeamIds } } } }),

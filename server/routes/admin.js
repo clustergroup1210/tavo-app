@@ -60,7 +60,7 @@ router.get('/teams', authenticate, requireOperator, async (req, res) => {
           include: { user: { select: { name: true } } },
           take: 1
         },
-        _count: { select: { players: true } }
+        _count: { select: { players: { where: { deletedAt: null } } } }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -70,7 +70,7 @@ router.get('/teams', authenticate, requireOperator, async (req, res) => {
       const allTeamIds = [team.id, ...childTeamIds];
       
       const totalPlayerCount = await prisma.player.count({
-        where: { teamId: { in: allTeamIds } }
+        where: { teamId: { in: allTeamIds }, deletedAt: null }
       });
 
       return {
@@ -112,7 +112,7 @@ router.get('/stats', authenticate, requireOperator, async (req, res) => {
   try {
     const [totalTeams, totalPlayers, totalUsers] = await Promise.all([
       prisma.team.count({ where: { parentId: null } }),
-      prisma.player.count(),
+      prisma.player.count({ where: { deletedAt: null } }),
       prisma.user.count()
     ]);
 
@@ -131,13 +131,13 @@ router.get('/teams/:id', authenticate, requireOperator, async (req, res) => {
         organization: true,
         children: {
           include: {
-            _count: { select: { players: true } }
+            _count: { select: { players: { where: { deletedAt: null } } } }
           }
         },
         users: {
           include: { user: { select: { id: true, name: true, email: true } } }
         },
-        _count: { select: { players: true } }
+        _count: { select: { players: { where: { deletedAt: null } } } }
       }
     });
 
@@ -268,7 +268,7 @@ router.get('/system-stats', authenticate, requireOperator, async (req, res) => {
     const [totalTeams, totalUsers, totalPlayers, totalEvaluations, totalVideos, totalNotifications, totalAnnouncements, totalCalendarEvents, totalGoals, totalTasks] = await Promise.all([
       prisma.team.count({ where: { parentId: null } }),
       prisma.user.count(),
-      prisma.player.count(),
+      prisma.player.count({ where: { deletedAt: null } }),
       prisma.evaluation.count(),
       prisma.video.count(),
       prisma.notification.count(),
