@@ -32,28 +32,27 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
-            ログイン
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            アカウントにログインしてください
-          </p>
+    <div className="min-h-screen flex flex-col bg-[#f3f3f3]">
+      <header className="bg-white border-b border-gray-200">
+        <div className="max-w-2xl mx-auto px-6 py-4">
+          <span className="text-2xl font-light tracking-tight text-gray-800 lowercase">
+            pds
+          </span>
         </div>
+      </header>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
+      <main className="flex-1 px-6 py-8">
+        <div className="max-w-md mx-auto bg-white p-6 sm:p-8 rounded-sm">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
+                {error}
+              </div>
+            )}
 
-          <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                メールアドレス
+              <label htmlFor="email" className="block text-sm text-gray-600 mb-2">
+                ログインメールアドレス
               </label>
               <input
                 id="email"
@@ -61,46 +60,56 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                className="block w-full px-3 py-3 bg-white border border-gray-300 rounded focus:outline-none focus:border-gray-400"
               />
             </div>
 
             <div>
-              <div className="flex items-center justify-between">
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                  パスワード
-                </label>
-                <Link to="/forgot-password" className="text-sm text-primary-600 hover:text-primary-500">
-                  パスワードをお忘れの方
-                </Link>
-              </div>
+              <label htmlFor="password" className="block text-sm text-gray-600 mb-2">
+                パスワード
+              </label>
               <input
                 id="password"
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                className="block w-full px-3 py-3 bg-white border border-gray-300 rounded focus:outline-none focus:border-gray-400"
               />
             </div>
-          </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
-          >
-            {loading ? 'ログイン中...' : 'ログイン'}
-          </button>
+            <div>
+              <Link
+                to="/forgot-password"
+                className="text-sm text-blue-600 hover:underline"
+              >
+                ログインでお困りの場合はこちら
+              </Link>
+            </div>
 
-          <p className="text-center text-sm text-gray-600">
-            アカウントをお持ちでない場合は{' '}
-            <Link to="/register" className="font-medium text-primary-600 hover:text-primary-500">
-              新規登録
-            </Link>
-          </p>
-        </form>
-      </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 px-4 rounded text-white font-medium bg-[#c4a96a] hover:bg-[#b59a5b] transition-colors disabled:opacity-60"
+            >
+              {loading ? 'ログイン中...' : 'ログイン'}
+            </button>
+
+            <div className="border-t border-gray-200 pt-5">
+              <Link
+                to="/register"
+                className="block w-full py-3 px-4 rounded text-white font-medium bg-[#e88341] hover:bg-[#d97431] transition-colors text-center"
+              >
+                新規登録（無料）
+              </Link>
+            </div>
+          </form>
+        </div>
+      </main>
+
+      <footer className="py-6 text-center text-xs text-gray-500">
+        ©PDS
+      </footer>
     </div>
   );
 }

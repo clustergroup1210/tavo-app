@@ -136,6 +136,21 @@ model User {
   coachAssignments     CoachAssignment[]  @relation("CoachAssignee")
   videoComments        VideoComment[]
   assignedTasks        Task[]             @relation("TaskAssigner")
+  pushSubscriptions    PushSubscription[]
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model UserOrganization {

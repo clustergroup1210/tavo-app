@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Mail, ClipboardCheck, Target, MessageSquare, Calendar, Megaphone, Save, ArrowLeft } from 'lucide-react';
+import { Bell, Mail, ClipboardCheck, Target, MessageSquare, Calendar, Megaphone, Save, ArrowLeft, Smartphone, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
+import {
+  isPushSupported,
+  getPushPermissionState,
+  getCurrentSubscription,
+  subscribeToPush,
+  unsubscribeFromPush,
+  sendTestPush
+} from '../lib/push';
 
 const settingItems = [
   {
@@ -61,11 +69,75 @@ export default function NotificationSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushPermission, setPushPermission] = useState('default');
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState('');
+  const [pushInfo, setPushInfo] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchSettings();
+    refreshPushState();
   }, []);
+
+  const refreshPushState = async () => {
+    const supported = isPushSupported();
+    setPushSupported(supported);
+    if (!supported) return;
+    setPushPermission(await getPushPermissionState());
+    const sub = await getCurrentSubscription();
+    setPushSubscribed(!!sub);
+  };
+
+  const handleEnablePush = async () => {
+    setPushBusy(true);
+    setPushError('');
+    setPushInfo('');
+    try {
+      await subscribeToPush();
+      setPushInfo('プッシュ通知を有効にしました');
+    } catch (e) {
+      setPushError(e.message || '有効化に失敗しました');
+    } finally {
+      await refreshPushState();
+      setPushBusy(false);
+    }
+  };
+
+  const handleDisablePush = async () => {
+    setPushBusy(true);
+    setPushError('');
+    setPushInfo('');
+    try {
+      await unsubscribeFromPush();
+      setPushInfo('プッシュ通知を無効にしました');
+    } catch (e) {
+      setPushError(e.message || '無効化に失敗しました');
+    } finally {
+      await refreshPushState();
+      setPushBusy(false);
+    }
+  };
+
+  const handleTestPush = async () => {
+    setPushBusy(true);
+    setPushError('');
+    setPushInfo('');
+    try {
+      const res = await sendTestPush();
+      if (res.sent > 0) {
+        setPushInfo(`テスト通知を ${res.sent} 件送信しました`);
+      } else {
+        setPushError('送信先がありません。先にプッシュ通知を有効にしてください');
+      }
+    } catch (e) {
+      setPushError(e.message || 'テスト通知に失敗しました');
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -180,6 +252,64 @@ export default function NotificationSettings() {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                <Smartphone className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900">プッシュ通知（ブラウザ）</p>
+                <p className="text-sm text-gray-500">
+                  ブラウザを閉じていてもデスクトップ・モバイルに通知を表示
+                </p>
+              </div>
+            </div>
+            {pushSupported ? (
+              pushSubscribed ? (
+                <button
+                  onClick={handleDisablePush}
+                  disabled={pushBusy}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap"
+                >
+                  無効にする
+                </button>
+              ) : (
+                <button
+                  onClick={handleEnablePush}
+                  disabled={pushBusy || pushPermission === 'denied'}
+                  className="px-3 py-1.5 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 whitespace-nowrap"
+                >
+                  有効にする
+                </button>
+              )
+            ) : (
+              <span className="text-xs text-gray-500">非対応のブラウザです</span>
+            )}
+          </div>
+          {pushSupported && pushPermission === 'denied' && (
+            <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+              ブラウザの通知許可がブロックされています。アドレスバーの設定から「通知」を許可してください。
+            </p>
+          )}
+          {pushSupported && pushSubscribed && (
+            <div className="mt-3">
+              <button
+                onClick={handleTestPush}
+                disabled={pushBusy}
+                className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline disabled:opacity-50"
+              >
+                <Send className="w-3.5 h-3.5" />
+                テスト通知を送る
+              </button>
+            </div>
+          )}
+          {pushError && <p className="mt-2 text-sm text-red-600">{pushError}</p>}
+          {pushInfo && <p className="mt-2 text-sm text-green-600">{pushInfo}</p>}
         </div>
       </div>
 

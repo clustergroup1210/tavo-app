@@ -70,6 +70,13 @@ async function createNotification({ userId, type, title, message, linkUrl }) {
       await sendEmailNotification(userId, { type, title, message, linkUrl });
     }
 
+    try {
+      const { sendPushToUser } = require('./pushService');
+      await sendPushToUser(userId, { type, title, message, linkUrl });
+    } catch (e) {
+      console.error('[notification] push error:', e?.message || e);
+    }
+
     return notification;
   } catch (error) {
     console.error('Failed to create notification:', error);

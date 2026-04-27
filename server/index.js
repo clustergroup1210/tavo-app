@@ -30,6 +30,7 @@ const evaluationMatrixRoutes = require('./routes/evaluationMatrix');
 const evaluationTemplateRoutes = require('./routes/evaluationTemplate');
 const mentoringRoutes = require('./routes/mentoring');
 const teamInvitationRoutes = require('./routes/teamInvitations');
+const pushRoutes = require('./routes/push');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -83,6 +84,7 @@ app.use('/api/evaluation-matrix', evaluationMatrixRoutes);
 app.use('/api/evaluation-templates', evaluationTemplateRoutes);
 app.use('/api/mentoring', mentoringRoutes);
 app.use('/api/team-invitations', teamInvitationRoutes);
+app.use('/api/push', pushRoutes);
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));
