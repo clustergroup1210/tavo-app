@@ -55,9 +55,10 @@ export default function AdminSidebar({ isOpen, onClose }) {
   return (
     <aside
       className={clsx(
-        'fixed left-0 top-0 h-screen w-60 bg-sidebar flex flex-col z-[60] transition-transform duration-300',
-        'lg:translate-x-0',
-        isOpen ? 'translate-x-0' : '-translate-x-full'
+        'fixed top-0 h-screen w-60 bg-sidebar flex flex-col z-[60] transition-transform duration-300',
+        'lg:left-0 lg:translate-x-0',
+        'right-0 lg:right-auto',
+        isOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
       )}
     >
       <div className="px-4 pt-4 pb-3 border-b border-white/[0.06]">
