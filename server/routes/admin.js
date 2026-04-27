@@ -233,6 +233,11 @@ router.delete('/teams/:id', authenticate, requireOperator, async (req, res) => {
       await tx.calendarEvent.deleteMany({ where: { teamId } });
       await tx.announcement.deleteMany({ where: { teamId } });
       await tx.goalCategory.deleteMany({ where: { teamId } });
+      await tx.video.deleteMany({ where: { teamId } });
+      await tx.transferHistory.deleteMany({
+        where: { OR: [{ fromTeamId: teamId }, { toTeamId: teamId }] }
+      });
+      await tx.teamCategory.deleteMany({ where: { teamId } });
       await tx.team.delete({ where: { id: teamId } });
     });
 
