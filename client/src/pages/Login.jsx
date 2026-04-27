@@ -32,10 +32,10 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f3f3f3]">
-      <header className="bg-white border-b border-gray-200">
+    <div className="min-h-screen flex flex-col bg-slate-50">
+      <header className="bg-sidebar border-b border-sidebar-dark">
         <div className="max-w-2xl mx-auto px-6 py-4">
-          <span className="text-2xl font-light tracking-tight text-gray-800 lowercase">
+          <span className="text-2xl font-light tracking-tight text-white lowercase">
             pds
           </span>
         </div>
@@ -90,7 +90,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 rounded text-white font-medium bg-[#c4a96a] hover:bg-[#b59a5b] transition-colors disabled:opacity-60"
+              className="w-full py-3 px-4 rounded text-white font-medium bg-primary-600 hover:bg-primary-700 transition-colors disabled:opacity-60"
             >
               {loading ? 'ログイン中...' : 'ログイン'}
             </button>
@@ -98,7 +98,7 @@ export default function Login() {
             <div className="border-t border-gray-200 pt-5">
               <Link
                 to="/register"
-                className="block w-full py-3 px-4 rounded text-white font-medium bg-[#e88341] hover:bg-[#d97431] transition-colors text-center"
+                className="block w-full py-3 px-4 rounded font-medium border border-primary-600 text-primary-600 bg-white hover:bg-primary-50 transition-colors text-center"
               >
                 新規登録（無料）
               </Link>
