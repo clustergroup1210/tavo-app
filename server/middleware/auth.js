@@ -160,6 +160,58 @@ const hasTeamAccess = (user, teamId, requiredRoles = []) => {
   return requiredRoles.includes(teamRole.role);
 };
 
+const getTeamSubtreeIds = async (rootTeamId) => {
+  const result = new Set();
+  const stack = [rootTeamId];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (result.has(current)) continue;
+    result.add(current);
+    const children = await prisma.team.findMany({
+      where: { parentId: current },
+      select: { id: true }
+    });
+    for (const c of children) stack.push(c.id);
+  }
+  return result;
+};
+
+const getHeadCoachVisibleTeamIds = async (userId) => {
+  const headCoachTeams = await prisma.team.findMany({
+    where: { headCoachId: userId },
+    select: { id: true, parentId: true }
+  });
+
+  if (headCoachTeams.length === 0) return new Set();
+
+  const visible = new Set();
+
+  for (const t of headCoachTeams) {
+    let root = t;
+    const seen = new Set([root.id]);
+    while (root.parentId && !seen.has(root.parentId)) {
+      const parent = await prisma.team.findUnique({
+        where: { id: root.parentId },
+        select: { id: true, parentId: true }
+      });
+      if (!parent) break;
+      seen.add(parent.id);
+      root = parent;
+    }
+
+    const subtree = await getTeamSubtreeIds(root.id);
+    for (const id of subtree) visible.add(id);
+  }
+
+  return visible;
+};
+
+const hasTeamViewAccess = async (user, teamId) => {
+  if (hasTeamAccess(user, teamId)) return true;
+  const visible = await getHeadCoachVisibleTeamIds(user.id);
+  return visible.has(teamId);
+};
+
 const canEvaluatePlayer = async (user, playerId, teamId) => {
   const isOperator = user.organizations?.some(o => 
     ['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'EXTERNAL'].includes(o.role)
@@ -202,4 +254,4 @@ const canCommentOnVideo = async (user, playerId, teamId) => {
   return canEvaluatePlayer(user, playerId, teamId);
 };
 
-module.exports = { authenticate, getUserRoles, hasTeamAccess, canEvaluatePlayer, canCommentOnVideo, JWT_SECRET };
+module.exports = { authenticate, getUserRoles, hasTeamAccess, hasTeamViewAccess, getHeadCoachVisibleTeamIds, getTeamSubtreeIds, canEvaluatePlayer, canCommentOnVideo, JWT_SECRET };

@@ -3,7 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const prisma = require('../lib/prisma');
-const { authenticate, hasTeamAccess } = require('../middleware/auth');
+const { authenticate, hasTeamAccess, getHeadCoachVisibleTeamIds, getTeamSubtreeIds } = require('../middleware/auth');
 const { transferPlayer } = require('../services/transferService');
 const { filterDataByVisibility } = require('../services/dataVisibilityService');
 
@@ -23,21 +23,18 @@ router.get('/', authenticate, async (req, res) => {
       ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
     );
 
+    const headCoachVisible = isOperator ? new Set() : await getHeadCoachVisibleTeamIds(req.user.id);
+
     const where = {};
     let scopedTeamIds = null;
     if (teamId) {
-      if (!hasTeamAccess(req.user, teamId)) {
+      const allowed = hasTeamAccess(req.user, teamId) || headCoachVisible.has(teamId);
+      if (!allowed) {
         return res.status(403).json({ error: 'このチームへのアクセス権がありません' });
       }
       if (includeChildren === 'true') {
-        const team = await prisma.team.findUnique({
-          where: { id: teamId },
-          include: { children: { select: { id: true } } }
-        });
-        const teamIds = [teamId];
-        if (team?.children) {
-          team.children.forEach(child => teamIds.push(child.id));
-        }
+        const subtree = await getTeamSubtreeIds(teamId);
+        const teamIds = Array.from(subtree);
         where.teamId = { in: teamIds };
         scopedTeamIds = teamIds;
       } else {
@@ -46,7 +43,8 @@ router.get('/', authenticate, async (req, res) => {
       }
     } else {
       if (!isOperator) {
-        const teamIds = req.user.teams?.map(t => t.teamId) || [];
+        const memberTeamIds = req.user.teams?.map(t => t.teamId) || [];
+        const teamIds = Array.from(new Set([...memberTeamIds, ...headCoachVisible]));
         if (teamIds.length > 0) {
           where.teamId = { in: teamIds };
           scopedTeamIds = teamIds;

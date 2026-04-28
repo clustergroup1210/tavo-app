@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, getHeadCoachVisibleTeamIds, getTeamSubtreeIds } = require('../middleware/auth');
 
 const prisma = new PrismaClient();
 
@@ -28,6 +28,11 @@ async function hasTeamMembershipOrParent(user, teamId) {
   if (team?.parentId && user.teams?.some(ut => ut.teamId === team.parentId)) {
     return true;
   }
+
+  const headCoachVisible = await getHeadCoachVisibleTeamIds(user.id);
+  if (headCoachVisible.has(teamId)) {
+    return true;
+  }
   
   return false;
 }
@@ -45,11 +50,8 @@ router.get('/', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    const childTeams = await prisma.team.findMany({
-      where: { parentId: teamId },
-      select: { id: true }
-    });
-    const teamIds = [teamId, ...childTeams.map(ct => ct.id)];
+    const subtree = await getTeamSubtreeIds(teamId);
+    const teamIds = Array.from(subtree);
     
     const categories = await prisma.teamCategory.findMany({
       where: { teamId: { in: teamIds }, isActive: true },
