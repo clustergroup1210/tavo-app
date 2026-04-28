@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const Papa = require('papaparse');
-const { findCandidateParents, extractCategoryToken, extractBaseName } = require('../services/teamNameMatcher');
+const { findCandidateParents, extractCategoryToken, extractBaseName, findDuplicateGroups } = require('../services/teamNameMatcher');
 
 const csvUpload = multer({
   storage: multer.memoryStorage(),
@@ -121,6 +121,23 @@ router.get('/stats', authenticate, requireOperator, async (req, res) => {
   } catch (error) {
     console.error('Failed to fetch stats:', error);
     res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+router.get('/teams/duplicate-groups', authenticate, requireOperator, async (req, res) => {
+  try {
+    const operatorOrgs = (req.user.organizations || []).filter(o =>
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
+    );
+    if (operatorOrgs.length === 0) {
+      return res.status(403).json({ error: 'この操作には権限がありません' });
+    }
+    const orgId = operatorOrgs[0].organizationId;
+    const groups = await findDuplicateGroups(orgId);
+    res.json({ groups });
+  } catch (error) {
+    console.error('Duplicate groups error:', error);
+    res.status(500).json({ error: '重複検出に失敗しました' });
   }
 });
 
@@ -663,6 +680,99 @@ router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single
   } catch (error) {
     console.error('CSV import error:', error);
     res.status(500).json({ error: 'CSVインポートに失敗しました' });
+  }
+});
+
+router.post('/teams/merge-as-children', authenticate, requireOperator, async (req, res) => {
+  try {
+    const { parentId, childIds } = req.body || {};
+    if (!parentId || !Array.isArray(childIds) || childIds.length === 0) {
+      return res.status(400).json({ error: 'parentId と childIds が必要です' });
+    }
+    if (childIds.includes(parentId)) {
+      return res.status(400).json({ error: '親チームを子チームに含めることはできません' });
+    }
+
+    const operatorOrgs = (req.user.organizations || []).filter(o =>
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
+    );
+    if (operatorOrgs.length === 0) {
+      return res.status(403).json({ error: 'この操作には権限がありません' });
+    }
+    const operatorOrgIds = new Set(operatorOrgs.map(o => o.organizationId));
+
+    const parent = await prisma.team.findUnique({
+      where: { id: parentId },
+      select: { id: true, organizationId: true, parentId: true },
+    });
+    if (!parent) return res.status(404).json({ error: '親チームが見つかりません' });
+    if (parent.parentId) return res.status(400).json({ error: '親チームはトップレベルチームである必要があります' });
+    if (!operatorOrgIds.has(parent.organizationId)) {
+      return res.status(403).json({ error: 'この組織に対する権限がありません' });
+    }
+
+    const { errors, updatedCount } = await prisma.$transaction(async (tx) => {
+      const parentLatest = await tx.team.findUnique({
+        where: { id: parent.id },
+        select: { id: true, organizationId: true, parentId: true },
+      });
+      if (!parentLatest || parentLatest.parentId) {
+        throw Object.assign(new Error('親チームの状態が変更されました'), { httpStatus: 409 });
+      }
+
+      const children = await tx.team.findMany({
+        where: { id: { in: childIds } },
+        select: {
+          id: true,
+          name: true,
+          organizationId: true,
+          parentId: true,
+          _count: { select: { children: true } },
+        },
+      });
+
+      const errs = [];
+      const eligibleIds = [];
+      for (const id of childIds) {
+        const c = children.find(x => x.id === id);
+        if (!c) { errs.push({ id, reason: 'チームが見つかりません' }); continue; }
+        if (c.organizationId !== parentLatest.organizationId) {
+          errs.push({ id, reason: '親チームと異なる組織のため統合できません' }); continue;
+        }
+        if (c.parentId) { errs.push({ id, reason: 'すでにサブチームのため統合できません' }); continue; }
+        if (c._count.children > 0) { errs.push({ id, reason: 'サブチームを持つチームは統合できません' }); continue; }
+        eligibleIds.push(id);
+      }
+
+      let count = 0;
+      if (eligibleIds.length > 0) {
+        const result = await tx.team.updateMany({
+          where: {
+            id: { in: eligibleIds },
+            parentId: null,
+            organizationId: parentLatest.organizationId,
+            children: { none: {} },
+          },
+          data: { parentId: parentLatest.id },
+        });
+        count = result.count;
+        if (count !== eligibleIds.length) {
+          throw Object.assign(
+            new Error('統合中に他のユーザーがチーム構造を変更しました。やり直してください。'),
+            { httpStatus: 409 }
+          );
+        }
+      }
+      return { errors: errs, updatedCount: count };
+    });
+
+    res.json({ merged: updatedCount, errors });
+  } catch (error) {
+    console.error('Merge teams error:', error);
+    if (error.httpStatus) {
+      return res.status(error.httpStatus).json({ error: error.message });
+    }
+    res.status(500).json({ error: 'チーム統合に失敗しました' });
   }
 });
 

@@ -43,9 +43,96 @@ export default function AdminTeamManagement() {
   const [selectedParentId, setSelectedParentId] = useState('');
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
+  const [duplicateGroups, setDuplicateGroups] = useState([]);
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [mergeSelections, setMergeSelections] = useState({});
+  const [mergeProcessing, setMergeProcessing] = useState(false);
+  const [mergeResultMessage, setMergeResultMessage] = useState('');
+
   useEffect(() => {
     fetchTeams();
+    fetchDuplicateGroups();
   }, []);
+
+  const fetchDuplicateGroups = async () => {
+    try {
+      const res = await fetch('/api/admin/teams/duplicate-groups', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setDuplicateGroups(data.groups || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch duplicate groups:', err);
+    }
+  };
+
+  const openMergeModal = () => {
+    const initial = {};
+    for (const g of duplicateGroups) {
+      initial[g.baseName] = { parentId: '', childIds: new Set() };
+    }
+    setMergeSelections(initial);
+    setMergeResultMessage('');
+    setShowMergeModal(true);
+  };
+
+  const getMergePlanSummary = () => {
+    const items = [];
+    for (const g of duplicateGroups) {
+      const sel = mergeSelections[g.baseName];
+      if (!sel || !sel.parentId || sel.childIds.size === 0) continue;
+      const parent = g.teams.find(t => t.id === sel.parentId);
+      const children = g.teams.filter(t => sel.childIds.has(t.id));
+      if (parent && children.length) items.push({ parent, children });
+    }
+    return items;
+  };
+
+  const handleMergeExecute = async () => {
+    const plan = getMergePlanSummary();
+    if (plan.length === 0) {
+      setMergeResultMessage('統合対象を選択してください（親と統合先のサブチームの両方）');
+      return;
+    }
+    const totalChildren = plan.reduce((s, p) => s + p.children.length, 0);
+    const summary = plan.map(p => `・${p.parent.name} に「${p.children.map(c => c.name).join('」「')}」を統合`).join('\n');
+    if (!window.confirm(`${plan.length}グループ・${totalChildren}件のサブチーム統合を実行します。よろしいですか？\n\n${summary}`)) {
+      return;
+    }
+    setMergeProcessing(true);
+    setMergeResultMessage('');
+    let totalMerged = 0;
+    const errors = [];
+    try {
+      for (const g of duplicateGroups) {
+        const sel = mergeSelections[g.baseName];
+        if (!sel || !sel.parentId || sel.childIds.size === 0) continue;
+        const res = await fetch('/api/admin/teams/merge-as-children', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ parentId: sel.parentId, childIds: Array.from(sel.childIds) }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          totalMerged += data.merged || 0;
+          if (data.errors?.length > 0) errors.push(...data.errors);
+        } else {
+          const data = await res.json().catch(() => ({}));
+          errors.push({ group: g.baseName, reason: data.error || '統合に失敗しました' });
+        }
+      }
+      setMergeResultMessage(
+        `${totalMerged}件のチームをサブチームとして統合しました${errors.length > 0 ? `（${errors.length}件のエラー）` : ''}`
+      );
+      await fetchTeams();
+      await fetchDuplicateGroups();
+    } catch (err) {
+      setMergeResultMessage('統合処理中にエラーが発生しました');
+    } finally {
+      setMergeProcessing(false);
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -406,6 +493,18 @@ export default function AdminTeamManagement() {
           <p className="mt-1 text-sm text-gray-500">全チームの管理と監視</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {duplicateGroups.length > 0 && (
+            <button
+              onClick={openMergeModal}
+              className="relative flex items-center gap-2 px-3 sm:px-4 py-2 bg-amber-50 border border-amber-300 text-amber-800 rounded-lg hover:bg-amber-100 transition-colors text-sm whitespace-nowrap"
+              title="登録済みチームから類似名のものを統合"
+            >
+              <AlertCircle className="w-4 h-4" />
+              <span className="hidden sm:inline">重複候補を統合</span>
+              <span className="sm:hidden">統合</span>
+              <span className="ml-1 px-1.5 py-0.5 bg-amber-600 text-white text-xs rounded-full">{duplicateGroups.length}</span>
+            </button>
+          )}
           <button
             onClick={() => { setShowCsvModal(true); setCsvFile(null); setCsvResult(null); }}
             className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm whitespace-nowrap"
@@ -1194,6 +1293,123 @@ export default function AdminTeamManagement() {
                     インポート実行
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMergeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-amber-600" />
+                重複候補を統合
+              </h3>
+              <button onClick={() => setShowMergeModal(false)} className="p-1 hover:bg-gray-100 rounded">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800">
+              名前が似ているチームが見つかりました。親チームを選び、サブチームとして統合したいチームにチェックを入れてください。
+              <p className="text-xs mt-1 text-amber-700">※ サブチームを既に持つチームや、別組織のチームは統合できません。</p>
+            </div>
+
+            {duplicateGroups.length === 0 ? (
+              <p className="text-sm text-gray-500">統合候補は見つかりませんでした。</p>
+            ) : (
+              <div className="space-y-4">
+                {duplicateGroups.map(g => {
+                  const sel = mergeSelections[g.baseName] || { parentId: '', childIds: new Set() };
+                  return (
+                    <div key={g.baseName} className="border border-gray-200 rounded-lg p-3">
+                      <p className="text-sm font-medium text-gray-900 mb-2">
+                        ベース名: <span className="text-amber-700">{g.baseName}</span>
+                        <span className="ml-2 text-xs text-gray-500">{g.teams.length}件</span>
+                      </p>
+                      <div className="space-y-2">
+                        {g.teams.map(t => {
+                          const isParent = sel.parentId === t.id;
+                          const isChild = sel.childIds.has(t.id);
+                          const cannotBeChild = t.childCount > 0;
+                          return (
+                            <div key={t.id} className="flex items-center justify-between gap-3 py-1.5 border-b last:border-b-0 border-gray-100">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {t.name}
+                                  {t.suggestedCategoryName && (
+                                    <span className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-700 rounded">{t.suggestedCategoryName}</span>
+                                  )}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  選手 {t.playerCount}名 / サブチーム {t.childCount}件
+                                  {t.region && ` / ${t.region}`}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-3 flex-shrink-0">
+                                <label className="flex items-center gap-1 text-xs cursor-pointer">
+                                  <input
+                                    type="radio"
+                                    name={`parent-${g.baseName}`}
+                                    checked={isParent}
+                                    onChange={() => setMergeSelections(prev => {
+                                      const next = { ...prev };
+                                      const newChildIds = new Set(prev[g.baseName]?.childIds || []);
+                                      newChildIds.delete(t.id);
+                                      next[g.baseName] = { parentId: t.id, childIds: newChildIds };
+                                      return next;
+                                    })}
+                                  />
+                                  <span>親</span>
+                                </label>
+                                <label className={`flex items-center gap-1 text-xs ${cannotBeChild || isParent ? 'text-gray-300 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                  <input
+                                    type="checkbox"
+                                    disabled={cannotBeChild || isParent}
+                                    checked={isChild}
+                                    onChange={(e) => setMergeSelections(prev => {
+                                      const next = { ...prev };
+                                      const newChildIds = new Set(prev[g.baseName]?.childIds || []);
+                                      if (e.target.checked) newChildIds.add(t.id);
+                                      else newChildIds.delete(t.id);
+                                      next[g.baseName] = { parentId: prev[g.baseName]?.parentId || '', childIds: newChildIds };
+                                      return next;
+                                    })}
+                                  />
+                                  <span>サブチームとして統合</span>
+                                </label>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {mergeResultMessage && (
+              <div className="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800">
+                {mergeResultMessage}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowMergeModal(false)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                閉じる
+              </button>
+              <button
+                onClick={handleMergeExecute}
+                disabled={mergeProcessing || duplicateGroups.length === 0}
+                className="px-5 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
+              >
+                {mergeProcessing ? '統合中...' : '統合実行'}
               </button>
             </div>
           </div>

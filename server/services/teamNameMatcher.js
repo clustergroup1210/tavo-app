@@ -93,9 +93,43 @@ async function findCandidateParents(orgId, name, excludeId = null) {
     }));
 }
 
+async function findDuplicateGroups(orgId) {
+  const teams = await prisma.team.findMany({
+    where: { organizationId: orgId, parentId: null },
+    select: {
+      id: true,
+      name: true,
+      league: true,
+      region: true,
+      _count: { select: { children: true, players: true } },
+    },
+    orderBy: { name: 'asc' },
+  });
+
+  const groups = new Map();
+  for (const t of teams) {
+    const base = extractBaseName(t.name);
+    if (!base || base.length < 3) continue;
+    const key = base.toLowerCase();
+    if (!groups.has(key)) groups.set(key, { baseName: base, teams: [] });
+    groups.get(key).teams.push({
+      id: t.id,
+      name: t.name,
+      league: t.league,
+      region: t.region,
+      suggestedCategoryName: extractCategoryToken(t.name),
+      childCount: t._count.children,
+      playerCount: t._count.players,
+    });
+  }
+
+  return Array.from(groups.values()).filter(g => g.teams.length >= 2);
+}
+
 module.exports = {
   normalizeName,
   extractBaseName,
   extractCategoryToken,
   findCandidateParents,
+  findDuplicateGroups,
 };
