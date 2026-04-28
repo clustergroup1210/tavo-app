@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const Papa = require('papaparse');
+const { findCandidateParents, extractCategoryToken, extractBaseName } = require('../services/teamNameMatcher');
 
 const csvUpload = multer({
   storage: multer.memoryStorage(),
@@ -387,75 +388,160 @@ router.post('/broadcast-notification', authenticate, requireOperator, async (req
   }
 });
 
-router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single('file'), async (req, res) => {
-  try {
-    const isSuperAdmin = req.user.organizations?.some(o => o.role === 'SUPER_ADMIN');
-    if (!isSuperAdmin) {
-      const isAdmin = req.user.organizations?.some(o => ['ADMIN', 'OPERATOR'].includes(o.role));
-      if (!isAdmin) {
-        return res.status(403).json({ error: 'この操作にはスーパー管理者権限が必要です' });
-      }
+async function parseTeamCsvRows(req) {
+  const isSuperAdmin = req.user.organizations?.some(o => o.role === 'SUPER_ADMIN');
+  if (!isSuperAdmin) {
+    const isAdmin = req.user.organizations?.some(o => ['ADMIN', 'OPERATOR'].includes(o.role));
+    if (!isAdmin) {
+      return { error: { status: 403, body: { error: 'この操作にはスーパー管理者権限が必要です' } } };
+    }
+  }
+
+  if (!req.file) {
+    return { error: { status: 400, body: { error: 'CSVファイルが選択されていません' } } };
+  }
+
+  const csvText = req.file.buffer.toString('utf-8').replace(/^\uFEFF/, '');
+  const parsed = Papa.parse(csvText, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: (h) => h.trim(),
+  });
+
+  if (parsed.errors.length > 0 && parsed.data.length === 0) {
+    return {
+      error: {
+        status: 400,
+        body: {
+          error: 'CSVの解析に失敗しました',
+          details: parsed.errors.slice(0, 5).map(e => e.message),
+        },
+      },
+    };
+  }
+
+  const userOrg = req.user.organizations?.[0];
+  let orgId;
+  if (userOrg) {
+    orgId = userOrg.organizationId;
+  } else {
+    let defaultOrg = await prisma.organization.findFirst();
+    if (!defaultOrg) {
+      defaultOrg = await prisma.organization.create({ data: { name: 'Default Organization' } });
+    }
+    orgId = defaultOrg.id;
+  }
+
+  const skipped = [];
+  const validRows = [];
+
+  for (let i = 0; i < parsed.data.length; i++) {
+    const row = parsed.data[i];
+    const teamName = (row.team || row.name || row['チーム名'] || '').trim();
+
+    if (!teamName) {
+      skipped.push({ row: i + 2, reason: 'チーム名が空です' });
+      continue;
     }
 
-    if (!req.file) {
-      return res.status(400).json({ error: 'CSVファイルが選択されていません' });
-    }
+    const descriptionValue = (row.description || row['説明'] || row.category || row['カテゴリー'] || '').trim();
+    const leagueValue = (row.league || row['リーグ'] || '').trim();
+    const regionValue = (row.region || row['拠点地域'] || row['地域'] || '').trim();
 
-    const csvText = req.file.buffer.toString('utf-8').replace(/^\uFEFF/, '');
-    const parsed = Papa.parse(csvText, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (h) => h.trim(),
+    validRows.push({
+      rowNumber: i + 2,
+      name: teamName,
+      description: descriptionValue || null,
+      league: leagueValue || null,
+      region: regionValue || null,
+      organizationId: orgId,
+      status: 'PENDING',
+      hasDescription: !!descriptionValue,
+      hasLeague: !!leagueValue,
+      hasRegion: !!regionValue,
     });
+  }
 
-    if (parsed.errors.length > 0 && parsed.data.length === 0) {
-      return res.status(400).json({
-        error: 'CSVの解析に失敗しました',
-        details: parsed.errors.slice(0, 5).map(e => e.message),
-      });
+  return { orgId, totalRowCount: parsed.data.length, validRows, skipped };
+}
+
+router.post('/teams/import-csv/analyze', authenticate, requireOperator, csvUpload.single('file'), async (req, res) => {
+  try {
+    const parseResult = await parseTeamCsvRows(req);
+    if (parseResult.error) {
+      return res.status(parseResult.error.status).json(parseResult.error.body);
+    }
+    const { orgId, totalRowCount, validRows, skipped } = parseResult;
+
+    if (validRows.length === 0) {
+      return res.json({ total: totalRowCount, rows: [], skipped });
     }
 
-    const userOrg = req.user.organizations?.[0];
-    let orgId;
-    if (userOrg) {
-      orgId = userOrg.organizationId;
-    } else {
-      let defaultOrg = await prisma.organization.findFirst();
-      if (!defaultOrg) {
-        defaultOrg = await prisma.organization.create({ data: { name: 'Default Organization' } });
-      }
-      orgId = defaultOrg.id;
-    }
+    const existingTeams = await prisma.team.findMany({
+      where: {
+        organizationId: orgId,
+        name: { in: validRows.map(r => r.name) },
+        parentId: null,
+      },
+      select: { id: true, name: true, description: true, league: true, region: true },
+    });
+    const existingByName = new Map(existingTeams.map(t => [t.name, t]));
 
-    const results = { success: 0, updated: 0, skipped: 0, errors: [] };
-    const validRows = [];
-
-    for (let i = 0; i < parsed.data.length; i++) {
-      const row = parsed.data[i];
-      const teamName = (row.team || row.name || row['チーム名'] || '').trim();
-
-      if (!teamName) {
-        results.skipped++;
-        results.errors.push({ row: i + 2, reason: 'チーム名が空です' });
+    const rows = [];
+    for (const row of validRows) {
+      const existing = existingByName.get(row.name);
+      if (existing) {
+        rows.push({
+          rowNumber: row.rowNumber,
+          name: row.name,
+          league: row.league,
+          region: row.region,
+          status: 'update',
+          existingTeamId: existing.id,
+          candidates: [],
+        });
         continue;
       }
 
-      const descriptionValue = (row.description || row['説明'] || row.category || row['カテゴリー'] || '').trim();
-      const leagueValue = (row.league || row['リーグ'] || '').trim();
-      const regionValue = (row.region || row['拠点地域'] || row['地域'] || '').trim();
-
-      validRows.push({
-        name: teamName,
-        description: descriptionValue || null,
-        league: leagueValue || null,
-        region: regionValue || null,
-        organizationId: orgId,
-        status: 'PENDING',
-        hasDescription: !!descriptionValue,
-        hasLeague: !!leagueValue,
-        hasRegion: !!regionValue,
+      const candidates = await findCandidateParents(orgId, row.name);
+      rows.push({
+        rowNumber: row.rowNumber,
+        name: row.name,
+        league: row.league,
+        region: row.region,
+        status: candidates.length > 0 ? 'merge_candidate' : 'new',
+        candidates,
       });
     }
+
+    res.json({ total: totalRowCount, rows, skipped });
+  } catch (error) {
+    console.error('CSV analyze error:', error);
+    res.status(500).json({ error: 'CSV解析に失敗しました' });
+  }
+});
+
+router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single('file'), async (req, res) => {
+  try {
+    const parseResult = await parseTeamCsvRows(req);
+    if (parseResult.error) {
+      return res.status(parseResult.error.status).json(parseResult.error.body);
+    }
+    const { orgId, totalRowCount, validRows, skipped } = parseResult;
+
+    let mergeDecisions = {};
+    if (req.body && req.body.mergeDecisions) {
+      try {
+        mergeDecisions = typeof req.body.mergeDecisions === 'string'
+          ? JSON.parse(req.body.mergeDecisions)
+          : req.body.mergeDecisions;
+      } catch (e) {
+        mergeDecisions = {};
+      }
+    }
+
+    const results = { success: 0, updated: 0, skipped: 0, errors: [...skipped] };
+    results.skipped = results.errors.length;
 
     if (validRows.length === 0) {
       return res.json({
@@ -477,9 +563,49 @@ router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single
     });
     const existingByName = new Map(existingTeams.map(t => [t.name, t]));
 
-    const newRows = [];
+    const newRowsTopLevel = [];
+
     for (const row of validRows) {
+      const decision = mergeDecisions[String(row.rowNumber)];
+
+      if (decision === 'skip') {
+        results.skipped++;
+        results.errors.push({ row: row.rowNumber, reason: `「${row.name}」はスキップしました` });
+        continue;
+      }
+
       const existing = existingByName.get(row.name);
+
+      if (decision && decision !== 'new') {
+        const parent = await prisma.team.findFirst({
+          where: { id: decision, organizationId: orgId, parentId: null },
+          select: { id: true, organizationId: true },
+        });
+        if (!parent) {
+          results.skipped++;
+          results.errors.push({ row: row.rowNumber, reason: `「${row.name}」の親チームが見つかりません` });
+          continue;
+        }
+        try {
+          await prisma.team.create({
+            data: {
+              name: row.name,
+              description: row.description,
+              league: row.league,
+              region: row.region,
+              organizationId: parent.organizationId,
+              parentId: parent.id,
+              status: 'PENDING',
+            },
+          });
+          results.success++;
+        } catch (err) {
+          results.skipped++;
+          results.errors.push({ row: row.rowNumber, reason: `「${row.name}」のサブチーム作成に失敗しました` });
+        }
+        continue;
+      }
+
       if (existing) {
         const updateData = {};
         if (row.hasDescription && row.description !== existing.description) {
@@ -501,24 +627,24 @@ router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single
             results.updated++;
           } catch (err) {
             results.skipped++;
-            results.errors.push({ row: 0, reason: `「${row.name}」の更新に失敗しました` });
+            results.errors.push({ row: row.rowNumber, reason: `「${row.name}」の更新に失敗しました` });
           }
         } else {
           results.skipped++;
-          results.errors.push({ row: 0, reason: `「${row.name}」は変更がありません` });
+          results.errors.push({ row: row.rowNumber, reason: `「${row.name}」は変更がありません` });
         }
       } else {
-        const { hasDescription, hasLeague, hasRegion, ...newRow } = row;
-        newRows.push(newRow);
+        const { hasDescription, hasLeague, hasRegion, rowNumber, ...newRow } = row;
+        newRowsTopLevel.push(newRow);
       }
     }
 
-    if (newRows.length > 0) {
+    if (newRowsTopLevel.length > 0) {
       const created = await prisma.team.createMany({
-        data: newRows,
+        data: newRowsTopLevel,
         skipDuplicates: true,
       });
-      results.success = created.count;
+      results.success += created.count;
     }
 
     const messageParts = [];
@@ -530,7 +656,7 @@ router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single
       success: results.success,
       updated: results.updated,
       skipped: results.skipped,
-      total: parsed.data.length,
+      total: totalRowCount,
       errors: results.errors.slice(0, 20),
       message: messageParts.length > 0 ? messageParts.join('、') : '処理対象がありませんでした',
     });

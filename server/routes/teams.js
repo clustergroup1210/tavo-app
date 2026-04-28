@@ -4,6 +4,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { PrismaClient } = require('@prisma/client');
 const { authenticate, hasTeamAccess } = require('../middleware/auth');
+const { findCandidateParents } = require('../services/teamNameMatcher');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -81,6 +82,44 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
+router.get('/suggestions', authenticate, async (req, res) => {
+  try {
+    const name = (req.query.name || '').toString().trim();
+    if (!name || name.length < 2) {
+      return res.json({ candidates: [] });
+    }
+
+    const operatorOrgs = (req.user.organizations || []).filter(o =>
+      ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
+    );
+    const managerTeamIds = (req.user.teams || [])
+      .filter(t => ['TEAM_MANAGER', 'COACH'].includes(t.role))
+      .map(t => t.teamId);
+
+    if (operatorOrgs.length === 0 && managerTeamIds.length === 0) {
+      return res.json({ candidates: [] });
+    }
+
+    let orgId;
+    if (operatorOrgs.length > 0) {
+      orgId = operatorOrgs[0].organizationId;
+    } else {
+      const team = await prisma.team.findFirst({
+        where: { id: { in: managerTeamIds } },
+        select: { organizationId: true },
+      });
+      orgId = team?.organizationId;
+    }
+    if (!orgId) return res.json({ candidates: [] });
+
+    const candidates = await findCandidateParents(orgId, name);
+    res.json({ candidates });
+  } catch (error) {
+    console.error('Get team suggestions error:', error);
+    res.status(500).json({ error: 'Failed to fetch suggestions' });
+  }
+});
+
 router.get('/:id', authenticate, async (req, res) => {
   try {
     const team = await prisma.team.findUnique({
@@ -121,9 +160,23 @@ router.post('/', authenticate, async (req, res) => {
     const { name, organizationId, description, parentId, league, region } = req.body;
 
     let orgId = organizationId;
-    if (parentId && !organizationId) {
+
+    if (parentId) {
       const parent = await prisma.team.findUnique({ where: { id: parentId } });
-      if (parent) orgId = parent.organizationId;
+      if (!parent) {
+        return res.status(400).json({ error: '指定された親チームが見つかりません' });
+      }
+
+      const isOperator = req.user.organizations?.some(o =>
+        ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role) && o.organizationId === parent.organizationId
+      );
+      const isParentManager = req.user.teams?.some(t =>
+        t.teamId === parentId && ['TEAM_MANAGER', 'COACH'].includes(t.role)
+      );
+      if (!isOperator && !isParentManager) {
+        return res.status(403).json({ error: 'この親チームの下にチームを作成する権限がありません' });
+      }
+      orgId = parent.organizationId;
     }
 
     if (!orgId) {
@@ -142,7 +195,7 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     const team = await prisma.team.create({
-      data: { name, organizationId: orgId, description, parentId, league: league?.trim() || null, region: region?.trim() || null }
+      data: { name, organizationId: orgId, description, parentId: parentId || null, league: league?.trim() || null, region: region?.trim() || null }
     });
 
     await prisma.userTeam.create({

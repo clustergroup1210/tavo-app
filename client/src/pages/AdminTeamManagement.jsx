@@ -34,7 +34,14 @@ export default function AdminTeamManagement() {
   const [csvFile, setCsvFile] = useState(null);
   const [csvImporting, setCsvImporting] = useState(false);
   const [csvResult, setCsvResult] = useState(null);
+  const [csvAnalyzing, setCsvAnalyzing] = useState(false);
+  const [csvAnalysis, setCsvAnalysis] = useState(null);
+  const [csvDecisions, setCsvDecisions] = useState({});
   const csvInputRef = useRef(null);
+
+  const [suggestedParents, setSuggestedParents] = useState([]);
+  const [selectedParentId, setSelectedParentId] = useState('');
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   useEffect(() => {
     fetchTeams();
@@ -49,6 +56,45 @@ export default function AdminTeamManagement() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!showCreateModal) return;
+    const name = newTeamName.trim();
+    if (name.length < 2) {
+      setSuggestedParents([]);
+      return;
+    }
+    setLoadingSuggestions(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/teams/suggestions?name=${encodeURIComponent(name)}`, {
+          credentials: 'include',
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSuggestedParents(data.candidates || []);
+          if (selectedParentId && !(data.candidates || []).some(c => c.id === selectedParentId)) {
+            setSelectedParentId('');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch suggestions:', err);
+      } finally {
+        setLoadingSuggestions(false);
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [newTeamName, showCreateModal]);
+
+  const closeCreateModal = () => {
+    setShowCreateModal(false);
+    setError('');
+    setNewTeamName('');
+    setNewTeamLeague('');
+    setNewTeamRegion('');
+    setSuggestedParents([]);
+    setSelectedParentId('');
+  };
 
   const handleAuthError = () => {
     setError('セッションの有効期限が切れました。再度ログインしてください。');
@@ -84,7 +130,12 @@ export default function AdminTeamManagement() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name: newTeamName, league: newTeamLeague || undefined, region: newTeamRegion || undefined }),
+        body: JSON.stringify({
+          name: newTeamName,
+          league: newTeamLeague || undefined,
+          region: newTeamRegion || undefined,
+          parentId: selectedParentId || undefined,
+        }),
       });
       if (res.status === 401) {
         handleAuthError();
@@ -227,6 +278,44 @@ export default function AdminTeamManagement() {
     }
   };
 
+  const handleCsvAnalyze = async (file) => {
+    if (!file) return;
+    setCsvAnalyzing(true);
+    setCsvAnalysis(null);
+    setCsvResult(null);
+    setCsvDecisions({});
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/admin/teams/import-csv/analyze', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (res.status === 401) {
+        handleAuthError();
+        return;
+      }
+      const data = await res.json();
+      if (res.ok) {
+        setCsvAnalysis(data);
+        const initial = {};
+        for (const r of data.rows || []) {
+          if (r.status === 'merge_candidate' && r.candidates?.length > 0) {
+            initial[r.rowNumber] = r.candidates[0].id;
+          }
+        }
+        setCsvDecisions(initial);
+      } else {
+        setCsvResult({ type: 'error', message: data.error || 'CSV解析に失敗しました', details: data.details });
+      }
+    } catch (err) {
+      setCsvResult({ type: 'error', message: 'CSV解析に失敗しました' });
+    } finally {
+      setCsvAnalyzing(false);
+    }
+  };
+
   const handleCsvImport = async () => {
     if (!csvFile) return;
     setCsvImporting(true);
@@ -234,6 +323,7 @@ export default function AdminTeamManagement() {
     try {
       const formData = new FormData();
       formData.append('file', csvFile);
+      formData.append('mergeDecisions', JSON.stringify(csvDecisions));
       const res = await fetch('/api/admin/teams/import-csv', {
         method: 'POST',
         credentials: 'include',
@@ -246,7 +336,8 @@ export default function AdminTeamManagement() {
       const data = await res.json();
       if (res.ok) {
         setCsvResult({ type: 'success', ...data });
-        if (data.success > 0) {
+        setCsvAnalysis(null);
+        if (data.success > 0 || data.updated > 0) {
           fetchTeams();
         }
       } else {
@@ -257,6 +348,14 @@ export default function AdminTeamManagement() {
     } finally {
       setCsvImporting(false);
     }
+  };
+
+  const closeCsvModal = () => {
+    setShowCsvModal(false);
+    setCsvFile(null);
+    setCsvResult(null);
+    setCsvAnalysis(null);
+    setCsvDecisions({});
   };
 
   const handleDownloadTemplate = () => {
@@ -580,11 +679,11 @@ export default function AdminTeamManagement() {
 
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900">新規チーム作成</h2>
-              <button 
-                onClick={() => { setShowCreateModal(false); setError(''); }}
+              <button
+                onClick={closeCreateModal}
                 className="p-1 hover:bg-gray-100 rounded"
               >
                 <X className="w-5 h-5 text-gray-500" />
@@ -604,6 +703,55 @@ export default function AdminTeamManagement() {
                     required
                   />
                 </div>
+
+                {suggestedParents.length > 0 && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <div className="flex items-start gap-2 mb-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm text-amber-900">
+                        似た名前のチームが見つかりました。<br />
+                        <span className="text-xs text-amber-800">同じチームの別カテゴリとして登録すると、サブチームとしてまとめて管理できます。</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5 mt-2">
+                      <label className="flex items-start gap-2 text-sm cursor-pointer">
+                        <input
+                          type="radio"
+                          name="parentChoice"
+                          value=""
+                          checked={selectedParentId === ''}
+                          onChange={() => setSelectedParentId('')}
+                          className="mt-0.5"
+                        />
+                        <span className="text-gray-800">別チームとして登録（既定）</span>
+                      </label>
+                      {suggestedParents.map(c => (
+                        <label key={c.id} className="flex items-start gap-2 text-sm cursor-pointer">
+                          <input
+                            type="radio"
+                            name="parentChoice"
+                            value={c.id}
+                            checked={selectedParentId === c.id}
+                            onChange={() => setSelectedParentId(c.id)}
+                            className="mt-0.5"
+                          />
+                          <span className="text-gray-800">
+                            <span className="font-medium">{c.name}</span> の別カテゴリ
+                            {c.suggestedCategoryName && (
+                              <span className="ml-1 inline-block px-1.5 py-0.5 text-xs bg-amber-100 text-amber-800 rounded">
+                                {c.suggestedCategoryName}
+                              </span>
+                            )}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {loadingSuggestions && newTeamName.trim().length >= 2 && suggestedParents.length === 0 && (
+                  <p className="text-xs text-gray-400">類似チームを確認中...</p>
+                )}
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">リーグ</label>
                   <input
@@ -628,7 +776,7 @@ export default function AdminTeamManagement() {
               <div className="flex justify-end gap-3 mt-6">
                 <button
                   type="button"
-                  onClick={() => { setShowCreateModal(false); setError(''); }}
+                  onClick={closeCreateModal}
                   className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
                 >
                   キャンセル
@@ -638,7 +786,7 @@ export default function AdminTeamManagement() {
                   disabled={creating}
                   className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
                 >
-                  {creating ? '作成中...' : '作成'}
+                  {creating ? '作成中...' : (selectedParentId ? 'サブチームとして作成' : '作成')}
                 </button>
               </div>
             </form>
@@ -849,6 +997,7 @@ export default function AdminTeamManagement() {
                 if (file && (file.name.endsWith('.csv') || file.type === 'text/csv')) {
                   setCsvFile(file);
                   setCsvResult(null);
+                  handleCsvAnalyze(file);
                 }
               }}
             >
@@ -858,8 +1007,10 @@ export default function AdminTeamManagement() {
                 accept=".csv"
                 className="hidden"
                 onChange={(e) => {
-                  setCsvFile(e.target.files?.[0] || null);
+                  const file = e.target.files?.[0] || null;
+                  setCsvFile(file);
                   setCsvResult(null);
+                  if (file) handleCsvAnalyze(file);
                 }}
               />
               {csvFile ? (
@@ -870,7 +1021,7 @@ export default function AdminTeamManagement() {
                     <p className="text-xs text-gray-500">{(csvFile.size / 1024).toFixed(1)} KB</p>
                   </div>
                   <button
-                    onClick={(e) => { e.stopPropagation(); setCsvFile(null); setCsvResult(null); }}
+                    onClick={(e) => { e.stopPropagation(); setCsvFile(null); setCsvResult(null); setCsvAnalysis(null); setCsvDecisions({}); }}
                     className="ml-2 p-1 hover:bg-gray-100 rounded"
                   >
                     <X className="w-4 h-4 text-gray-400" />
@@ -884,6 +1035,106 @@ export default function AdminTeamManagement() {
                 </div>
               )}
             </div>
+
+            {csvAnalyzing && (
+              <div className="rounded-lg p-3 mb-4 bg-gray-50 border border-gray-200 flex items-center gap-2 text-sm text-gray-600">
+                <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                CSVを解析しています...
+              </div>
+            )}
+
+            {csvAnalysis && csvAnalysis.rows && csvAnalysis.rows.length > 0 && !csvResult && (
+              <div className="rounded-lg border border-gray-200 mb-4 overflow-hidden">
+                <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
+                  プレビュー（全{csvAnalysis.rows.length}件）
+                  {(() => {
+                    const mc = csvAnalysis.rows.filter(r => r.status === 'merge_candidate').length;
+                    return mc > 0 ? (
+                      <span className="ml-2 text-xs text-amber-700">類似チームの候補: {mc}件</span>
+                    ) : null;
+                  })()}
+                </div>
+                <div className="max-h-72 overflow-y-auto divide-y divide-gray-100">
+                  {csvAnalysis.rows.map(row => {
+                    const decision = csvDecisions[row.rowNumber];
+                    const isMerge = decision && decision !== 'new' && decision !== 'skip';
+                    return (
+                      <div key={row.rowNumber} className="p-3 text-sm">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-gray-900 truncate">{row.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {row.status === 'update' && '既存チームを更新'}
+                              {row.status === 'new' && !isMerge && '新規チームとして登録'}
+                              {row.status === 'merge_candidate' && !isMerge && '新規チームとして登録'}
+                              {isMerge && (() => {
+                                const c = row.candidates.find(x => x.id === decision);
+                                return c ? `「${c.name}」のサブチームとして登録` : 'サブチームとして登録';
+                              })()}
+                              {decision === 'skip' && 'スキップ'}
+                            </p>
+                          </div>
+                          <span className={`text-xs px-2 py-0.5 rounded flex-shrink-0 ${
+                            row.status === 'update' ? 'bg-blue-100 text-blue-700' :
+                            isMerge ? 'bg-amber-100 text-amber-700' :
+                            decision === 'skip' ? 'bg-gray-100 text-gray-600' :
+                            'bg-green-100 text-green-700'
+                          }`}>
+                            {row.status === 'update' ? '更新' :
+                              isMerge ? 'サブチーム' :
+                              decision === 'skip' ? 'スキップ' : '新規'}
+                          </span>
+                        </div>
+                        {row.status === 'merge_candidate' && row.candidates?.length > 0 && (
+                          <div className="mt-2 ml-1 space-y-1">
+                            <p className="text-xs text-amber-700">類似チームが見つかりました：</p>
+                            <label className="flex items-center gap-2 text-xs cursor-pointer">
+                              <input
+                                type="radio"
+                                name={`row-${row.rowNumber}`}
+                                checked={decision === 'new'}
+                                onChange={() => setCsvDecisions(d => ({ ...d, [row.rowNumber]: 'new' }))}
+                              />
+                              <span>別チームとして登録</span>
+                            </label>
+                            {row.candidates.map(c => (
+                              <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name={`row-${row.rowNumber}`}
+                                  checked={decision === c.id}
+                                  onChange={() => setCsvDecisions(d => ({ ...d, [row.rowNumber]: c.id }))}
+                                />
+                                <span>
+                                  <span className="font-medium">{c.name}</span> の別カテゴリ
+                                  {c.suggestedCategoryName && (
+                                    <span className="ml-1 px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded">{c.suggestedCategoryName}</span>
+                                  )}
+                                </span>
+                              </label>
+                            ))}
+                            <label className="flex items-center gap-2 text-xs cursor-pointer text-gray-500">
+                              <input
+                                type="radio"
+                                name={`row-${row.rowNumber}`}
+                                checked={decision === 'skip'}
+                                onChange={() => setCsvDecisions(d => ({ ...d, [row.rowNumber]: 'skip' }))}
+                              />
+                              <span>この行をスキップ</span>
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {csvAnalysis.skipped?.length > 0 && (
+                  <div className="px-3 py-2 bg-amber-50 border-t border-amber-200 text-xs text-amber-700">
+                    スキップ: {csvAnalysis.skipped.length}件（{csvAnalysis.skipped.slice(0, 3).map(s => `行${s.row}: ${s.reason}`).join(', ')}{csvAnalysis.skipped.length > 3 ? '...' : ''}）
+                  </div>
+                )}
+              </div>
+            )}
 
             {csvResult && (
               <div className={`rounded-lg p-4 mb-4 ${csvResult.type === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
@@ -922,14 +1173,14 @@ export default function AdminTeamManagement() {
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => setShowCsvModal(false)}
+                onClick={closeCsvModal}
                 className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
               >
                 閉じる
               </button>
               <button
                 onClick={handleCsvImport}
-                disabled={!csvFile || csvImporting}
+                disabled={!csvFile || csvImporting || csvAnalyzing || !!csvResult}
                 className="flex items-center gap-2 px-5 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition"
               >
                 {csvImporting ? (
