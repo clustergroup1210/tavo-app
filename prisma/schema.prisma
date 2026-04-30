@@ -602,6 +602,7 @@ model TeamJoinRequest {
   playerName  String
   message     String?
   status      String   @default("pending")
+  requestType String   @default("PLAYER")
   reviewedBy  String?
   reviewedAt  DateTime?
   createdAt   DateTime @default(now())

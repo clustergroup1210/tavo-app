@@ -3,7 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { UserPlus, Check, X, Clock, CheckCircle, XCircle, Mail } from 'lucide-react';
 
 export default function JoinRequests() {
-  const { currentTeam } = useAuth();
+  const { currentTeam, isTeamAdmin, isOperator } = useAuth();
+  const canHandleStaffRequests = isTeamAdmin || isOperator;
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('pending');
@@ -33,9 +34,16 @@ export default function JoinRequests() {
     }
   };
 
-  const handleApprove = async (id) => {
-    if (!confirm('この申請を承認しますか？選手としてチームに追加されます。')) return;
-    
+  const handleApprove = async (request) => {
+    const id = typeof request === 'string' ? request : request.id;
+    const reqType = typeof request === 'object' ? request.requestType : null;
+    const message = reqType === 'STAFF'
+      ? 'この申請を承認しますか？スタッフ（コーチ）としてチームに追加されます。'
+      : reqType === 'PLAYER'
+        ? 'この申請を承認しますか？選手としてチームに追加されます。'
+        : 'この申請を承認しますか？';
+    if (!confirm(message)) return;
+
     setProcessing(id);
     try {
       const res = await fetch(`/api/join-requests/${id}/approve`, {
@@ -44,9 +52,13 @@ export default function JoinRequests() {
       });
       if (res.ok) {
         fetchRequests();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || '申請の承認に失敗しました');
       }
     } catch (error) {
       console.error('Failed to approve request:', error);
+      alert('申請の承認に失敗しました');
     } finally {
       setProcessing(null);
     }
@@ -168,7 +180,12 @@ export default function JoinRequests() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {request.playerName}
+                        <div className="flex items-center gap-2">
+                          <span>{request.playerName}</span>
+                          <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${request.requestType === 'STAFF' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {request.requestType === 'STAFF' ? 'スタッフ' : '選手'}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
                         {request.message || '-'}
@@ -184,24 +201,30 @@ export default function JoinRequests() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         {request.status === 'pending' && (
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => handleApprove(request.id)}
-                              disabled={processing === request.id}
-                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg disabled:opacity-50"
-                              title="承認"
-                            >
-                              <Check className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={() => handleReject(request.id)}
-                              disabled={processing === request.id}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50"
-                              title="却下"
-                            >
-                              <X className="w-5 h-5" />
-                            </button>
-                          </div>
+                          request.requestType === 'STAFF' && !canHandleStaffRequests ? (
+                            <span className="text-xs text-gray-500">
+                              チーム管理者の承認待ち
+                            </span>
+                          ) : (
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleApprove(request)}
+                                disabled={processing === request.id}
+                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg disabled:opacity-50"
+                                title="承認"
+                              >
+                                <Check className="w-5 h-5" />
+                              </button>
+                              <button
+                                onClick={() => handleReject(request.id)}
+                                disabled={processing === request.id}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50"
+                                title="却下"
+                              >
+                                <X className="w-5 h-5" />
+                              </button>
+                            </div>
+                          )
                         )}
                         {request.status !== 'pending' && request.reviewer && (
                           <span className="text-xs text-gray-500">
@@ -249,27 +272,36 @@ export default function JoinRequests() {
                     </span>
                   </div>
                   <div className="mt-2 pl-[52px] text-sm text-gray-600">
-                    <p>選手名: {request.playerName}</p>
+                    <p className="flex items-center gap-2">
+                      <span>{request.requestType === 'STAFF' ? '氏名' : '選手名'}: {request.playerName}</span>
+                      <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${request.requestType === 'STAFF' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {request.requestType === 'STAFF' ? 'スタッフ' : '選手'}
+                      </span>
+                    </p>
                     {request.message && <p className="text-xs text-gray-500 mt-1 truncate">{request.message}</p>}
                     <p className="text-xs text-gray-400 mt-1">{new Date(request.createdAt).toLocaleDateString('ja-JP')}</p>
                   </div>
                   {request.status === 'pending' && (
-                    <div className="mt-3 flex items-center gap-2">
-                      <button
-                        onClick={() => handleApprove(request.id)}
-                        disabled={processing === request.id}
-                        className="flex-1 py-1.5 text-sm text-green-700 bg-green-50 hover:bg-green-100 rounded-lg disabled:opacity-50"
-                      >
-                        承認
-                      </button>
-                      <button
-                        onClick={() => handleReject(request.id)}
-                        disabled={processing === request.id}
-                        className="flex-1 py-1.5 text-sm text-red-700 bg-red-50 hover:bg-red-100 rounded-lg disabled:opacity-50"
-                      >
-                        却下
-                      </button>
-                    </div>
+                    request.requestType === 'STAFF' && !canHandleStaffRequests ? (
+                      <p className="mt-3 text-xs text-gray-500">チーム管理者の承認待ち</p>
+                    ) : (
+                      <div className="mt-3 flex items-center gap-2">
+                        <button
+                          onClick={() => handleApprove(request)}
+                          disabled={processing === request.id}
+                          className="flex-1 py-1.5 text-sm text-green-700 bg-green-50 hover:bg-green-100 rounded-lg disabled:opacity-50"
+                        >
+                          承認
+                        </button>
+                        <button
+                          onClick={() => handleReject(request.id)}
+                          disabled={processing === request.id}
+                          className="flex-1 py-1.5 text-sm text-red-700 bg-red-50 hover:bg-red-100 rounded-lg disabled:opacity-50"
+                        >
+                          却下
+                        </button>
+                      </div>
+                    )
                   )}
                 </div>
               );

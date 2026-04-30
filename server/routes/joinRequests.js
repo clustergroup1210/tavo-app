@@ -79,10 +79,11 @@ router.get('/my', authenticate, async (req, res) => {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { teamId, playerName, message } = req.body;
+    const { teamId, playerName, message, requestType: rawType } = req.body;
+    const requestType = rawType === 'STAFF' ? 'STAFF' : 'PLAYER';
 
     if (!teamId || !playerName) {
-      return res.status(400).json({ error: 'チームと選手名は必須です' });
+      return res.status(400).json({ error: 'チームと名前は必須です' });
     }
 
     const existingRequest = await prisma.teamJoinRequest.findUnique({
@@ -93,12 +94,20 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'このチームへの参加申請は既に存在します' });
     }
 
-    const existingPlayer = await prisma.player.findFirst({
-      where: { userId: req.user.id, teamId }
-    });
-
-    if (existingPlayer) {
-      return res.status(400).json({ error: '既にこのチームに所属しています' });
+    if (requestType === 'PLAYER') {
+      const existingPlayer = await prisma.player.findFirst({
+        where: { userId: req.user.id, teamId }
+      });
+      if (existingPlayer) {
+        return res.status(400).json({ error: '既にこのチームに所属しています' });
+      }
+    } else {
+      const existingMembership = await prisma.userTeam.findFirst({
+        where: { userId: req.user.id, teamId, role: { in: ['TEAM_MANAGER', 'COACH', 'GUEST_COACH'] } }
+      });
+      if (existingMembership) {
+        return res.status(400).json({ error: '既にこのチームのスタッフです' });
+      }
     }
 
     const request = await prisma.teamJoinRequest.create({
@@ -106,7 +115,8 @@ router.post('/', authenticate, async (req, res) => {
         userId: req.user.id,
         teamId,
         playerName,
-        message
+        message,
+        requestType,
       },
       include: {
         team: { select: { id: true, name: true } }
@@ -121,7 +131,7 @@ router.post('/', authenticate, async (req, res) => {
       select: { userId: true }
     });
 
-    const operators = await prisma.organizationMember.findMany({
+    const operators = await prisma.userOrganization.findMany({
       where: {
         role: { in: ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'] }
       },
@@ -162,8 +172,15 @@ router.put('/:id/approve', authenticate, async (req, res) => {
     }
 
     const isOperator = isOperatorUser(req.user);
-    if (!isOperator && !hasTeamAccess(req.user, request.teamId, ['TEAM_MANAGER', 'COACH'])) {
-      return res.status(403).json({ error: 'Access denied' });
+    const requiredTeamRoles = request.requestType === 'STAFF'
+      ? ['TEAM_MANAGER']
+      : ['TEAM_MANAGER', 'COACH'];
+    if (!isOperator && !hasTeamAccess(req.user, request.teamId, requiredTeamRoles)) {
+      return res.status(403).json({
+        error: request.requestType === 'STAFF'
+          ? 'スタッフ申請の承認はチーム管理者または運営者のみ可能です'
+          : 'Access denied'
+      });
     }
 
     if (request.status !== 'pending') {
@@ -171,45 +188,83 @@ router.put('/:id/approve', authenticate, async (req, res) => {
     }
 
     const updatedRequest = await prisma.$transaction(async (tx) => {
-      const player = await tx.player.create({
-        data: {
-          userId: request.userId,
-          teamId: request.teamId,
-          name: request.playerName
-        }
-      });
-
-      await tx.playerTeamHistory.create({
-        data: {
-          playerId: player.id,
-          teamId: request.teamId,
-          joinedAt: new Date()
-        }
-      });
-
-      await tx.userTeam.upsert({
-        where: {
-          userId_teamId_role: {
-            userId: request.userId,
-            teamId: request.teamId,
-            role: 'PLAYER'
-          }
-        },
-        update: {},
-        create: {
-          userId: request.userId,
-          teamId: request.teamId,
-          role: 'PLAYER'
-        }
-      });
-
-      return await tx.teamJoinRequest.update({
-        where: { id: req.params.id },
+      const claim = await tx.teamJoinRequest.updateMany({
+        where: { id: req.params.id, status: 'pending' },
         data: {
           status: 'approved',
           reviewedBy: req.user.id,
           reviewedAt: new Date()
-        },
+        }
+      });
+
+      if (claim.count === 0) {
+        const err = new Error('ALREADY_PROCESSED');
+        err.code = 'ALREADY_PROCESSED';
+        throw err;
+      }
+
+      if (request.requestType === 'STAFF') {
+        await tx.userTeam.upsert({
+          where: {
+            userId_teamId_role: {
+              userId: request.userId,
+              teamId: request.teamId,
+              role: 'COACH'
+            }
+          },
+          update: { isActive: true },
+          create: {
+            userId: request.userId,
+            teamId: request.teamId,
+            role: 'COACH'
+          }
+        });
+      } else {
+        const existingPlayer = await tx.player.findFirst({
+          where: {
+            userId: request.userId,
+            teamId: request.teamId,
+            deletedAt: null
+          }
+        });
+
+        const player = existingPlayer || await tx.player.create({
+          data: {
+            userId: request.userId,
+            teamId: request.teamId,
+            name: request.playerName
+          }
+        });
+
+        if (!existingPlayer) {
+          await tx.playerTeamHistory.create({
+            data: {
+              playerId: player.id,
+              teamId: request.teamId,
+              joinedAt: new Date()
+            }
+          });
+        }
+
+        await tx.userTeam.upsert({
+          where: {
+            userId_teamId_role: {
+              userId: request.userId,
+              teamId: request.teamId,
+              role: 'PLAYER'
+            }
+          },
+          update: {},
+          create: {
+            userId: request.userId,
+            teamId: request.teamId,
+            role: 'PLAYER'
+          }
+        });
+      }
+
+      return await tx.teamJoinRequest.findUnique({
+        where: { id: req.params.id },
         include: {
           user: { select: { id: true, name: true, email: true } },
           team: { select: { id: true, name: true } },
@@ -220,6 +275,9 @@ router.put('/:id/approve', authenticate, async (req, res) => {
 
     res.json(updatedRequest);
   } catch (error) {
+    if (error.code === 'ALREADY_PROCESSED') {
+      return res.status(409).json({ error: 'この申請は既に処理されています' });
+    }
     console.error('Failed to approve join request:', error);
     res.status(500).json({ error: '申請の承認に失敗しました' });
   }
@@ -236,8 +294,15 @@ router.put('/:id/reject', authenticate, async (req, res) => {
     }
 
     const isOperator = isOperatorUser(req.user);
-    if (!isOperator && !hasTeamAccess(req.user, request.teamId, ['TEAM_MANAGER', 'COACH'])) {
-      return res.status(403).json({ error: 'Access denied' });
+    const requiredTeamRoles = request.requestType === 'STAFF'
+      ? ['TEAM_MANAGER']
+      : ['TEAM_MANAGER', 'COACH'];
+    if (!isOperator && !hasTeamAccess(req.user, request.teamId, requiredTeamRoles)) {
+      return res.status(403).json({
+        error: request.requestType === 'STAFF'
+          ? 'スタッフ申請の処理はチーム管理者または運営者のみ可能です'
+          : 'Access denied'
+      });
     }
 
     if (request.status !== 'pending') {
