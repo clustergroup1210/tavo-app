@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Save, Plus, X, Calendar, CheckCircle, HelpCircle, Trash2, Edit3, ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import { Save, Plus, X, Calendar, CheckCircle, HelpCircle, Trash2, Edit3, ChevronLeft, ChevronRight, ChevronDown, Users } from 'lucide-react';
 import clsx from 'clsx';
 
 const getScoreColor = (score) => {
@@ -252,40 +252,57 @@ export default function EvaluationEntry() {
     }
   };
 
-  const buildRows = () => {
+  const buildRowsForParent = (parent) => {
+    if (!parent.children || parent.children.length === 0) {
+      return [{ childName: null, leaf: parent, childRowSpan: 1, isFirstChild: true }];
+    }
     const rows = [];
-    items.forEach(parent => {
-      if (!parent.children || parent.children.length === 0) {
-        rows.push({ parentName: parent.name, childName: null, leaf: parent, parentRowSpan: 1, childRowSpan: 1, isFirstParent: true, isFirstChild: true });
-        return;
-      }
-      const childGroups = parent.children.map(child => {
-        const grandchildren = child.children && child.children.length > 0 ? child.children : [child];
-        const hasGrandchildren = child.children && child.children.length > 0;
-        return { child, grandchildren, hasGrandchildren };
-      });
-      const totalParentLeaves = childGroups.reduce((sum, g) => sum + g.grandchildren.length, 0);
-
-      childGroups.forEach((group, ci) => {
-        group.grandchildren.forEach((gc, gi) => {
-          rows.push({
-            parentName: parent.name,
-            parentDescription: parent.description,
-            childName: group.hasGrandchildren ? group.child.name : null,
-            childDescription: group.hasGrandchildren ? group.child.description : null,
-            leaf: gc,
-            parentRowSpan: totalParentLeaves,
-            childRowSpan: group.grandchildren.length,
-            isFirstParent: ci === 0 && gi === 0,
-            isFirstChild: gi === 0,
-          });
+    const childGroups = parent.children.map(child => {
+      const grandchildren = child.children && child.children.length > 0 ? child.children : [child];
+      const hasGrandchildren = child.children && child.children.length > 0;
+      return { child, grandchildren, hasGrandchildren };
+    });
+    childGroups.forEach((group) => {
+      group.grandchildren.forEach((gc, gi) => {
+        rows.push({
+          childName: group.hasGrandchildren ? group.child.name : null,
+          leaf: gc,
+          childRowSpan: group.grandchildren.length,
+          isFirstChild: gi === 0,
         });
       });
     });
     return rows;
   };
 
-  const rows = useMemo(() => buildRows(), [items]);
+  const groups = useMemo(() => items.map(parent => ({
+    parent,
+    leaves: collectLeaves(parent),
+    rows: buildRowsForParent(parent),
+  })), [items]);
+
+  const [collapsedParents, setCollapsedParents] = useState(() => new Set());
+
+  const toggleParentCollapsed = (parentId) => {
+    setCollapsedParents(prev => {
+      const next = new Set(prev);
+      if (next.has(parentId)) next.delete(parentId);
+      else next.add(parentId);
+      return next;
+    });
+  };
+
+  const collapseAllParents = () => {
+    setCollapsedParents(new Set(items.map(p => p.id)));
+  };
+
+  const expandAllParents = () => {
+    setCollapsedParents(new Set());
+  };
+
+  useEffect(() => {
+    setCollapsedParents(new Set());
+  }, [selectedPlayer]);
 
   const selectedRoundIdx = rounds.findIndex(r => r.id === selectedRound);
 
@@ -473,13 +490,33 @@ export default function EvaluationEntry() {
           )}
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-200 bg-gray-50">
+              <div className="text-[11px] text-gray-500">
+                大分類のヘッダーをタップして開閉できます
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={collapseAllParents}
+                  className="text-[11px] text-gray-600 hover:text-gray-900 px-2 py-1 rounded hover:bg-gray-100"
+                >
+                  全て折りたたむ
+                </button>
+                <button
+                  type="button"
+                  onClick={expandAllParents}
+                  className="text-[11px] text-gray-600 hover:text-gray-900 px-2 py-1 rounded hover:bg-gray-100"
+                >
+                  全て展開
+                </button>
+              </div>
+            </div>
             <div className="overflow-x-auto" ref={tableRef}>
               <table className="w-full border-collapse text-xs">
                 <thead>
                   <tr className="bg-gray-50">
-                    <th className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-2 text-left font-semibold text-gray-700 min-w-[80px] w-[80px]">大分類</th>
-                    <th className="sticky left-[80px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-2 text-left font-semibold text-gray-700 min-w-[90px] w-[90px]">中分類</th>
-                    <th className="sticky left-[170px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-2 text-left font-semibold text-gray-700 min-w-[120px] w-[120px]">評価項目</th>
+                    <th className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-2 text-left font-semibold text-gray-700 min-w-[90px] w-[90px]">中分類</th>
+                    <th className="sticky left-[90px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-2 text-left font-semibold text-gray-700 min-w-[120px] w-[120px]">評価項目</th>
                     {visibleHistoryRounds.map(r => (
                       <th key={r.id} className="border-b border-r border-gray-200 px-1 py-2 text-center font-medium text-gray-400 min-w-[52px] w-[52px] whitespace-nowrap">
                         {r.name.replace(/年/, '/').replace(/月/, '')}
@@ -491,65 +528,90 @@ export default function EvaluationEntry() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row, ri) => (
-                    <tr key={ri} className={clsx('hover:bg-gray-50/50', ri > 0 && rows[ri - 1]?.parentName !== row.parentName && 'border-t-2 border-gray-300')}>
-                      {row.isFirstParent && (
-                        <td
-                          rowSpan={row.parentRowSpan}
-                          className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-1.5 align-top font-semibold text-gray-800 text-[11px]"
+                  {groups.map((group) => {
+                    const isCollapsed = collapsedParents.has(group.parent.id);
+                    const totalLeaves = group.leaves.length;
+                    const filledCount = group.leaves.filter(l => {
+                      if (Object.prototype.hasOwnProperty.call(editScores, l.id)) {
+                        return editScores[l.id] > 0;
+                      }
+                      const savedKey = `${selectedRound}_${l.id}_${evaluatorType}`;
+                      return !!scoreMap[savedKey];
+                    }).length;
+                    const totalCols = 2 + visibleHistoryRounds.length + 1;
+
+                    return (
+                      <React.Fragment key={group.parent.id}>
+                        <tr
+                          className="bg-gray-100 hover:bg-gray-200 cursor-pointer border-t-2 border-gray-300"
+                          onClick={() => toggleParentCollapsed(group.parent.id)}
                         >
-                          <div className="flex items-start gap-0.5">
-                            <span>{row.parentName}</span>
-                          </div>
-                        </td>
-                      )}
-                      {row.isFirstChild && row.childName && (
-                        <td
-                          rowSpan={row.childRowSpan}
-                          className="sticky left-[80px] z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 align-top text-gray-600 text-[11px]"
-                        >
-                          {row.childName}
-                        </td>
-                      )}
-                      {row.isFirstChild && !row.childName && (
-                        <td
-                          rowSpan={row.childRowSpan || 1}
-                          className="sticky left-[80px] z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 align-top text-gray-400 text-[11px]"
-                        >
-                          -
-                        </td>
-                      )}
-                      <td className="sticky left-[170px] z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 text-gray-700 text-[11px]">
-                        {row.leaf.name}
-                      </td>
-                      {visibleHistoryRounds.map(r => {
-                        const score = scoreMap[`${r.id}_${row.leaf.id}_${evaluatorType}`];
-                        return (
-                          <td key={r.id} className={clsx('border-b border-r border-gray-200 px-1 py-1.5 text-center', getScoreBg(score))}>
-                            <span className={clsx('inline-flex items-center justify-center w-6 h-5 rounded text-[11px] font-bold', score ? getScoreColor(score) : 'text-gray-300')}>
-                              {score || '-'}
-                            </span>
+                          <td colSpan={totalCols} className="px-2 py-2">
+                            <div className="flex items-center gap-2">
+                              {isCollapsed ? (
+                                <ChevronRight className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" />
+                              )}
+                              <span className="font-semibold text-gray-900 text-[12px]">{group.parent.name}</span>
+                              <span className="text-[11px] text-gray-500 ml-auto">
+                                {filledCount}/{totalLeaves} 入力済
+                              </span>
+                            </div>
                           </td>
-                        );
-                      })}
-                      <td className={clsx('border-b border-gray-200 px-1 py-1 text-center bg-primary-50/30')}>
-                        {canEdit ? (
-                          <select
-                            value={editScores[row.leaf.id] || ''}
-                            onChange={(e) => handleScoreChange(row.leaf.id, e.target.value)}
-                            className="w-12 px-0.5 py-0.5 border border-gray-300 rounded text-xs text-center bg-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                          >
-                            <option value="">-</option>
-                            {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
-                          </select>
-                        ) : (
-                          <span className={clsx('inline-flex items-center justify-center w-6 h-5 rounded text-[11px] font-bold', editScores[row.leaf.id] ? getScoreColor(editScores[row.leaf.id]) : 'text-gray-300')}>
-                            {editScores[row.leaf.id] || '-'}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </tr>
+                        {!isCollapsed && group.rows.map((row, ri) => (
+                          <tr key={`${group.parent.id}_${ri}`} className="hover:bg-gray-50/50">
+                            {row.isFirstChild && row.childName && (
+                              <td
+                                rowSpan={row.childRowSpan}
+                                className="sticky left-0 z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 align-top text-gray-600 text-[11px]"
+                              >
+                                {row.childName}
+                              </td>
+                            )}
+                            {row.isFirstChild && !row.childName && (
+                              <td
+                                rowSpan={row.childRowSpan || 1}
+                                className="sticky left-0 z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 align-top text-gray-400 text-[11px]"
+                              >
+                                -
+                              </td>
+                            )}
+                            <td className="sticky left-[90px] z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 text-gray-700 text-[11px]">
+                              {row.leaf.name}
+                            </td>
+                            {visibleHistoryRounds.map(r => {
+                              const score = scoreMap[`${r.id}_${row.leaf.id}_${evaluatorType}`];
+                              return (
+                                <td key={r.id} className={clsx('border-b border-r border-gray-200 px-1 py-1.5 text-center', getScoreBg(score))}>
+                                  <span className={clsx('inline-flex items-center justify-center w-6 h-5 rounded text-[11px] font-bold', score ? getScoreColor(score) : 'text-gray-300')}>
+                                    {score || '-'}
+                                  </span>
+                                </td>
+                              );
+                            })}
+                            <td className={clsx('border-b border-gray-200 px-1 py-1 text-center bg-primary-50/30')}>
+                              {canEdit ? (
+                                <select
+                                  value={editScores[row.leaf.id] || ''}
+                                  onChange={(e) => handleScoreChange(row.leaf.id, e.target.value)}
+                                  className="w-12 px-0.5 py-0.5 border border-gray-300 rounded text-xs text-center bg-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                                >
+                                  <option value="">-</option>
+                                  {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
+                                </select>
+                              ) : (
+                                <span className={clsx('inline-flex items-center justify-center w-6 h-5 rounded text-[11px] font-bold', editScores[row.leaf.id] ? getScoreColor(editScores[row.leaf.id]) : 'text-gray-300')}>
+                                  {editScores[row.leaf.id] || '-'}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
