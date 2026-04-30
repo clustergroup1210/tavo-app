@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { UserCircle, Plus, ChevronUp, ChevronDown, Filter, X, Trash2, RotateCcw, GraduationCap } from 'lucide-react';
+import Pagination, { usePagination } from '../components/Pagination';
 
 export default function PlayerList() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -234,6 +235,15 @@ export default function PlayerList() {
 
   const hasActiveFilters = filterCategory || filterPosition || includeGraduated || includeDeleted;
 
+  const { page, pageSize, setPage, setPageSize, paginate, reset: resetPagination } = usePagination(25);
+
+  const displayPlayers = sortedAndFilteredPlayers();
+  const pagedPlayers = paginate(displayPlayers);
+
+  useEffect(() => {
+    resetPagination();
+  }, [filterCategory, filterPosition, includeGraduated, includeDeleted, sortField, sortDirection, resetPagination]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -241,8 +251,6 @@ export default function PlayerList() {
       </div>
     );
   }
-
-  const displayPlayers = sortedAndFilteredPlayers();
 
   return (
     <div className="space-y-6">
@@ -329,7 +337,7 @@ export default function PlayerList() {
           )}
 
           <div className="ml-auto text-sm text-gray-500">
-            {displayPlayers.length}件表示
+            {displayPlayers.length}件該当
           </div>
         </div>
       </div>
