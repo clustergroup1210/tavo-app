@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import MobileBottomNav from './MobileBottomNav';
+import PostLoginPushPrompt from './PostLoginPushPrompt';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../contexts/AuthContext';
 import { Menu, Building2, UserCircle } from 'lucide-react';
@@ -80,6 +81,7 @@ export default function Layout({ children }) {
       </div>
 
       {!sidebarOpen && <MobileBottomNav />}
+      <PostLoginPushPrompt />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import AdminSidebar from './AdminSidebar';
+import PostLoginPushPrompt from './PostLoginPushPrompt';
 import { Menu } from 'lucide-react';
 
 export default function AdminLayout({ children }) {
@@ -30,6 +31,7 @@ export default function AdminLayout({ children }) {
           {children}
         </main>
       </div>
+      <PostLoginPushPrompt />
     </div>
   );
 }
