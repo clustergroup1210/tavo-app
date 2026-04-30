@@ -58,13 +58,28 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
+const ALLOWED_INVITE_ROLES = ['TEAM_MANAGER', 'COACH', 'GUEST_COACH', 'PLAYER', 'PARENT'];
+const TEAM_MANAGER_ONLY_ROLES = new Set(['TEAM_MANAGER']);
+
 router.post('/', authenticate, async (req, res) => {
   try {
     const { teamId, role, email, playerName, playerId, expiryDays = 7 } = req.body;
     const isOperator = isOperatorUser(req.user);
 
-    if (!isOperator && !hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH', 'COACH'])) {
+    if (!teamId || !role) {
+      return res.status(400).json({ error: 'teamIdとroleは必須です' });
+    }
+
+    if (!ALLOWED_INVITE_ROLES.includes(role)) {
+      return res.status(400).json({ error: '指定された役割は招待対象ではありません' });
+    }
+
+    if (!isOperator && !hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH'])) {
       return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (TEAM_MANAGER_ONLY_ROLES.has(role) && !isOperator && !hasTeamAccess(req.user, teamId, ['TEAM_MANAGER'])) {
+      return res.status(403).json({ error: 'チーム管理者の招待はチーム管理者または運営者のみ発行できます' });
     }
 
     if (role === 'PARENT' && !playerId) {
