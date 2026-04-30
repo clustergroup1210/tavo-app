@@ -35,9 +35,10 @@ export default function Login() {
     <div className="min-h-screen flex flex-col bg-slate-50">
       <header className="bg-sidebar border-b border-sidebar-dark">
         <div className="max-w-7xl mx-auto px-6 lg:px-10 py-4">
-          <span className="text-2xl font-light tracking-tight text-white lowercase">
-            pds
-          </span>
+          <div className="flex items-baseline gap-0.5">
+            <span className="text-2xl font-bold tracking-tight text-white leading-none">PDS</span>
+            <span className="text-2xl font-bold text-blue-400 leading-none">.</span>
+          </div>
         </div>
       </header>
 

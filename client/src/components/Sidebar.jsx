@@ -180,9 +180,12 @@ export default function Sidebar({ isOpen, onClose }) {
       )}
     >
       <div className="px-4 pt-4 pb-3 border-b border-white/[0.06]">
-        <div className="flex items-center justify-between lg:hidden mb-2">
-          <span className="text-xs font-medium text-slate-400">メニュー</span>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white rounded">
+        <div className="flex items-center justify-between mb-3">
+          <Link to="/dashboard" className="flex items-baseline gap-0.5 group">
+            <span className="text-[20px] font-bold text-white tracking-tight leading-none group-hover:text-blue-300 transition-colors">PDS</span>
+            <span className="text-[20px] font-bold text-blue-400 leading-none">.</span>
+          </Link>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white rounded lg:hidden">
             <X className="w-4 h-4" />
           </button>
         </div>
