@@ -4,11 +4,11 @@
 The Player Development Support System is a SaaS platform designed for sports teams to streamline player development, evaluation, and communication. It offers tools for team management, performance tracking, goal setting, and communication, aiming to enhance athletic performance and team cohesion. The system uses `player_id` as a central identifier and focuses on a team-centric approach.
 
 ## User Preferences
-- No product name should be displayed in the UI.
+- The system name "育成支援システム" is shown in the top-left of the mobile header (followed by the current team/player as secondary context). Desktop continues to rely on the left sidebar for branding.
 - All views should be organized around teams.
 - Database and API paths should use generic names, while display names should be team/player specific.
 - Different menu structures should be displayed based on user roles.
-- The UI should feature a clevio-style left-fixed sidebar.
+- The UI should feature a clevio-style left-fixed sidebar. On mobile, the sidebar slides in from the **left** via a hamburger button placed at the top-left of the header.
 
 ## System Architecture
 
