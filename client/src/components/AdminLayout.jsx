@@ -18,14 +18,19 @@ export default function AdminLayout({ children }) {
       <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="flex-1 lg:ml-60 flex flex-col min-w-0">
-        <header className="h-12 bg-white border-b border-gray-200/80 flex items-center justify-between px-4 fixed top-0 left-0 right-0 lg:left-60 z-30 shadow-[0_1px_3px_rgba(0,0,0,0.04)] lg:hidden">
-          <span className="font-medium text-gray-700 text-[13px]">システム管理</span>
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
+        <header className="h-12 bg-white border-b border-gray-200/80 flex items-center justify-between px-3 fixed top-0 left-0 right-0 lg:left-60 z-[45] shadow-[0_1px_3px_rgba(0,0,0,0.04)] lg:hidden">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-1.5 -ml-1 text-gray-600 hover:bg-gray-100 rounded flex-shrink-0"
+              aria-label="メニューを開く"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <span className="text-sm font-bold text-gray-800 truncate">育成支援システム</span>
+            <span className="text-gray-300 flex-shrink-0">|</span>
+            <span className="text-xs text-gray-600 truncate">システム管理</span>
+          </div>
         </header>
         <main className="flex-1 p-4 lg:p-5 mt-12 lg:mt-0">
           {children}
