@@ -27,7 +27,7 @@ export default function AdminLayout({ children }) {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <span className="text-sm font-bold text-gray-800 truncate">育成支援システム</span>
+            <span className="text-sm font-bold text-gray-800 truncate">PDS<span className="text-primary-600">.</span></span>
             <span className="text-gray-300 flex-shrink-0">|</span>
             <span className="text-xs text-gray-600 truncate">システム管理</span>
           </div>
