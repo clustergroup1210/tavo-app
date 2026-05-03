@@ -39,40 +39,34 @@ export default function AdminDashboard() {
         <p className="mt-1 text-sm text-gray-500">システム全体の概要</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-50 rounded-lg">
-              <Building2 className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">登録チーム数</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalTeams}</p>
-            </div>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 divide-y divide-gray-100 sm:divide-y-0 sm:divide-x sm:grid sm:grid-cols-3">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <div className="p-2 bg-blue-50 rounded-md flex-shrink-0">
+            <Building2 className="w-4 h-4 text-blue-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs text-gray-500">登録チーム数</p>
+            <p className="text-xl font-bold text-gray-900 leading-tight">{stats.totalTeams.toLocaleString()}</p>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-green-50 rounded-lg">
-              <Users className="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">総選手数</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalPlayers}</p>
-            </div>
+        <div className="flex items-center gap-3 px-4 py-3">
+          <div className="p-2 bg-green-50 rounded-md flex-shrink-0">
+            <Users className="w-4 h-4 text-green-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs text-gray-500">総選手数</p>
+            <p className="text-xl font-bold text-gray-900 leading-tight">{stats.totalPlayers.toLocaleString()}</p>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-purple-50 rounded-lg">
-              <Users className="w-6 h-6 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">総ユーザー数</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalUsers}</p>
-            </div>
+        <div className="flex items-center gap-3 px-4 py-3">
+          <div className="p-2 bg-purple-50 rounded-md flex-shrink-0">
+            <Users className="w-4 h-4 text-purple-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs text-gray-500">総ユーザー数</p>
+            <p className="text-xl font-bold text-gray-900 leading-tight">{stats.totalUsers.toLocaleString()}</p>
           </div>
         </div>
       </div>
