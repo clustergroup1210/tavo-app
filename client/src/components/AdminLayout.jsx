@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import AdminSidebar from './AdminSidebar';
 import PostLoginPushPrompt from './PostLoginPushPrompt';
 import { Menu } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function AdminLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -27,7 +28,7 @@ export default function AdminLayout({ children }) {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <span className="text-sm font-bold text-gray-800 truncate">PDS<span className="text-primary-600">.</span></span>
+            <Link to="/admin" className="text-sm font-bold text-gray-800 truncate hover:text-primary-600 transition-colors" aria-label="ホームへ">PDS<span className="text-primary-600">.</span></Link>
             <span className="text-gray-300 flex-shrink-0">|</span>
             <span className="text-xs text-gray-600 truncate">システム管理</span>
           </div>

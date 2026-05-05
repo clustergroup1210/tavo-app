@@ -5,6 +5,7 @@ import PostLoginPushPrompt from './PostLoginPushPrompt';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../contexts/AuthContext';
 import { Menu, Building2, UserCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function Layout({ children }) {
   const { user, currentTeam, isPlayer, isParent, playerData, childPlayerData } = useAuth();
@@ -43,7 +44,7 @@ export default function Layout({ children }) {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <span className="text-sm font-bold text-gray-800 truncate">PDS<span className="text-primary-600">.</span></span>
+            <Link to="/dashboard" className="text-sm font-bold text-gray-800 truncate hover:text-primary-600 transition-colors" aria-label="ホームへ">PDS<span className="text-primary-600">.</span></Link>
             {headerInfo.name && (
               <>
                 <span className="text-gray-300 flex-shrink-0">|</span>
