@@ -473,6 +473,12 @@ async function parseTeamCsvRows(req) {
     const descriptionValue = (row.description || row['説明'] || row.category || row['カテゴリー'] || '').trim();
     const leagueValue = (row.league || row['リーグ'] || '').trim();
     const regionValue = (row.region || row['拠点地域'] || row['地域'] || '').trim();
+    const teamCodeValue = (row.teamCode || row.team_code || row['チームID'] || row['チームコード'] || row['コード'] || '').trim();
+
+    if (teamCodeValue && !/^[A-Za-z0-9][A-Za-z0-9_-]{1,31}$/.test(teamCodeValue)) {
+      skipped.push({ row: i + 2, reason: `「${teamName}」のチームID「${teamCodeValue}」は形式が不正です` });
+      continue;
+    }
 
     validRows.push({
       rowNumber: i + 2,
@@ -480,11 +486,13 @@ async function parseTeamCsvRows(req) {
       description: descriptionValue || null,
       league: leagueValue || null,
       region: regionValue || null,
+      teamCode: teamCodeValue ? teamCodeValue.toUpperCase() : null,
       organizationId: orgId,
       status: 'PENDING',
       hasDescription: !!descriptionValue,
       hasLeague: !!leagueValue,
       hasRegion: !!regionValue,
+      hasTeamCode: !!teamCodeValue,
     });
   }
 
@@ -509,21 +517,51 @@ router.post('/teams/import-csv/analyze', authenticate, requireOperator, csvUploa
         name: { in: validRows.map(r => r.name) },
         parentId: null,
       },
-      select: { id: true, name: true, description: true, league: true, region: true },
+      select: { id: true, name: true, description: true, league: true, region: true, teamCode: true },
     });
     const existingByName = new Map(existingTeams.map(t => [t.name, t]));
+
+    const codesInRows = validRows.map(r => r.teamCode).filter(Boolean);
+    const teamsByCode = codesInRows.length
+      ? await prisma.team.findMany({
+          where: { teamCode: { in: codesInRows } },
+          select: { id: true, name: true, teamCode: true, organizationId: true },
+        })
+      : [];
+    const existingByCode = new Map(teamsByCode.map(t => [t.teamCode, t]));
+
+    const csvCodeCounts = new Map();
+    for (const r of validRows) {
+      if (r.hasTeamCode) csvCodeCounts.set(r.teamCode, (csvCodeCounts.get(r.teamCode) || 0) + 1);
+    }
 
     const rows = [];
     for (const row of validRows) {
       const existing = existingByName.get(row.name);
+      let codeConflict = null;
+      if (row.hasTeamCode) {
+        const codeOwner = existingByCode.get(row.teamCode);
+        if (codeOwner && (!existing || codeOwner.id !== existing.id)) {
+          codeConflict = {
+            teamId: codeOwner.id,
+            teamName: codeOwner.name,
+            sameOrg: codeOwner.organizationId === orgId,
+          };
+        } else if (csvCodeCounts.get(row.teamCode) > 1) {
+          codeConflict = { duplicateInCsv: true };
+        }
+      }
       if (existing) {
         rows.push({
           rowNumber: row.rowNumber,
           name: row.name,
           league: row.league,
           region: row.region,
+          teamCode: row.teamCode,
           status: 'update',
           existingTeamId: existing.id,
+          existingTeamCode: existing.teamCode,
+          codeConflict,
           candidates: [],
         });
         continue;
@@ -535,7 +573,9 @@ router.post('/teams/import-csv/analyze', authenticate, requireOperator, csvUploa
         name: row.name,
         league: row.league,
         region: row.region,
+        teamCode: row.teamCode,
         status: candidates.length > 0 ? 'merge_candidate' : 'new',
+        codeConflict,
         candidates,
       });
     }
@@ -585,11 +625,35 @@ router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single
         name: { in: validRows.map(r => r.name) },
         parentId: null,
       },
-      select: { id: true, name: true, description: true, league: true, region: true },
+      select: { id: true, name: true, description: true, league: true, region: true, teamCode: true },
     });
     const existingByName = new Map(existingTeams.map(t => [t.name, t]));
 
-    const newRowsTopLevel = [];
+    const { resolveTeamCode } = require('../services/teamCode');
+
+    const isTeamCodeP2002 = (err) => {
+      if (err?.code !== 'P2002') return false;
+      const target = err?.meta?.target;
+      if (Array.isArray(target)) return target.includes('teamCode');
+      if (typeof target === 'string') return target.includes('teamCode');
+      return false;
+    };
+
+    const createTeamWithCodeRetry = async (data, userProvidedCode) => {
+      const maxAttempts = userProvidedCode ? 1 : 5;
+      let lastErr;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+          const code = await resolveTeamCode(prisma, userProvidedCode || null);
+          return await prisma.team.create({ data: { ...data, teamCode: code } });
+        } catch (err) {
+          lastErr = err;
+          if (isTeamCodeP2002(err) && !userProvidedCode) continue;
+          throw err;
+        }
+      }
+      throw lastErr;
+    };
 
     for (const row of validRows) {
       const decision = mergeDecisions[String(row.rowNumber)];
@@ -613,21 +677,24 @@ router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single
           continue;
         }
         try {
-          await prisma.team.create({
-            data: {
-              name: row.name,
-              description: row.description,
-              league: row.league,
-              region: row.region,
-              organizationId: parent.organizationId,
-              parentId: parent.id,
-              status: 'PENDING',
-            },
-          });
+          await createTeamWithCodeRetry({
+            name: row.name,
+            description: row.description,
+            league: row.league,
+            region: row.region,
+            organizationId: parent.organizationId,
+            parentId: parent.id,
+            status: 'PENDING',
+          }, row.hasTeamCode ? row.teamCode : null);
           results.success++;
         } catch (err) {
           results.skipped++;
-          results.errors.push({ row: row.rowNumber, reason: `「${row.name}」のサブチーム作成に失敗しました` });
+          const reason = (err?.statusCode === 409 || isTeamCodeP2002(err))
+            ? `「${row.name}」のチームID「${row.teamCode || ''}」は既に使用されています`
+            : err?.statusCode === 400
+              ? `「${row.name}」のチームIDの形式が不正です`
+              : `「${row.name}」のサブチーム作成に失敗しました`;
+          results.errors.push({ row: row.rowNumber, reason });
         }
         continue;
       }
@@ -642,6 +709,20 @@ router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single
         }
         if (row.hasRegion && row.region !== existing.region) {
           updateData.region = row.region;
+        }
+        if (row.hasTeamCode && row.teamCode !== existing.teamCode) {
+          try {
+            updateData.teamCode = await resolveTeamCode(prisma, row.teamCode, { excludeId: existing.id });
+          } catch (err) {
+            results.skipped++;
+            results.errors.push({
+              row: row.rowNumber,
+              reason: err?.statusCode === 409
+                ? `「${row.name}」のチームID「${row.teamCode}」は既に使用されています`
+                : `「${row.name}」のチームIDの形式が不正です`,
+            });
+            continue;
+          }
         }
 
         if (Object.keys(updateData).length > 0) {
@@ -660,17 +741,28 @@ router.post('/teams/import-csv', authenticate, requireOperator, csvUpload.single
           results.errors.push({ row: row.rowNumber, reason: `「${row.name}」は変更がありません` });
         }
       } else {
-        const { hasDescription, hasLeague, hasRegion, rowNumber, ...newRow } = row;
-        newRowsTopLevel.push(newRow);
+        try {
+          await createTeamWithCodeRetry({
+            name: row.name,
+            description: row.description,
+            league: row.league,
+            region: row.region,
+            organizationId: row.organizationId,
+            status: row.status,
+          }, row.hasTeamCode ? row.teamCode : null);
+          results.success++;
+        } catch (err) {
+          results.skipped++;
+          const reason = (err?.statusCode === 409 || isTeamCodeP2002(err))
+            ? `「${row.name}」のチームID「${row.teamCode || ''}」は既に使用されています`
+            : err?.statusCode === 400
+              ? `「${row.name}」のチームIDの形式が不正です`
+              : err?.code === 'P2002'
+                ? `「${row.name}」は既に登録されています`
+                : `「${row.name}」の登録に失敗しました`;
+          results.errors.push({ row: row.rowNumber, reason });
+        }
       }
-    }
-
-    if (newRowsTopLevel.length > 0) {
-      const created = await prisma.team.createMany({
-        data: newRowsTopLevel,
-        skipDuplicates: true,
-      });
-      results.success += created.count;
     }
 
     const messageParts = [];

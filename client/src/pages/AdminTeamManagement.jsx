@@ -452,7 +452,7 @@ export default function AdminTeamManagement() {
 
   const handleDownloadTemplate = () => {
     const bom = '\uFEFF';
-    const csv = bom + 'name,region\nサンプルチームA,東京都\nサンプルチームB,大阪府\n';
+    const csv = bom + 'name,region,teamCode\nサンプルチームA,東京都,FCV-U15\nサンプルチームB,大阪府,\n';
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -473,10 +473,12 @@ export default function AdminTeamManagement() {
   }, [teams]);
 
   const filteredTeams = teams.filter(team => {
-    const matchesSearch = team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      team.representativeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      team.league?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      team.region?.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = team.name.toLowerCase().includes(q) ||
+      team.teamCode?.toLowerCase().includes(q) ||
+      team.representativeName?.toLowerCase().includes(q) ||
+      team.league?.toLowerCase().includes(q) ||
+      team.region?.toLowerCase().includes(q);
     const matchesLeague = !leagueFilter || team.league === leagueFilter;
     const matchesRegion = !regionFilter || team.region === regionFilter;
     return matchesSearch && matchesLeague && matchesRegion;
@@ -538,7 +540,7 @@ export default function AdminTeamManagement() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="チームを検索..."
+                  placeholder="チーム名・ID・代表者・リーグ・地域で検索..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full sm:w-auto pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
@@ -1113,8 +1115,8 @@ export default function AdminTeamManagement() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-700">
               <p className="font-medium mb-1">CSVフォーマット</p>
               <p>以下のヘッダー形式でCSVファイルを作成してください：</p>
-              <code className="block mt-1 bg-blue-100 px-2 py-1 rounded text-xs font-mono">name,region</code>
-              <p className="mt-1 text-xs text-blue-600">※「name/team/チーム名」「region/拠点地域/地域」ヘッダーに対応。文字コードはUTF-8で保存してください。</p>
+              <code className="block mt-1 bg-blue-100 px-2 py-1 rounded text-xs font-mono">name,region,teamCode</code>
+              <p className="mt-1 text-xs text-blue-600">※「name/team/チーム名」「region/拠点地域/地域」「teamCode/チームID/コード」ヘッダーに対応。teamCode列は省略可（空欄なら自動採番）。文字コードはUTF-8で保存してください。</p>
             </div>
 
             <button
@@ -1200,7 +1202,24 @@ export default function AdminTeamManagement() {
                       <div key={row.rowNumber} className="p-3 text-sm">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
-                            <p className="font-medium text-gray-900 truncate">{row.name}</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium text-gray-900 truncate">{row.name}</p>
+                              {row.teamCode && (
+                                <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${row.codeConflict ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+                                  {row.teamCode}
+                                </span>
+                              )}
+                              {row.status === 'update' && row.existingTeamCode && !row.teamCode && (
+                                <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-gray-50 text-gray-500">{row.existingTeamCode}</span>
+                              )}
+                            </div>
+                            {row.codeConflict && (
+                              <p className="text-xs text-red-600 mt-0.5">
+                                {row.codeConflict.duplicateInCsv
+                                  ? `※ チームID「${row.teamCode}」がCSV内で重複しています`
+                                  : `※ チームID「${row.teamCode}」は既に${row.codeConflict.sameOrg === false ? '別の組織の' : ''}「${row.codeConflict.teamName}」が使用中です`}
+                              </p>
+                            )}
                             <p className="text-xs text-gray-500">
                               {row.status === 'update' && '既存チームを更新'}
                               {row.status === 'new' && !isMerge && '新規チームとして登録'}
