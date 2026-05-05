@@ -112,6 +112,7 @@ model TeamInvitation {
 model User {
   id             String    @id @default(uuid())
   email          String    @unique
+  userCode       String?   @unique
   password       String
   name           String
   avatarUrl      String?

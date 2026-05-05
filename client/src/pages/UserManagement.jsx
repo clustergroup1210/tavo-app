@@ -187,7 +187,12 @@ export default function UserManagement() {
                     <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
                       <UserCircle className="w-6 h-6 text-gray-400" />
                     </div>
-                    <span className="font-medium text-gray-900">{user.name}</span>
+                    <div>
+                      <span className="font-medium text-gray-900 block">{user.name}</span>
+                      {user.userCode && (
+                        <span className="text-xs text-gray-500 font-mono">{user.userCode}</span>
+                      )}
+                    </div>
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

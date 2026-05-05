@@ -107,9 +107,22 @@ router.post('/:token/activate', async (req, res) => {
         throw err;
       }
 
-      const user = await tx.user.create({
-        data: { name: name.trim(), email: trimmedEmail, password: hashedPassword },
-      });
+      const { resolveUserCode } = require('../services/userCode');
+      let user;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          const userCode = await resolveUserCode(tx, null);
+          user = await tx.user.create({
+            data: { name: name.trim(), email: trimmedEmail, password: hashedPassword, userCode },
+          });
+          break;
+        } catch (err) {
+          const isUserCodeConflict = err?.code === 'P2002' &&
+            (Array.isArray(err.meta?.target) ? err.meta.target.includes('userCode') : String(err.meta?.target || '').includes('userCode'));
+          if (isUserCodeConflict && attempt < 4) continue;
+          throw err;
+        }
+      }
 
       await tx.userTeam.create({
         data: { userId: user.id, teamId: invitation.teamId, role: 'TEAM_MANAGER' },

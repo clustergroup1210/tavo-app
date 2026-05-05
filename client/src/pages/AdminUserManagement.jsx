@@ -21,6 +21,7 @@ export default function AdminUserManagement() {
     name: '',
     email: '',
     password: '',
+    userCode: '',
     role: '',
     teamId: '',
     teamRole: '',
@@ -30,6 +31,7 @@ export default function AdminUserManagement() {
     name: '',
     email: '',
     password: '',
+    userCode: '',
     organizationRole: '',
     teamRoles: [],
   });
@@ -137,7 +139,7 @@ export default function AdminUserManagement() {
       });
       if (res.ok) {
         setShowCreateModal(false);
-        setNewUser({ name: '', email: '', password: '', role: '', teamId: '', teamRole: '', playerId: '' });
+        setNewUser({ name: '', email: '', password: '', userCode: '', role: '', teamId: '', teamRole: '', playerId: '' });
         fetchUsers();
       } else {
         const data = await res.json();
@@ -228,6 +230,7 @@ export default function AdminUserManagement() {
       name: user.name || '',
       email: user.email || '',
       password: '',
+      userCode: user.userCode || '',
       organizationRole: orgRole,
       teamRoles: teamRolesData,
     });
@@ -244,6 +247,7 @@ export default function AdminUserManagement() {
         name: editForm.name,
         email: editForm.email,
         password: editForm.password || undefined,
+        userCode: editForm.userCode?.trim() ? editForm.userCode.trim() : undefined,
         organizationRole: editForm.organizationRole || null,
         teamRoles: editForm.teamRoles.map(tr => ({
           teamId: tr.teamId,
@@ -261,7 +265,7 @@ export default function AdminUserManagement() {
       if (res.ok) {
         setShowEditModal(false);
         setEditingUser(null);
-        setEditForm({ name: '', email: '', password: '', organizationRole: '', teamRoles: [] });
+        setEditForm({ name: '', email: '', password: '', userCode: '', organizationRole: '', teamRoles: [] });
         fetchUsers();
       } else {
         const data = await res.json();
@@ -307,8 +311,10 @@ export default function AdminUserManagement() {
   };
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = user.name?.toLowerCase().includes(q) ||
+      user.email?.toLowerCase().includes(q) ||
+      user.userCode?.toLowerCase().includes(q);
     
     const teamIds = getTeamIdsWithDescendants(teamFilter);
     const matchesTeam = !teamIds || 
@@ -514,7 +520,12 @@ export default function AdminUserManagement() {
                                 {user.name?.charAt(0) || 'U'}
                               </span>
                             </div>
-                            <p className="font-medium text-gray-900">{user.name}</p>
+                            <div className="min-w-0">
+                              <p className="font-medium text-gray-900">{user.name}</p>
+                              {user.userCode && (
+                                <p className="text-xs text-gray-500 font-mono">{user.userCode}</p>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
@@ -599,6 +610,9 @@ export default function AdminUserManagement() {
                         </div>
                         <div className="min-w-0">
                           <p className="font-medium text-gray-900 truncate">{user.name}</p>
+                          {user.userCode && (
+                            <p className="text-xs text-gray-500 font-mono truncate">{user.userCode}</p>
+                          )}
                           <p className="text-xs text-gray-500 truncate">{user.email}</p>
                         </div>
                       </div>
@@ -807,6 +821,18 @@ export default function AdminUserManagement() {
                     required
                   />
                   <p className="text-xs text-gray-500 mt-1">6文字以上</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ユーザーID</label>
+                  <input
+                    type="text"
+                    value={newUser.userCode}
+                    onChange={(e) => setNewUser({ ...newUser, userCode: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                    placeholder="例: U-000123（空欄なら自動採番）"
+                    maxLength={32}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">半角英数・ハイフン・アンダースコア（2〜32文字）。空欄なら自動採番</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">運営役割</label>
@@ -1058,6 +1084,18 @@ export default function AdminUserManagement() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   required
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">ユーザーID</label>
+                <input
+                  type="text"
+                  value={editForm.userCode}
+                  onChange={(e) => setEditForm({ ...editForm, userCode: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono"
+                  placeholder="例: U-000123"
+                  maxLength={32}
+                />
+                <p className="text-xs text-gray-500 mt-1">半角英数・ハイフン・アンダースコア（2〜32文字）。空欄のまま保存すると現在の値を維持</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">新しいパスワード（変更する場合のみ）</label>

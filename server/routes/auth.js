@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const { authenticate, getUserRoles, JWT_SECRET } = require('../middleware/auth');
+const { resolveUserCode } = require('../services/userCode');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -18,9 +19,21 @@ router.post('/register', async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await prisma.user.create({
-      data: { email, password: hashedPassword, name }
-    });
+    let user;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const userCode = await resolveUserCode(prisma, null);
+        user = await prisma.user.create({
+          data: { email, password: hashedPassword, name, userCode }
+        });
+        break;
+      } catch (err) {
+        const isUserCodeConflict = err?.code === 'P2002' &&
+          (Array.isArray(err.meta?.target) ? err.meta.target.includes('userCode') : String(err.meta?.target || '').includes('userCode'));
+        if (isUserCodeConflict && attempt < 4) continue;
+        throw err;
+      }
+    }
 
     if (invitationToken) {
       const invitation = await prisma.invitation.findFirst({

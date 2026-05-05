@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { PrismaClient } = require('@prisma/client');
 const { authenticate, hasTeamAccess } = require('../middleware/auth');
+const { resolveUserCode } = require('../services/userCode');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -31,6 +32,7 @@ router.get('/', authenticate, async (req, res) => {
       return res.json(users.map(u => ({
         id: u.id,
         email: u.email,
+        userCode: u.userCode,
         name: u.name,
         avatarUrl: u.avatarUrl,
         organizations: u.organizations,
@@ -72,6 +74,7 @@ router.get('/', authenticate, async (req, res) => {
     res.json(users.map(u => ({
       id: u.id,
       email: u.email,
+      userCode: u.userCode,
       name: u.name,
       avatarUrl: u.avatarUrl,
       organizations: u.organizations,
@@ -88,7 +91,7 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Operator access required' });
     }
 
-    const { name, email, password, role, teamId, teamRole, playerId } = req.body;
+    const { name, email, password, role, teamId, teamRole, playerId, userCode } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required' });
@@ -117,11 +120,31 @@ router.post('/', authenticate, async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     
+    const userProvidedCode = userCode !== undefined && userCode !== null && String(userCode).trim() !== '';
     const userData = {
       name,
       email,
       password: hashedPassword
     };
+
+    const maxAttempts = userProvidedCode ? 1 : 5;
+    let resolvedCode;
+    let lastErr;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        resolvedCode = await resolveUserCode(prisma, userProvidedCode ? userCode : null);
+        break;
+      } catch (e) {
+        lastErr = e;
+        if (e.statusCode === 400 || e.statusCode === 409) {
+          return res.status(e.statusCode).json({ error: e.message });
+        }
+      }
+    }
+    if (!resolvedCode) {
+      return res.status(500).json({ error: lastErr?.message || 'ユーザーIDの生成に失敗しました' });
+    }
+    userData.userCode = resolvedCode;
 
     if (isOperatorRole) {
       const operatorOrg = req.user.organizations?.find(o => 
@@ -155,19 +178,38 @@ router.post('/', authenticate, async (req, res) => {
       };
     }
 
-    const user = await prisma.user.create({
-      data: userData,
-      include: {
-        organizations: true,
-        teams: { include: { team: true } },
-        parentPlayers: { include: { player: true } }
+    let user;
+    const createMaxAttempts = userProvidedCode ? 1 : 5;
+    for (let attempt = 0; attempt < createMaxAttempts; attempt++) {
+      try {
+        user = await prisma.user.create({
+          data: userData,
+          include: {
+            organizations: true,
+            teams: { include: { team: true } },
+            parentPlayers: { include: { player: true } }
+          }
+        });
+        break;
+      } catch (err) {
+        const isUserCodeConflict = err?.code === 'P2002' &&
+          (Array.isArray(err.meta?.target) ? err.meta.target.includes('userCode') : String(err.meta?.target || '').includes('userCode'));
+        if (isUserCodeConflict && !userProvidedCode && attempt < createMaxAttempts - 1) {
+          userData.userCode = await resolveUserCode(prisma, null);
+          continue;
+        }
+        if (isUserCodeConflict) {
+          return res.status(409).json({ error: '指定されたユーザーIDは既に使用されています' });
+        }
+        throw err;
       }
-    });
+    }
 
     res.status(201).json({
       id: user.id,
       name: user.name,
       email: user.email,
+      userCode: user.userCode,
       organizations: user.organizations,
       teams: user.teams,
       parentPlayers: user.parentPlayers,
@@ -246,7 +288,7 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Operator access required' });
     }
 
-    const { name, email, password, organizationRole, teamRoles } = req.body;
+    const { name, email, password, organizationRole, teamRoles, userCode } = req.body;
     const userId = req.params.id;
 
     const existingUser = await prisma.user.findUnique({
@@ -278,6 +320,13 @@ router.put('/:id', authenticate, async (req, res) => {
         return res.status(400).json({ error: 'パスワードは6文字以上である必要があります' });
       }
       updateData.password = await bcrypt.hash(password, 10);
+    }
+    if (userCode !== undefined && userCode !== null && String(userCode).trim() !== '') {
+      try {
+        updateData.userCode = await resolveUserCode(prisma, userCode, { excludeId: userId });
+      } catch (e) {
+        return res.status(e.statusCode || 500).json({ error: e.message || 'ユーザーIDの解決に失敗しました' });
+      }
     }
 
     await prisma.$transaction(async (tx) => {
@@ -363,6 +412,7 @@ router.put('/:id', authenticate, async (req, res) => {
     res.json({
       id: user.id,
       email: user.email,
+      userCode: user.userCode,
       name: user.name,
       avatarUrl: user.avatarUrl,
       organizations: user.organizations,
