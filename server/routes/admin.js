@@ -77,6 +77,7 @@ router.get('/teams', authenticate, requireOperator, async (req, res) => {
       return {
         id: team.id,
         name: team.name,
+        teamCode: team.teamCode,
         logoUrl: team.logoUrl,
         league: team.league,
         region: team.region,
@@ -172,11 +173,19 @@ router.get('/teams/:id', authenticate, requireOperator, async (req, res) => {
 
 router.put('/teams/:id', authenticate, requireOperator, async (req, res) => {
   try {
-    const { name, league, region } = req.body;
+    const { name, league, region, teamCode } = req.body;
     const updateData = {};
     if (name !== undefined) updateData.name = name;
     if (league !== undefined) updateData.league = league?.trim() || null;
     if (region !== undefined) updateData.region = region?.trim() || null;
+    if (teamCode !== undefined && teamCode !== null && String(teamCode).trim() !== '') {
+      const { resolveTeamCode } = require('../services/teamCode');
+      try {
+        updateData.teamCode = await resolveTeamCode(prisma, teamCode, { excludeId: req.params.id });
+      } catch (e) {
+        return res.status(e.statusCode || 500).json({ error: e.message || 'チームIDの解決に失敗しました' });
+      }
+    }
     const team = await prisma.team.update({
       where: { id: req.params.id },
       data: updateData

@@ -157,7 +157,8 @@ router.get('/:id', authenticate, async (req, res) => {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { name, organizationId, description, parentId, league, region } = req.body;
+    const { name, organizationId, description, parentId, league, region, teamCode } = req.body;
+    const { resolveTeamCode } = require('../services/teamCode');
 
     let orgId = organizationId;
 
@@ -194,9 +195,37 @@ router.post('/', authenticate, async (req, res) => {
       }
     }
 
-    const team = await prisma.team.create({
-      data: { name, organizationId: orgId, description, parentId: parentId || null, league: league?.trim() || null, region: region?.trim() || null }
-    });
+    const userProvidedCode = teamCode !== undefined && teamCode !== null && String(teamCode).trim() !== '';
+    const maxAttempts = userProvidedCode ? 1 : 5;
+    let team;
+    let lastError;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      let resolvedCode;
+      try {
+        resolvedCode = await resolveTeamCode(prisma, teamCode);
+      } catch (e) {
+        return res.status(e.statusCode || 500).json({ error: e.message || 'チームIDの解決に失敗しました' });
+      }
+      try {
+        team = await prisma.team.create({
+          data: { name, organizationId: orgId, description, parentId: parentId || null, league: league?.trim() || null, region: region?.trim() || null, teamCode: resolvedCode }
+        });
+        break;
+      } catch (e) {
+        if (e?.code === 'P2002' && Array.isArray(e?.meta?.target) && e.meta.target.includes('teamCode')) {
+          if (userProvidedCode) {
+            return res.status(409).json({ error: '指定されたチームIDは既に使用されています' });
+          }
+          lastError = e;
+          continue;
+        }
+        throw e;
+      }
+    }
+    if (!team) {
+      console.error('Auto-generated team code conflict after retries:', lastError);
+      return res.status(503).json({ error: 'チームIDの発行に失敗しました。もう一度お試しください' });
+    }
 
     await prisma.userTeam.create({
       data: { userId: req.user.id, teamId: team.id, role: 'TEAM_MANAGER' }

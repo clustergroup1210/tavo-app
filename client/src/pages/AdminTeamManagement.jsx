@@ -13,6 +13,7 @@ export default function AdminTeamManagement() {
   const [newTeamName, setNewTeamName] = useState('');
   const [newTeamLeague, setNewTeamLeague] = useState('');
   const [newTeamRegion, setNewTeamRegion] = useState('');
+  const [newTeamCode, setNewTeamCode] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -25,6 +26,7 @@ export default function AdminTeamManagement() {
   const [editTeamName, setEditTeamName] = useState('');
   const [editTeamLeague, setEditTeamLeague] = useState('');
   const [editTeamRegion, setEditTeamRegion] = useState('');
+  const [editTeamCode, setEditTeamCode] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [deleteConfirmPassword, setDeleteConfirmPassword] = useState('');
@@ -179,6 +181,7 @@ export default function AdminTeamManagement() {
     setNewTeamName('');
     setNewTeamLeague('');
     setNewTeamRegion('');
+    setNewTeamCode('');
     setSuggestedParents([]);
     setSelectedParentId('');
   };
@@ -222,6 +225,7 @@ export default function AdminTeamManagement() {
           league: newTeamLeague || undefined,
           region: newTeamRegion || undefined,
           parentId: selectedParentId || undefined,
+          teamCode: newTeamCode.trim() || undefined,
         }),
       });
       if (res.status === 401) {
@@ -254,6 +258,7 @@ export default function AdminTeamManagement() {
     setEditTeamName(team.name);
     setEditTeamLeague(team.league || '');
     setEditTeamRegion(team.region || '');
+    setEditTeamCode(team.teamCode || '');
     setShowEditModal(true);
     setOpenMenuId(null);
   };
@@ -275,7 +280,7 @@ export default function AdminTeamManagement() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name: editTeamName, league: editTeamLeague, region: editTeamRegion }),
+        body: JSON.stringify({ name: editTeamName, league: editTeamLeague, region: editTeamRegion, ...(editTeamCode.trim() ? { teamCode: editTeamCode.trim() } : {}) }),
       });
       if (res.status === 401) {
         handleAuthError();
@@ -620,9 +625,14 @@ export default function AdminTeamManagement() {
                             <Building2 className="w-5 h-5 text-gray-400" />
                           </div>
                         )}
-                        <div>
+                        <div className="min-w-0">
                           <p className="font-medium text-gray-900">{team.name}</p>
-                          <p className="text-sm text-gray-500">{team.organization?.name}</p>
+                          <div className="flex items-center gap-2 text-xs">
+                            {team.teamCode && (
+                              <span className="font-mono text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">{team.teamCode}</span>
+                            )}
+                            <span className="text-gray-500 truncate">{team.organization?.name}</span>
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -723,7 +733,12 @@ export default function AdminTeamManagement() {
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 truncate">{team.name}</p>
-                    <p className="text-xs text-gray-500">{team.organization?.name}</p>
+                    <div className="flex items-center gap-2 text-xs">
+                      {team.teamCode && (
+                        <span className="font-mono text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">{team.teamCode}</span>
+                      )}
+                      <span className="text-gray-500 truncate">{team.organization?.name}</span>
+                    </div>
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
                       {team.status === 'PENDING' ? (
                         <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-xs font-medium">仮登録</span>
@@ -801,6 +816,18 @@ export default function AdminTeamManagement() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     required
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">チームID</label>
+                  <input
+                    type="text"
+                    placeholder="例: FCV-U15（未入力の場合は自動採番）"
+                    value={newTeamCode}
+                    onChange={(e) => setNewTeamCode(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                    maxLength={32}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">半角英数・ハイフン・アンダースコアで2〜32文字。空欄なら自動採番（T-XXXXXX）。</p>
                 </div>
 
                 {suggestedParents.length > 0 && (
@@ -917,6 +944,18 @@ export default function AdminTeamManagement() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     required
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">チームID</label>
+                  <input
+                    type="text"
+                    value={editTeamCode}
+                    onChange={(e) => setEditTeamCode(e.target.value)}
+                    placeholder="例: FCV-U15"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                    maxLength={32}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">半角英数・ハイフン・アンダースコアで2〜32文字。</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">リーグ</label>

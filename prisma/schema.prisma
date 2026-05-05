@@ -57,6 +57,7 @@ model Organization {
 
 model Team {
   id             String   @id @default(uuid())
+  teamCode       String?  @unique
   organizationId String
   parentId       String?
   name           String
