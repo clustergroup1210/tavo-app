@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   UserCircle, Upload, Link2, TrendingUp, Video, ClipboardList, Edit2, Save, X,
   Calendar, Ruler, Weight, MapPin, GraduationCap, Users, Footprints, MessageSquare, Send, Trash2,
-  Star, Zap, Target, BookOpen, MessageCircle
+  Star, Zap, Target, BookOpen, MessageCircle, User as UserIcon, Settings
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -411,6 +411,7 @@ export default function PlayerDetail() {
   };
 
   const tabs = [
+    { id: 'profile', label: 'プロフィール', icon: UserIcon },
     { id: 'evaluation', label: '評価データ', icon: ClipboardList },
     { id: 'mentoring', label: 'メンタリング', icon: BookOpen },
     { id: 'tasks', label: '課題', icon: Target },
@@ -418,6 +419,7 @@ export default function PlayerDetail() {
     { id: 'notes', label: 'コメント/ノート', icon: MessageSquare },
     { id: 'progress', label: '上達状況', icon: TrendingUp },
     { id: 'appeal', label: 'アピール', icon: Link2 },
+    ...(isCoachOrAdmin ? [{ id: 'settings', label: '設定・連携', icon: Settings }] : []),
   ];
 
   return (
@@ -795,58 +797,33 @@ export default function PlayerDetail() {
         </div>
       )}
 
-      {isCoachOrAdmin && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Link2 className="w-5 h-5 text-primary-500" />
-            アカウント紐付け
-          </h2>
-          {player?.user ? (
-            <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div>
-                <p className="text-sm text-green-700 font-medium">紐付け済み</p>
-                <p className="text-sm text-green-600">{player.user.email}</p>
-              </div>
+      <div className="border-b border-gray-200 -mx-4 px-4 lg:-mx-8 lg:px-8">
+        <nav className="flex gap-1 sm:gap-6 overflow-x-auto scrollbar-hide -mb-px">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
               <button
-                onClick={handleUnlinkUser}
-                disabled={linkingUser}
-                className="px-4 py-2 text-sm text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-1.5 sm:gap-2 py-3 px-2 sm:px-0 border-b-2 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
               >
-                解除
+                <Icon className="w-4 h-4" />
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="sm:hidden">{tab.label.length > 4 ? tab.label.substring(0, 4) : tab.label}</span>
               </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-600">
-                この選手にログインアカウントを紐付けると、選手本人がマイページで評価データを確認できるようになります。
-              </p>
-              <div className="flex gap-2">
-                <input
-                  type="email"
-                  value={linkEmail}
-                  onChange={(e) => setLinkEmail(e.target.value)}
-                  placeholder="ユーザーのメールアドレス"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
-                <button
-                  onClick={handleLinkUser}
-                  disabled={linkingUser || !linkEmail.trim()}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
-                >
-                  {linkingUser ? '処理中...' : '紐付ける'}
-                </button>
-              </div>
-              {linkError && (
-                <p className="text-sm text-red-600">{linkError}</p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+            );
+          })}
+        </nav>
+      </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">基本情報</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      {activeTab === 'profile' && (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+        <h2 className="text-base md:text-lg font-semibold text-gray-900 mb-3 md:mb-4">基本情報</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-4">
           <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
             <Calendar className="w-5 h-5 text-primary-500 mt-0.5" />
             <div>
