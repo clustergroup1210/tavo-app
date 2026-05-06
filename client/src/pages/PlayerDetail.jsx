@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -40,6 +40,8 @@ export default function PlayerDetail() {
   const [comparisonMode, setComparisonMode] = useState('round');
   const [comparisonRoundId, setComparisonRoundId] = useState('');
   const [availableRounds, setAvailableRounds] = useState([]);
+  const touchStartRef = useRef(null);
+  const tabNavRef = useRef(null);
 
   useEffect(() => {
     fetchPlayer();
@@ -410,6 +412,33 @@ export default function PlayerDetail() {
     FW: 'bg-red-500'
   };
 
+  const handleTouchStart = (e) => {
+    if (e.touches.length !== 1) {
+      touchStartRef.current = null;
+      return;
+    }
+    const t = e.touches[0];
+    touchStartRef.current = { x: t.clientX, y: t.clientY, time: Date.now() };
+  };
+
+  const handleTouchEnd = (e) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    const dt = Date.now() - start.time;
+    if (Math.abs(dx) < 60 || Math.abs(dy) > 50 || dt > 600) return;
+    const idx = tabs.findIndex(tb => tb.id === activeTab);
+    if (idx === -1) return;
+    if (dx < 0 && idx < tabs.length - 1) {
+      setActiveTab(tabs[idx + 1].id);
+    } else if (dx > 0 && idx > 0) {
+      setActiveTab(tabs[idx - 1].id);
+    }
+  };
+
   const tabs = [
     { id: 'profile', label: 'プロフィール', icon: UserIcon },
     { id: 'evaluation', label: '評価データ', icon: ClipboardList },
@@ -423,7 +452,11 @@ export default function PlayerDetail() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div
+      className="space-y-6"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       <div className="bg-gradient-to-r from-primary-600 to-primary-800 rounded-2xl shadow-lg p-4 md:p-6 text-white">
         <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
           <div className="flex items-start gap-3 md:gap-4 md:flex-col md:items-stretch md:flex-shrink-0">
@@ -798,15 +831,26 @@ export default function PlayerDetail() {
       )}
 
       <div className="border-b border-gray-200 -mx-4 px-4 lg:-mx-8 lg:px-8">
-        <nav className="flex gap-1 sm:gap-6 overflow-x-auto scrollbar-hide -mb-px">
+        <nav ref={tabNavRef} className="flex gap-1 sm:gap-6 overflow-x-auto scrollbar-hide -mb-px">
           {tabs.map((tab) => {
             const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
+                ref={(el) => {
+                  if (isActive && el && tabNavRef.current) {
+                    const nav = tabNavRef.current;
+                    const elLeft = el.offsetLeft;
+                    const elRight = elLeft + el.offsetWidth;
+                    if (elLeft < nav.scrollLeft || elRight > nav.scrollLeft + nav.clientWidth) {
+                      nav.scrollTo({ left: elLeft - 16, behavior: 'smooth' });
+                    }
+                  }
+                }}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-1.5 sm:gap-2 py-3 px-2 sm:px-0 border-b-2 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
+                  isActive
                     ? 'border-primary-600 text-primary-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
