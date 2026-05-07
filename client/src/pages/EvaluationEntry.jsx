@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Save, Plus, X, Calendar, CheckCircle, HelpCircle, Trash2, Edit3, ChevronLeft, ChevronRight, ChevronDown, Users } from 'lucide-react';
 import clsx from 'clsx';
@@ -23,6 +24,7 @@ const getScoreBg = (score) => {
 
 export default function EvaluationEntry() {
   const { currentTeam, user, isCoach, isPlayer, isParent, playerData } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [players, setPlayers] = useState([]);
   const [evaluableInfo, setEvaluableInfo] = useState({ all: true, playerIds: [] });
   const [teamCategories, setTeamCategories] = useState([]);
@@ -52,6 +54,13 @@ export default function EvaluationEntry() {
       setSelectedPlayer(playerData.id);
     }
   }, [playerData]);
+
+  useEffect(() => {
+    const pid = searchParams.get('playerId');
+    if (pid && !isPlayer()) {
+      setSelectedPlayer(pid);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (currentTeam || (isPlayer() && playerData)) {

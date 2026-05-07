@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   UserCircle, Upload, Link2, TrendingUp, Video, ClipboardList, Edit2, Save, X,
@@ -566,15 +566,26 @@ export default function PlayerDetail() {
             </div>
           </div>
 
-          {canEdit && !editing && (
-            <button
-              onClick={startEditing}
-              className="md:flex-shrink-0 inline-flex items-center justify-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors backdrop-blur-sm text-sm self-end md:self-auto"
-            >
-              <Edit2 className="w-4 h-4" />
-              編集
-            </button>
-          )}
+          <div className="flex items-center gap-2 self-end md:self-auto md:flex-shrink-0">
+            {isCoachOrAdmin && (
+              <Link
+                to={`/evaluations/entry?playerId=${player.id}`}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 md:px-4 md:py-2 bg-white text-primary-700 hover:bg-primary-50 rounded-lg transition-colors text-sm font-semibold shadow-sm"
+              >
+                <ClipboardList className="w-4 h-4" />
+                評価入力
+              </Link>
+            )}
+            {canEdit && !editing && (
+              <button
+                onClick={startEditing}
+                className="inline-flex items-center justify-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors backdrop-blur-sm text-sm"
+              >
+                <Edit2 className="w-4 h-4" />
+                編集
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
