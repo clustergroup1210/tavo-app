@@ -14,6 +14,24 @@ const eventTypeColors = {
   other: { bg: 'bg-gray-400', light: 'bg-gray-100 text-gray-700', border: 'border-gray-400', dot: 'bg-gray-400' }
 };
 
+const COLOR_PRESETS = [
+  { value: '#22c55e', name: 'グリーン' },
+  { value: '#ef4444', name: 'レッド' },
+  { value: '#a855f7', name: 'パープル' },
+  { value: '#3b82f6', name: 'ブルー' },
+  { value: '#f59e0b', name: 'アンバー' },
+  { value: '#ec4899', name: 'ピンク' },
+  { value: '#14b8a6', name: 'ティール' },
+  { value: '#6b7280', name: 'グレー' }
+];
+
+const RECURRENCE_OPTIONS = [
+  { value: 'none', label: '繰り返さない' },
+  { value: 'daily', label: '毎日' },
+  { value: 'weekly', label: '毎週' },
+  { value: 'monthly', label: '毎月' }
+];
+
 const eventTypeLabels = {
   event: 'イベント',
   practice: '練習',
@@ -46,16 +64,19 @@ function EventPill({ event, compact = false, onClick }) {
   const startDate = new Date(event.startDate);
   const timeStr = event.allDay ? '' : `${startDate.getHours()}時`;
   const typeLabel = eventTypeLabels[event.eventType] || '';
-  
+  const customStyle = event.color ? { backgroundColor: event.color } : undefined;
+
   return (
-    <div 
+    <div
       onClick={(e) => { e.stopPropagation(); onClick?.(event); }}
-      className={`${colors.bg} text-white text-[10px] sm:text-[11px] leading-tight px-1.5 py-0.5 rounded truncate cursor-pointer hover:opacity-90 transition-opacity`}
+      style={customStyle}
+      className={`${event.color ? '' : colors.bg} text-white text-[10px] sm:text-[11px] leading-tight px-1.5 py-0.5 rounded truncate cursor-pointer hover:opacity-90 transition-opacity`}
     >
       {!compact && timeStr && <span className="font-medium">{timeStr} </span>}
       {!compact && typeLabel && <span className="opacity-80">{typeLabel}</span>}
       {!compact && ' '}
       <span>{event.title}</span>
+      {event.seriesId && <span className="ml-1 opacity-70">↻</span>}
     </div>
   );
 }
@@ -230,10 +251,12 @@ function EventDetailModal({ event, onClose, onEdit, onDelete, canEdit }) {
 
 function EventListItem({ event, onClick }) {
   const colors = eventTypeColors[event.eventType] || eventTypeColors.event;
+  const borderStyle = event.color ? { borderLeftColor: event.color } : undefined;
   return (
     <div
       onClick={() => onClick(event)}
-      className={`flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors border-l-[3px] ${colors.border} cursor-pointer`}
+      style={borderStyle}
+      className={`flex items-start gap-3 px-5 py-3 hover:bg-gray-50 transition-colors border-l-[3px] ${event.color ? '' : colors.border} cursor-pointer`}
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -293,7 +316,10 @@ export default function Calendar() {
     allDay: false,
     eventType: 'event',
     location: '',
-    categoryIds: []
+    categoryIds: [],
+    color: '',
+    repeatFreq: 'none',
+    repeatUntil: ''
   });
 
   const currentTeamId = currentTeam?.id;
@@ -485,7 +511,10 @@ export default function Calendar() {
       allDay: false,
       eventType: canCreate ? 'event' : 'personal',
       location: '',
-      categoryIds: []
+      categoryIds: [],
+      color: '',
+      repeatFreq: 'none',
+      repeatUntil: ''
     });
     setShowModal(true);
   };
@@ -504,7 +533,10 @@ export default function Calendar() {
       allDay: event.allDay,
       eventType: event.eventType,
       location: event.location || '',
-      categoryIds: event.categoryTargets?.map(ct => ct.teamCategoryId) || []
+      categoryIds: event.categoryTargets?.map(ct => ct.teamCategoryId) || [],
+      color: event.color || '',
+      repeatFreq: 'none',
+      repeatUntil: ''
     });
     setShowModal(true);
   };
@@ -535,18 +567,31 @@ export default function Calendar() {
         eventType: form.eventType,
         location: form.location,
         categoryIds: isPersonalEvent ? [] : form.categoryIds,
-        isPersonal: isPersonalEvent
+        isPersonal: isPersonalEvent,
+        color: form.color || null
       };
 
       let res;
       if (editingEvent) {
-        res = await fetch(`/api/calendar/${editingEvent.id}`, {
+        let scope = '';
+        if (editingEvent.seriesId) {
+          const applyAll = confirm('この予定は繰り返し予定の一部です。\nOK：シリーズ全体に変更を適用\nキャンセル：この予定のみ変更');
+          scope = applyAll ? '?scope=series' : '';
+        }
+        res = await fetch(`/api/calendar/${editingEvent.id}${scope}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify(payload)
         });
       } else {
+        if (form.repeatFreq !== 'none') {
+          if (!form.repeatUntil) {
+            alert('繰り返しの終了日を設定してください');
+            return;
+          }
+          payload.recurrence = { freq: form.repeatFreq, until: form.repeatUntil };
+        }
         res = await fetch('/api/calendar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -570,9 +615,17 @@ export default function Calendar() {
   };
 
   const handleDelete = async (eventId) => {
-    if (!confirm('このイベントを削除しますか？')) return;
+    const target = events.find(e => e.id === eventId);
+    let scope = '';
+    if (target?.seriesId) {
+      const choice = confirm('繰り返し予定です。\nOK：シリーズ全体を削除\nキャンセル：この予定のみ削除');
+      if (choice) scope = '?scope=series';
+      else if (!confirm('この予定のみを削除しますか？')) return;
+    } else {
+      if (!confirm('このイベントを削除しますか？')) return;
+    }
     try {
-      await fetch(`/api/calendar/${eventId}`, {
+      await fetch(`/api/calendar/${eventId}${scope}`, {
         method: 'DELETE',
         credentials: 'include'
       });
@@ -976,6 +1029,76 @@ export default function Calendar() {
                   placeholder="場所（任意）"
                 />
               </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-gray-500 mb-1.5">色</label>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, color: '' })}
+                    className={`px-2.5 py-1 text-[11px] rounded-full border transition-colors ${
+                      !form.color ? 'bg-gray-100 border-gray-400 text-gray-800 font-medium' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    既定
+                  </button>
+                  {COLOR_PRESETS.map(c => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      onClick={() => setForm({ ...form, color: c.value })}
+                      title={c.name}
+                      style={{ backgroundColor: c.value }}
+                      className={`w-7 h-7 rounded-full border-2 transition-transform ${
+                        form.color === c.value ? 'border-gray-900 scale-110' : 'border-white shadow-sm hover:scale-105'
+                      }`}
+                      aria-label={c.name}
+                    />
+                  ))}
+                  <input
+                    type="color"
+                    value={form.color || '#3b82f6'}
+                    onChange={(e) => setForm({ ...form, color: e.target.value })}
+                    className="w-7 h-7 rounded-full border border-gray-200 cursor-pointer p-0"
+                    aria-label="カスタム色"
+                  />
+                </div>
+              </div>
+
+              {!editingEvent && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="min-w-0">
+                    <label className="block text-[11px] font-medium text-gray-500 mb-1">繰り返し</label>
+                    <select
+                      value={form.repeatFreq}
+                      onChange={(e) => setForm({ ...form, repeatFreq: e.target.value })}
+                      className="w-full min-w-0 px-2 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                    >
+                      {RECURRENCE_OPTIONS.map(o => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {form.repeatFreq !== 'none' && (
+                    <div className="min-w-0">
+                      <label className="block text-[11px] font-medium text-gray-500 mb-1">繰り返し終了日</label>
+                      <input
+                        type="date"
+                        value={form.repeatUntil}
+                        onChange={(e) => setForm({ ...form, repeatUntil: e.target.value })}
+                        min={form.startDate}
+                        className="w-full min-w-0 px-2 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {editingEvent?.seriesId && (
+                <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-800">
+                  ↻ この予定は繰り返し予定の一部です。保存時に「この予定のみ」または「シリーズ全体」を選択できます。
+                </div>
+              )}
 
               <div>
                 <label className="block text-[11px] font-medium text-gray-500 mb-1">説明</label>

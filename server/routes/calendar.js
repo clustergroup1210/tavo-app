@@ -180,28 +180,69 @@ router.get('/personal', authenticate, async (req, res) => {
   }
 });
 
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+function generateRecurrenceDates(startDate, endDate, recurrence) {
+  if (!recurrence || !recurrence.freq || recurrence.freq === 'none') {
+    return [{ start: startDate, end: endDate }];
+  }
+  const freq = recurrence.freq;
+  if (!['daily', 'weekly', 'monthly'].includes(freq)) {
+    return [{ start: startDate, end: endDate }];
+  }
+  const until = recurrence.until ? new Date(recurrence.until) : null;
+  if (!until || isNaN(until.getTime())) {
+    return [{ start: startDate, end: endDate }];
+  }
+  until.setHours(23, 59, 59, 999);
+  if (until < startDate) {
+    return [{ start: startDate, end: endDate }];
+  }
+  const MAX_OCC = 366;
+  const out = [];
+  const durationMs = endDate ? (endDate.getTime() - startDate.getTime()) : 0;
+  let cursor = new Date(startDate);
+  while (cursor <= until && out.length < MAX_OCC) {
+    const s = new Date(cursor);
+    const e = endDate ? new Date(s.getTime() + durationMs) : null;
+    out.push({ start: s, end: e });
+    if (freq === 'daily') cursor.setDate(cursor.getDate() + 1);
+    else if (freq === 'weekly') cursor.setDate(cursor.getDate() + 7);
+    else if (freq === 'monthly') cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return out;
+}
+
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { teamId, organizationId, title, description, startDate, endDate, allDay, eventType, location, categoryIds, isPersonal } = req.body;
-    
+    const { teamId, organizationId, title, description, startDate, endDate, allDay, eventType, location, categoryIds, isPersonal, color, recurrence } = req.body;
+
+    const safeColor = (typeof color === 'string' && HEX_RE.test(color)) ? color : null;
+    const start = new Date(startDate);
+    const end = endDate ? new Date(endDate) : null;
+    const occurrences = generateRecurrenceDates(start, end, recurrence);
+    const seriesId = occurrences.length > 1 ? require('crypto').randomUUID() : null;
+
     if (isPersonal) {
-      const event = await prisma.calendarEvent.create({
-        data: {
-          title,
-          description,
-          startDate: new Date(startDate),
-          endDate: endDate ? new Date(endDate) : null,
-          allDay: allDay || false,
-          eventType: eventType || 'personal',
-          location,
-          isPersonal: true,
-          createdBy: req.user.id
-        },
-        include: {
-          author: { select: { id: true, name: true } }
-        }
-      });
-      return res.status(201).json(event);
+      const created = await prisma.$transaction(
+        occurrences.map(occ => prisma.calendarEvent.create({
+          data: {
+            title,
+            description,
+            startDate: occ.start,
+            endDate: occ.end,
+            allDay: allDay || false,
+            eventType: eventType || 'personal',
+            location,
+            isPersonal: true,
+            color: safeColor,
+            seriesId,
+            createdBy: req.user.id
+          },
+          include: { author: { select: { id: true, name: true } } }
+        }))
+      );
+      return res.status(201).json(created[0]);
     }
     
     const canCreate = teamId 
@@ -221,39 +262,43 @@ router.post('/', authenticate, async (req, res) => {
         return res.status(400).json({ error: 'Categories must belong to the same team' });
       }
     }
-    
-    const event = await prisma.calendarEvent.create({
-      data: {
-        teamId,
-        organizationId: organizationId || (isOperator(req.user) && !teamId ? req.user.organizations[0]?.organizationId : null),
-        title,
-        description,
-        startDate: new Date(startDate),
-        endDate: endDate ? new Date(endDate) : null,
-        allDay: allDay || false,
-        eventType: eventType || 'event',
-        location,
-        createdBy: req.user.id,
-        categoryTargets: categoryIds && categoryIds.length > 0 ? {
-          create: categoryIds.map(categoryId => ({ teamCategoryId: categoryId }))
-        } : undefined
-      },
-      include: {
-        team: { select: { id: true, name: true } },
-        author: { select: { id: true, name: true } },
-        categoryTargets: {
-          include: {
-            teamCategory: { select: { id: true, name: true } }
+
+    const orgIdResolved = organizationId || (isOperator(req.user) && !teamId ? req.user.organizations[0]?.organizationId : null);
+
+    const created = await prisma.$transaction(
+      occurrences.map(occ => prisma.calendarEvent.create({
+        data: {
+          teamId,
+          organizationId: orgIdResolved,
+          title,
+          description,
+          startDate: occ.start,
+          endDate: occ.end,
+          allDay: allDay || false,
+          eventType: eventType || 'event',
+          location,
+          color: safeColor,
+          seriesId,
+          createdBy: req.user.id,
+          categoryTargets: categoryIds && categoryIds.length > 0 ? {
+            create: categoryIds.map(categoryId => ({ teamCategoryId: categoryId }))
+          } : undefined
+        },
+        include: {
+          team: { select: { id: true, name: true } },
+          author: { select: { id: true, name: true } },
+          categoryTargets: {
+            include: { teamCategory: { select: { id: true, name: true } } }
           }
         }
-      }
-    });
-    
+      }))
+    );
+
     if (teamId) {
-      sendCalendarNotifications(teamId, event, req.user, categoryIds, 'created');
+      sendCalendarNotifications(teamId, created[0], req.user, categoryIds, 'created');
     }
-    
-    res.status(201).json(event);
+
+    res.status(201).json({ event: created[0], count: created.length, seriesId });
   } catch (error) {
     console.error('Create calendar event error:', error);
     res.status(500).json({ error: 'Failed to create calendar event' });
@@ -338,8 +383,10 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
     
-    const { title, description, startDate, endDate, allDay, eventType, location, categoryIds } = req.body;
-    
+    const { title, description, startDate, endDate, allDay, eventType, location, categoryIds, color } = req.body;
+    const scope = req.query.scope === 'series' && event.seriesId ? 'series' : 'single';
+    const safeColor = color === null ? null : (typeof color === 'string' && HEX_RE.test(color)) ? color : undefined;
+
     if (categoryIds !== undefined && event.teamId) {
       if (Array.isArray(categoryIds) && categoryIds.length > 0) {
         const categories = await prisma.teamCategory.findMany({
@@ -350,31 +397,59 @@ router.put('/:id', authenticate, async (req, res) => {
           return res.status(400).json({ error: 'Categories must belong to the same team' });
         }
       }
-      
+
+      const seriesScopeWhere = event.isPersonal
+        ? { seriesId: event.seriesId, isPersonal: true, createdBy: req.user.id }
+        : { seriesId: event.seriesId, teamId: event.teamId };
+      const targetIds = scope === 'series'
+        ? (await prisma.calendarEvent.findMany({ where: seriesScopeWhere, select: { id: true } })).map(e => e.id)
+        : [req.params.id];
+
       await prisma.calendarEventCategoryTarget.deleteMany({
-        where: { calendarEventId: req.params.id }
+        where: { calendarEventId: { in: targetIds } }
       });
-      
+
       if (Array.isArray(categoryIds) && categoryIds.length > 0) {
         await prisma.calendarEventCategoryTarget.createMany({
-          data: categoryIds.map(categoryId => ({
-            calendarEventId: req.params.id,
+          data: targetIds.flatMap(eid => categoryIds.map(categoryId => ({
+            calendarEventId: eid,
             teamCategoryId: categoryId
-          }))
+          })))
         });
       }
     }
-    
+
+    if (scope === 'series') {
+      await prisma.calendarEvent.updateMany({
+        where: event.isPersonal
+          ? { seriesId: event.seriesId, isPersonal: true, createdBy: req.user.id }
+          : { seriesId: event.seriesId, teamId: event.teamId },
+        data: {
+          title,
+          description,
+          allDay,
+          eventType,
+          location,
+          ...(safeColor !== undefined && { color: safeColor })
+        }
+      });
+    }
+
     const updated = await prisma.calendarEvent.update({
       where: { id: req.params.id },
       data: {
         title,
         description,
-        startDate: startDate ? new Date(startDate) : undefined,
-        endDate: endDate ? new Date(endDate) : null,
+        ...(scope === 'series'
+          ? {}
+          : {
+              startDate: startDate ? new Date(startDate) : undefined,
+              endDate: endDate ? new Date(endDate) : null,
+            }),
         allDay,
         eventType,
-        location
+        location,
+        ...(safeColor !== undefined && { color: safeColor })
       },
       include: {
         team: { select: { id: true, name: true } },
@@ -416,10 +491,18 @@ router.delete('/:id', authenticate, async (req, res) => {
     if (!canDelete) {
       return res.status(403).json({ error: 'Access denied' });
     }
-    
+
+    if (req.query.scope === 'series' && event.seriesId) {
+      const where = event.isPersonal
+        ? { seriesId: event.seriesId, isPersonal: true, createdBy: req.user.id }
+        : { seriesId: event.seriesId, teamId: event.teamId };
+      const result = await prisma.calendarEvent.deleteMany({ where });
+      return res.json({ success: true, deleted: result.count });
+    }
+
     await prisma.calendarEvent.delete({ where: { id: req.params.id } });
-    
-    res.json({ success: true });
+
+    res.json({ success: true, deleted: 1 });
   } catch (error) {
     console.error('Delete calendar event error:', error);
     res.status(500).json({ error: 'Failed to delete calendar event' });
