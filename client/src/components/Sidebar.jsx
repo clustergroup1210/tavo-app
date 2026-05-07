@@ -180,7 +180,7 @@ export default function Sidebar({ isOpen, onClose }) {
     >
       <div className="px-4 pt-4 pb-3 border-b border-white/[0.06]">
         <div className="flex items-center justify-between mb-3">
-          <Link to="/dashboard" className="flex items-baseline gap-0.5 group">
+          <Link to={isOperator() ? '/admin' : (isPlayer() || isParent()) ? '/player-dashboard' : '/dashboard'} className="flex items-baseline gap-0.5 group">
             <span className="text-[20px] font-bold text-white tracking-tight leading-none group-hover:text-blue-300 transition-colors">PDS</span>
             <span className="text-[20px] font-bold text-blue-400 leading-none">.</span>
           </Link>
