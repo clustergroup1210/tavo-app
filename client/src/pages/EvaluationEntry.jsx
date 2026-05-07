@@ -30,6 +30,7 @@ export default function EvaluationEntry() {
   const [teamCategories, setTeamCategories] = useState([]);
   const [filterCategory, setFilterCategory] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState('');
+  const [forcedPlayer, setForcedPlayer] = useState(null);
   const [items, setItems] = useState([]);
   const [rounds, setRounds] = useState([]);
   const [scoreMap, setScoreMap] = useState({});
@@ -57,9 +58,22 @@ export default function EvaluationEntry() {
 
   useEffect(() => {
     const pid = searchParams.get('playerId');
-    if (pid && !isPlayer()) {
-      setSelectedPlayer(pid);
-    }
+    if (!pid || isPlayer()) return;
+    setSelectedPlayer(pid);
+    setFilterCategory('');
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/players/${pid}`, { credentials: 'include' });
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          setForcedPlayer(data);
+        }
+      } catch (e) {
+        console.error('Failed to fetch forced player:', e);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [searchParams]);
 
   useEffect(() => {
@@ -332,12 +346,18 @@ export default function EvaluationEntry() {
 
   const canEvaluatePlayerId = (pid) => {
     if (evaluableInfo.all) return true;
+    if (forcedPlayer && forcedPlayer.id === pid) return true;
     return evaluableInfo.playerIds.includes(pid);
   };
 
-  const filteredPlayers = players.filter(p => !filterCategory || p.teamCategoryId === filterCategory);
+  const mergedPlayers = useMemo(() => {
+    if (!forcedPlayer) return players;
+    return players.some(p => p.id === forcedPlayer.id) ? players : [forcedPlayer, ...players];
+  }, [players, forcedPlayer]);
 
-  const selectedPlayerObj = players.find(p => p.id === selectedPlayer) || (isSelfEval && playerData ? playerData : null);
+  const filteredPlayers = mergedPlayers.filter(p => !filterCategory || p.teamCategoryId === filterCategory);
+
+  const selectedPlayerObj = mergedPlayers.find(p => p.id === selectedPlayer) || (isSelfEval && playerData ? playerData : null);
 
   return (
     <div className="space-y-4">
