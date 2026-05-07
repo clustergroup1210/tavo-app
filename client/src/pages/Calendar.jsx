@@ -870,8 +870,8 @@ export default function Calendar() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowModal(false)}>
-          <div className="bg-white rounded-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto shadow-xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4" onClick={() => setShowModal(false)}>
+          <div className="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
               <h3 className="text-[14px] font-semibold text-gray-900">
                 {editingEvent ? '予定を編集' : '新しい予定'}
@@ -920,47 +920,47 @@ export default function Calendar() {
                 <label htmlFor="allDay" className="text-[13px] text-gray-600">終日</label>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="min-w-0">
                   <label className="block text-[11px] font-medium text-gray-500 mb-1">開始日</label>
                   <input
                     type="date"
                     value={form.startDate}
                     onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                    className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                    className="w-full min-w-0 px-2 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                   />
                 </div>
                 {!form.allDay && (
-                  <div>
+                  <div className="min-w-0">
                     <label className="block text-[11px] font-medium text-gray-500 mb-1">開始時間</label>
                     <input
                       type="time"
                       value={form.startTime}
                       onChange={(e) => setForm({ ...form, startTime: e.target.value })}
-                      className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                      className="w-full min-w-0 px-2 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                     />
                   </div>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="min-w-0">
                   <label className="block text-[11px] font-medium text-gray-500 mb-1">終了日</label>
                   <input
                     type="date"
                     value={form.endDate}
                     onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                    className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                    className="w-full min-w-0 px-2 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                   />
                 </div>
                 {!form.allDay && (
-                  <div>
+                  <div className="min-w-0">
                     <label className="block text-[11px] font-medium text-gray-500 mb-1">終了時間</label>
                     <input
                       type="time"
                       value={form.endTime}
                       onChange={(e) => setForm({ ...form, endTime: e.target.value })}
-                      className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                      className="w-full min-w-0 px-2 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                     />
                   </div>
                 )}
