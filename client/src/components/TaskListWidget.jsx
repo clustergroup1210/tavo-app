@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Check, ClipboardList, Calendar, ChevronRight, X, Video, Target, MessageSquare, Tag } from 'lucide-react';
+import { Plus, Check, ClipboardList, Calendar, ChevronRight, X, Video, Target, MessageSquare, Tag, StickyNote } from 'lucide-react';
 import clsx from 'clsx';
 
 const TARGET_TYPES = [
@@ -218,14 +218,21 @@ export default function TaskListWidget() {
                     </span>
                   </div>
                   <div className="flex items-center gap-3 mt-0.5">
-                    {!playerMode && (task.player || task.assignee) && (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-gray-500 truncate">
-                        {task.assignee && (
-                          <span className="px-1 py-px text-[9px] bg-indigo-50 text-indigo-700 rounded">スタッフ</span>
-                        )}
-                        {task.player?.name || task.assignee?.name}
-                      </span>
-                    )}
+                    {!playerMode && (task.player || task.assignee) && (() => {
+                      const isSelfMemo = task.assignee && task.assignee.id === user?.id && task.assignedBy === user?.id;
+                      return (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-gray-500 truncate">
+                          {isSelfMemo ? (
+                            <span className="inline-flex items-center gap-0.5 px-1 py-px text-[9px] bg-amber-50 text-amber-700 rounded">
+                              <StickyNote className="w-2.5 h-2.5" />メモ
+                            </span>
+                          ) : task.assignee ? (
+                            <span className="px-1 py-px text-[9px] bg-indigo-50 text-indigo-700 rounded">スタッフ</span>
+                          ) : null}
+                          {!isSelfMemo && (task.player?.name || task.assignee?.name)}
+                        </span>
+                      );
+                    })()}
                     {due && (
                       <span className={clsx(
                         'inline-flex items-center gap-0.5 text-[11px]',
@@ -257,6 +264,7 @@ export default function TaskListWidget() {
           players={players}
           staff={staff}
           teamId={teamId}
+          currentUser={user}
           onClose={() => setShowModal(false)}
           onCreated={(t) => { setTasks(prev => [t, ...prev]); setShowModal(false); }}
         />
@@ -265,10 +273,10 @@ export default function TaskListWidget() {
   );
 }
 
-function CreateTaskModal({ players, staff, teamId, onClose, onCreated }) {
+function CreateTaskModal({ players, staff, teamId, currentUser, onClose, onCreated }) {
   const [form, setForm] = useState({
-    assigneeKind: 'PLAYER',
-    assigneeId: '',
+    assigneeKind: 'SELF',
+    assigneeId: currentUser?.id || '',
     title: '',
     description: '',
     dueDate: '',
@@ -278,13 +286,20 @@ function CreateTaskModal({ players, staff, teamId, onClose, onCreated }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  const setKind = (kind) => {
+    if (kind === 'SELF') setForm(f => ({ ...f, assigneeKind: 'SELF', assigneeId: currentUser?.id || '' }));
+    else setForm(f => ({ ...f, assigneeKind: kind, assigneeId: '' }));
+  };
+
   const targetUrlAuto = form.targetType
     ? buildTargetUrl(form.targetType, form.assigneeKind === 'PLAYER' ? form.assigneeId : null)
     : '';
 
+  const submitDisabled = submitting || !form.title.trim() || (form.assigneeKind !== 'SELF' && !form.assigneeId);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.assigneeId || !form.title.trim()) return;
+    if (submitDisabled) return;
     setSubmitting(true);
     setError('');
     try {
@@ -297,8 +312,11 @@ function CreateTaskModal({ players, staff, teamId, onClose, onCreated }) {
       };
       if (form.assigneeKind === 'PLAYER') {
         body.playerId = form.assigneeId;
-      } else {
+      } else if (form.assigneeKind === 'STAFF') {
         body.assigneeUserId = form.assigneeId;
+        body.teamId = teamId;
+      } else {
+        body.assigneeUserId = currentUser?.id;
         body.teamId = teamId;
       }
       const res = await fetch('/api/tasks', {
@@ -335,12 +353,23 @@ function CreateTaskModal({ players, staff, teamId, onClose, onCreated }) {
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
             <label className="block text-[11px] font-medium text-gray-500 mb-1.5">担当者の種類</label>
-            <div className="grid grid-cols-2 gap-1.5 mb-2">
+            <div className="grid grid-cols-3 gap-1.5 mb-2">
               <button
                 type="button"
-                onClick={() => setForm({ ...form, assigneeKind: 'PLAYER', assigneeId: '' })}
+                onClick={() => setKind('SELF')}
                 className={clsx(
-                  'px-3 py-1.5 text-[12px] rounded-lg border transition-colors',
+                  'inline-flex items-center justify-center gap-1 px-2 py-1.5 text-[12px] rounded-lg border transition-colors',
+                  form.assigneeKind === 'SELF' ? 'bg-amber-50 border-amber-400 text-amber-800 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                )}
+              >
+                <StickyNote className="w-3 h-3" />
+                自分用メモ
+              </button>
+              <button
+                type="button"
+                onClick={() => setKind('PLAYER')}
+                className={clsx(
+                  'px-2 py-1.5 text-[12px] rounded-lg border transition-colors',
                   form.assigneeKind === 'PLAYER' ? 'bg-orange-50 border-orange-400 text-orange-800 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                 )}
               >
@@ -348,35 +377,46 @@ function CreateTaskModal({ players, staff, teamId, onClose, onCreated }) {
               </button>
               <button
                 type="button"
-                onClick={() => setForm({ ...form, assigneeKind: 'STAFF', assigneeId: '' })}
+                onClick={() => setKind('STAFF')}
                 className={clsx(
-                  'px-3 py-1.5 text-[12px] rounded-lg border transition-colors',
+                  'px-2 py-1.5 text-[12px] rounded-lg border transition-colors',
                   form.assigneeKind === 'STAFF' ? 'bg-indigo-50 border-indigo-400 text-indigo-800 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                 )}
               >
-                スタッフ（コーチ陣）
+                スタッフ
               </button>
             </div>
-            <label className="block text-[11px] font-medium text-gray-500 mb-1">
-              {form.assigneeKind === 'PLAYER' ? '担当選手' : '担当スタッフ'} <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={form.assigneeId}
-              onChange={(e) => setForm({ ...form, assigneeId: e.target.value })}
-              required
-              className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-            >
-              <option value="">{form.assigneeKind === 'PLAYER' ? '選手を選択...' : 'スタッフを選択...'}</option>
-              {form.assigneeKind === 'PLAYER'
-                ? players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)
-                : staff.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}（{s.role === 'TEAM_MANAGER' ? 'チーム管理者' : s.role === 'COACH' ? 'コーチ' : 'ゲストコーチ'}）
-                    </option>
-                  ))}
-            </select>
-            {form.assigneeKind === 'STAFF' && staff.length === 0 && (
-              <p className="text-[10px] text-gray-400 mt-1">このチームに登録されているスタッフがいません。</p>
+            {form.assigneeKind === 'SELF' ? (
+              <p className="text-[11px] text-gray-500 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                自分専用のメモタスクとして登録します。他のユーザーには通知されません。
+              </p>
+            ) : (
+              <>
+                <label className="block text-[11px] font-medium text-gray-500 mb-1">
+                  {form.assigneeKind === 'PLAYER' ? '担当選手' : '担当スタッフ'} <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={form.assigneeId}
+                  onChange={(e) => setForm({ ...form, assigneeId: e.target.value })}
+                  required
+                  className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                >
+                  <option value="">{form.assigneeKind === 'PLAYER' ? '選手を選択...' : 'スタッフを選択...'}</option>
+                  {form.assigneeKind === 'PLAYER'
+                    ? players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)
+                    : staff.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}（{s.role === 'TEAM_MANAGER' ? 'チーム管理者' : s.role === 'COACH' ? 'コーチ' : 'ゲストコーチ'}）
+                        </option>
+                      ))}
+                </select>
+                {form.assigneeKind === 'STAFF' && staff.length === 0 && (
+                  <p className="text-[10px] text-gray-400 mt-1">このチームに登録されているスタッフがいません。</p>
+                )}
+                {form.assigneeKind !== 'SELF' && (
+                  <p className="text-[10px] text-gray-400 mt-1">担当者がタスクを完了すると、あなたに完了通知が届きます。</p>
+                )}
+              </>
             )}
           </div>
 
@@ -466,7 +506,7 @@ function CreateTaskModal({ players, staff, teamId, onClose, onCreated }) {
             </button>
             <button
               type="submit"
-              disabled={submitting || !form.assigneeId || !form.title.trim()}
+              disabled={submitDisabled}
               className="px-4 py-2 text-[12px] font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? '作成中...' : '作成'}

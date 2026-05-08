@@ -187,6 +187,16 @@ router.post('/', authenticate, async (req, res) => {
       createData.playerId = playerId;
       notifyUserId = player.userId;
       assigneeName = player.name;
+    } else if (assigneeUserId === req.user.id) {
+      createData.assigneeUserId = req.user.id;
+      if (teamId) {
+        if (!isOperator(req.user) && !hasTeamAccess(req.user, teamId)) {
+          return res.status(403).json({ error: 'このチームへのアクセス権がありません' });
+        }
+        createData.teamId = teamId;
+      }
+      notifyUserId = null;
+      assigneeName = req.user.name;
     } else {
       if (!teamId) {
         return res.status(400).json({ error: 'teamId is required when assigning to a staff user' });
@@ -271,7 +281,9 @@ router.put('/:id', authenticate, async (req, res) => {
     }
     if (status !== undefined) {
       updateData.status = status;
-      updateData.completedAt = status === 'COMPLETED' ? new Date() : null;
+      if (status === 'COMPLETED' && !task.completedAt) {
+        updateData.completedAt = new Date();
+      }
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -283,6 +295,22 @@ router.put('/:id', authenticate, async (req, res) => {
       data: updateData,
       include: TASK_INCLUDE
     });
+
+    if (
+      status === 'COMPLETED' &&
+      !task.completedAt &&
+      task.assignedBy &&
+      task.assignedBy !== req.user.id
+    ) {
+      const completerName = updated.assignee?.name || updated.player?.name || req.user.name;
+      await createNotification({
+        userId: task.assignedBy,
+        type: 'TASK',
+        title: 'タスクが完了しました',
+        message: `${completerName}さんが「${updated.title}」を完了しました`,
+        linkUrl: '/dashboard'
+      });
+    }
 
     res.json(updated);
   } catch (error) {
