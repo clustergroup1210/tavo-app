@@ -85,6 +85,7 @@ model Team {
   teamCategories    TeamCategory[]
   calendarEvents    CalendarEvent[]
   announcements     Announcement[]
+  tasks             Task[]
   joinRequests      TeamJoinRequest[]
   transfersFrom     TransferHistory[]  @relation("TransferFromTeam")
   transfersTo       TransferHistory[]  @relation("TransferToTeam")
@@ -138,6 +139,7 @@ model User {
   coachAssignments     CoachAssignment[]  @relation("CoachAssignee")
   videoComments        VideoComment[]
   assignedTasks        Task[]             @relation("TaskAssigner")
+  receivedTasks        Task[]             @relation("TaskAssignee")
   pushSubscriptions    PushSubscription[]
 }
 
@@ -464,23 +466,29 @@ model VideoComment {
 }
 
 model Task {
-  id          String    @id @default(uuid())
-  playerId    String
-  assignedBy  String
-  title       String
-  description String?
-  dueDate     DateTime?
-  status      TaskStatus @default(PENDING)
-  completedAt DateTime?
-  targetType  String?
-  targetUrl   String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id              String    @id @default(uuid())
+  playerId        String?
+  assigneeUserId  String?
+  teamId          String?
+  assignedBy      String
+  title           String
+  description     String?
+  dueDate         DateTime?
+  status          TaskStatus @default(PENDING)
+  completedAt     DateTime?
+  targetType      String?
+  targetUrl       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  player   Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  assigner User   @relation("TaskAssigner", fields: [assignedBy], references: [id])
+  player   Player? @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  assignee User?   @relation("TaskAssignee", fields: [assigneeUserId], references: [id], onDelete: Cascade)
+  team     Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  assigner User    @relation("TaskAssigner", fields: [assignedBy], references: [id])
 
   @@index([playerId])
+  @@index([assigneeUserId])
+  @@index([teamId])
   @@index([assignedBy])
   @@index([status])
 }

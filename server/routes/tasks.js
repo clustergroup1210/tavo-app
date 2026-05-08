@@ -6,11 +6,25 @@ const { createNotification } = require('../services/notificationService');
 const router = express.Router();
 const prisma = new PrismaClient();
 
+const ALLOWED_TYPES = ['EVALUATION', 'VIDEO', 'MEETING', 'GOAL', 'MENTORING', 'OTHER'];
+const STAFF_ROLES = ['TEAM_MANAGER', 'COACH', 'GUEST_COACH'];
+
 function isOperator(user) {
-  return user.organizations?.some(o => 
+  return user.organizations?.some(o =>
     ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
   );
 }
+
+function safeTargetUrl(targetUrl) {
+  return (typeof targetUrl === 'string' && targetUrl.startsWith('/') && !targetUrl.startsWith('//')) ? targetUrl : null;
+}
+
+const TASK_INCLUDE = {
+  player: { select: { id: true, name: true, teamId: true, userId: true } },
+  assignee: { select: { id: true, name: true } },
+  team: { select: { id: true, name: true } },
+  assigner: { select: { id: true, name: true } }
+};
 
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -28,7 +42,10 @@ router.get('/', authenticate, async (req, res) => {
       if (!isOperator(req.user) && !hasTeamAccess(req.user, teamId)) {
         return res.status(403).json({ error: 'Access denied' });
       }
-      where.player = { teamId };
+      where.OR = [
+        { player: { teamId } },
+        { teamId }
+      ];
     }
 
     if (playerId && !isOperator(req.user)) {
@@ -36,15 +53,10 @@ router.get('/', authenticate, async (req, res) => {
         where: { id: playerId },
         select: { userId: true, teamId: true }
       });
-
-      if (!player) {
-        return res.status(404).json({ error: 'Player not found' });
-      }
-
+      if (!player) return res.status(404).json({ error: 'Player not found' });
       const isSelf = player.userId === req.user.id;
       const isParent = req.user.parentPlayers?.some(pp => pp.playerId === playerId);
       const hasAccess = hasTeamAccess(req.user, player.teamId);
-
       if (!isSelf && !isParent && !hasAccess) {
         return res.status(403).json({ error: 'Access denied' });
       }
@@ -52,10 +64,7 @@ router.get('/', authenticate, async (req, res) => {
 
     const tasks = await prisma.task.findMany({
       where,
-      include: {
-        player: { select: { id: true, name: true, teamId: true, userId: true } },
-        assigner: { select: { id: true, name: true } }
-      },
+      include: TASK_INCLUDE,
       orderBy: { createdAt: 'desc' }
     });
 
@@ -75,19 +84,15 @@ router.get('/my-tasks', authenticate, async (req, res) => {
     const childPlayerIds = (req.user.parentPlayers || []).map(pp => pp.playerId).filter(Boolean);
     const playerIds = Array.from(new Set([...ownPlayers.map(p => p.id), ...childPlayerIds]));
 
-    if (playerIds.length === 0) {
-      return res.json([]);
-    }
+    const orClauses = [{ assigneeUserId: req.user.id }];
+    if (playerIds.length > 0) orClauses.push({ playerId: { in: playerIds } });
 
     const tasks = await prisma.task.findMany({
       where: {
-        playerId: { in: playerIds },
+        OR: orClauses,
         status: { not: 'CANCELLED' }
       },
-      include: {
-        player: { select: { id: true, name: true } },
-        assigner: { select: { id: true, name: true } }
-      },
+      include: TASK_INCLUDE,
       orderBy: [
         { status: 'asc' },
         { dueDate: 'asc' },
@@ -111,29 +116,23 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
       where: { id: playerId },
       select: { userId: true, teamId: true }
     });
-
-    if (!player) {
-      return res.status(404).json({ error: 'Player not found' });
-    }
+    if (!player) return res.status(404).json({ error: 'Player not found' });
 
     if (!isOperator(req.user)) {
       const isSelf = player.userId === req.user.id;
       const isParent = req.user.parentPlayers?.some(pp => pp.playerId === playerId);
       const hasAccess = hasTeamAccess(req.user, player.teamId);
-
       if (!isSelf && !isParent && !hasAccess) {
         return res.status(403).json({ error: 'Access denied' });
       }
     }
-    
+
     const where = { playerId };
     if (status) where.status = status;
 
     const tasks = await prisma.task.findMany({
       where,
-      include: {
-        assigner: { select: { id: true, name: true } }
-      },
+      include: TASK_INCLUDE,
       orderBy: [
         { status: 'asc' },
         { dueDate: 'asc' },
@@ -150,57 +149,81 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { playerId, title, description, dueDate, targetType, targetUrl } = req.body;
+    const { playerId, assigneeUserId, teamId, title, description, dueDate, targetType, targetUrl } = req.body;
 
-    if (!playerId || !title?.trim()) {
-      return res.status(400).json({ error: 'Player ID and title are required' });
+    if (!title?.trim()) {
+      return res.status(400).json({ error: 'Title is required' });
     }
-
-    const ALLOWED_TYPES = ['EVALUATION', 'VIDEO', 'MEETING', 'GOAL', 'MENTORING', 'OTHER'];
+    if ((!playerId && !assigneeUserId) || (playerId && assigneeUserId)) {
+      return res.status(400).json({ error: 'Provide exactly one of playerId or assigneeUserId' });
+    }
     if (targetType && !ALLOWED_TYPES.includes(targetType)) {
       return res.status(400).json({ error: 'Invalid targetType' });
     }
-    const safeUrl = (typeof targetUrl === 'string' && targetUrl.startsWith('/') && !targetUrl.startsWith('//')) ? targetUrl : null;
+    const safeUrl = safeTargetUrl(targetUrl);
 
-    const player = await prisma.player.findUnique({
-      where: { id: playerId },
-      select: { id: true, name: true, userId: true, teamId: true }
-    });
+    let createData = {
+      assignedBy: req.user.id,
+      title: title.trim(),
+      description: description?.trim() || null,
+      dueDate: dueDate ? new Date(dueDate) : null,
+      targetType: targetType || null,
+      targetUrl: safeUrl
+    };
+    let notifyUserId = null;
+    let assigneeName = '';
 
-    if (!player) {
-      return res.status(404).json({ error: 'Player not found' });
-    }
+    if (playerId) {
+      const player = await prisma.player.findUnique({
+        where: { id: playerId },
+        select: { id: true, name: true, userId: true, teamId: true }
+      });
+      if (!player) return res.status(404).json({ error: 'Player not found' });
 
-    const canAssign = isOperator(req.user) ||
-      await canEvaluatePlayer(req.user, playerId, player.teamId);
+      const canAssign = isOperator(req.user) || await canEvaluatePlayer(req.user, playerId, player.teamId);
+      if (!canAssign) {
+        return res.status(403).json({ error: 'この選手にタスクを設定する権限がありません' });
+      }
+      createData.playerId = playerId;
+      notifyUserId = player.userId;
+      assigneeName = player.name;
+    } else {
+      if (!teamId) {
+        return res.status(400).json({ error: 'teamId is required when assigning to a staff user' });
+      }
+      const assignee = await prisma.user.findUnique({
+        where: { id: assigneeUserId },
+        select: { id: true, name: true, teams: { select: { teamId: true, role: true } } }
+      });
+      if (!assignee) return res.status(404).json({ error: 'Assignee not found' });
 
-    if (!canAssign) {
-      return res.status(403).json({ error: 'この選手に課題を設定する権限がありません' });
+      const assigneeTeamRole = (assignee.teams || []).find(t => t.teamId === teamId);
+      if (!assigneeTeamRole || !STAFF_ROLES.includes(assigneeTeamRole.role)) {
+        return res.status(400).json({ error: '担当者はそのチームのスタッフである必要があります' });
+      }
+
+      const canAssign = isOperator(req.user) || hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH']);
+      if (!canAssign) {
+        return res.status(403).json({ error: 'このチームのスタッフにタスクを設定する権限がありません' });
+      }
+      createData.assigneeUserId = assigneeUserId;
+      createData.teamId = teamId;
+      notifyUserId = assigneeUserId;
+      assigneeName = assignee.name;
     }
 
     const task = await prisma.task.create({
-      data: {
-        playerId,
-        assignedBy: req.user.id,
-        title: title.trim(),
-        description: description?.trim() || null,
-        dueDate: dueDate ? new Date(dueDate) : null,
-        targetType: targetType || null,
-        targetUrl: safeUrl
-      },
-      include: {
-        player: { select: { id: true, name: true } },
-        assigner: { select: { id: true, name: true } }
-      }
+      data: createData,
+      include: TASK_INCLUDE
     });
 
-    if (player.userId) {
+    if (notifyUserId) {
       await createNotification({
-        userId: player.userId,
+        userId: notifyUserId,
         type: 'TASK',
-        title: '新しい課題が設定されました',
-        message: `${req.user.name}さんから課題「${title}」が設定されました`,
-        linkUrl: `/player-dashboard?tab=tasks`
+        title: '新しいタスクが設定されました',
+        message: `${req.user.name}さんからタスク「${title}」が設定されました`,
+        linkUrl: playerId ? `/player-dashboard?tab=tasks` : `/dashboard`
       });
     }
 
@@ -214,30 +237,29 @@ router.post('/', authenticate, async (req, res) => {
 router.put('/:id', authenticate, async (req, res) => {
   try {
     const { title, description, dueDate, status, targetType, targetUrl } = req.body;
-    const ALLOWED_TYPES = ['EVALUATION', 'VIDEO', 'MEETING', 'GOAL', 'MENTORING', 'OTHER'];
     if (targetType !== undefined && targetType !== null && !ALLOWED_TYPES.includes(targetType)) {
       return res.status(400).json({ error: 'Invalid targetType' });
     }
 
     const task = await prisma.task.findUnique({
       where: { id: req.params.id },
-      include: { player: { select: { id: true, userId: true, teamId: true } } }
+      include: {
+        player: { select: { id: true, userId: true, teamId: true } }
+      }
     });
-
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
-    }
+    if (!task) return res.status(404).json({ error: 'Task not found' });
 
     const isAssigner = task.assignedBy === req.user.id;
-    const isPlayer = task.player.userId === req.user.id;
-    const isParent = (req.user.parentPlayers || []).some(pp => pp.playerId === task.player.id);
-    const isCoach = hasTeamAccess(req.user, task.player.teamId, ['TEAM_MANAGER', 'COACH']);
+    const isAssigneePlayer = task.player?.userId === req.user.id;
+    const isAssigneeUser = task.assigneeUserId === req.user.id;
+    const isParent = task.player && (req.user.parentPlayers || []).some(pp => pp.playerId === task.player.id);
+    const scopeTeamId = task.player?.teamId || task.teamId;
+    const isCoach = scopeTeamId && hasTeamAccess(req.user, scopeTeamId, ['TEAM_MANAGER', 'COACH']);
     const isOp = isOperator(req.user);
     const canEditMeta = isAssigner || isCoach || isOp;
+    const canChangeStatus = canEditMeta || isAssigneePlayer || isAssigneeUser || isParent;
 
-    if (!canEditMeta && !isPlayer && !isParent) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
+    if (!canChangeStatus) return res.status(403).json({ error: 'Access denied' });
 
     const updateData = {};
     if (canEditMeta) {
@@ -245,17 +267,11 @@ router.put('/:id', authenticate, async (req, res) => {
       if (description !== undefined) updateData.description = description?.trim() || null;
       if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null;
       if (targetType !== undefined) updateData.targetType = targetType || null;
-      if (targetUrl !== undefined) {
-        updateData.targetUrl = (typeof targetUrl === 'string' && targetUrl.startsWith('/') && !targetUrl.startsWith('//')) ? targetUrl : null;
-      }
+      if (targetUrl !== undefined) updateData.targetUrl = safeTargetUrl(targetUrl);
     }
     if (status !== undefined) {
       updateData.status = status;
-      if (status === 'COMPLETED') {
-        updateData.completedAt = new Date();
-      } else {
-        updateData.completedAt = null;
-      }
+      updateData.completedAt = status === 'COMPLETED' ? new Date() : null;
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -265,10 +281,7 @@ router.put('/:id', authenticate, async (req, res) => {
     const updated = await prisma.task.update({
       where: { id: req.params.id },
       data: updateData,
-      include: {
-        player: { select: { id: true, name: true } },
-        assigner: { select: { id: true, name: true } }
-      }
+      include: TASK_INCLUDE
     });
 
     res.json(updated);
@@ -284,23 +297,18 @@ router.delete('/:id', authenticate, async (req, res) => {
       where: { id: req.params.id },
       include: { player: { select: { teamId: true } } }
     });
-
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
-    }
+    if (!task) return res.status(404).json({ error: 'Task not found' });
 
     const isAssigner = task.assignedBy === req.user.id;
-    const isCoach = hasTeamAccess(req.user, task.player.teamId, ['TEAM_MANAGER', 'COACH']);
+    const scopeTeamId = task.player?.teamId || task.teamId;
+    const isCoach = scopeTeamId && hasTeamAccess(req.user, scopeTeamId, ['TEAM_MANAGER', 'COACH']);
     const isOp = isOperator(req.user);
 
     if (!isAssigner && !isCoach && !isOp) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    await prisma.task.delete({
-      where: { id: req.params.id }
-    });
-
+    await prisma.task.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (error) {
     console.error('Delete task error:', error);

@@ -48,6 +48,7 @@ export default function TaskListWidget() {
 
   const [tasks, setTasks] = useState([]);
   const [players, setPlayers] = useState([]);
+  const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
 
@@ -58,7 +59,10 @@ export default function TaskListWidget() {
   }, [teamId, playerMode]);
 
   useEffect(() => {
-    if (canAssign && teamId) fetchPlayers();
+    if (canAssign && teamId) {
+      fetchPlayers();
+      fetchStaff();
+    }
   }, [teamId, canAssign]);
 
   const fetchTasks = async () => {
@@ -85,6 +89,23 @@ export default function TaskListWidget() {
       setPlayers(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error('Failed to fetch players:', e);
+    }
+  };
+
+  const fetchStaff = async () => {
+    try {
+      const res = await fetch(`/api/users?teamId=${teamId}`, { credentials: 'include' });
+      if (!res.ok) { setStaff([]); return; }
+      const data = await res.json();
+      const list = (Array.isArray(data) ? data : [])
+        .map(u => {
+          const tr = (u.teams || []).find(t => t.teamId === teamId);
+          return tr ? { id: u.id, name: u.name, role: tr.role } : null;
+        })
+        .filter(u => u && ['TEAM_MANAGER', 'COACH', 'GUEST_COACH'].includes(u.role) && u.id !== user?.id);
+      setStaff(list);
+    } catch (e) {
+      console.error('Failed to fetch staff:', e);
     }
   };
 
@@ -197,9 +218,12 @@ export default function TaskListWidget() {
                     </span>
                   </div>
                   <div className="flex items-center gap-3 mt-0.5">
-                    {task.player && !playerMode && (
-                      <span className="text-[11px] text-gray-500 truncate">
-                        {task.player.name}
+                    {!playerMode && (task.player || task.assignee) && (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-gray-500 truncate">
+                        {task.assignee && (
+                          <span className="px-1 py-px text-[9px] bg-indigo-50 text-indigo-700 rounded">スタッフ</span>
+                        )}
+                        {task.player?.name || task.assignee?.name}
                       </span>
                     )}
                     {due && (
@@ -231,6 +255,8 @@ export default function TaskListWidget() {
       {showModal && (
         <CreateTaskModal
           players={players}
+          staff={staff}
+          teamId={teamId}
           onClose={() => setShowModal(false)}
           onCreated={(t) => { setTasks(prev => [t, ...prev]); setShowModal(false); }}
         />
@@ -239,9 +265,10 @@ export default function TaskListWidget() {
   );
 }
 
-function CreateTaskModal({ players, onClose, onCreated }) {
+function CreateTaskModal({ players, staff, teamId, onClose, onCreated }) {
   const [form, setForm] = useState({
-    playerId: '',
+    assigneeKind: 'PLAYER',
+    assigneeId: '',
     title: '',
     description: '',
     dueDate: '',
@@ -251,26 +278,34 @@ function CreateTaskModal({ players, onClose, onCreated }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const targetUrlAuto = form.targetType ? buildTargetUrl(form.targetType, form.playerId) : '';
+  const targetUrlAuto = form.targetType
+    ? buildTargetUrl(form.targetType, form.assigneeKind === 'PLAYER' ? form.assigneeId : null)
+    : '';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.playerId || !form.title.trim()) return;
+    if (!form.assigneeId || !form.title.trim()) return;
     setSubmitting(true);
     setError('');
     try {
+      const body = {
+        title: form.title.trim(),
+        description: form.description.trim() || null,
+        dueDate: form.dueDate || null,
+        targetType: form.targetType || null,
+        targetUrl: form.targetType ? (form.targetUrl || targetUrlAuto || null) : null
+      };
+      if (form.assigneeKind === 'PLAYER') {
+        body.playerId = form.assigneeId;
+      } else {
+        body.assigneeUserId = form.assigneeId;
+        body.teamId = teamId;
+      }
       const res = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          playerId: form.playerId,
-          title: form.title.trim(),
-          description: form.description.trim() || null,
-          dueDate: form.dueDate || null,
-          targetType: form.targetType || null,
-          targetUrl: form.targetType ? (form.targetUrl || targetUrlAuto || null) : null
-        })
+        body: JSON.stringify(body)
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -299,18 +334,50 @@ function CreateTaskModal({ players, onClose, onCreated }) {
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-[11px] font-medium text-gray-500 mb-1">担当選手 <span className="text-red-500">*</span></label>
+            <label className="block text-[11px] font-medium text-gray-500 mb-1.5">担当者の種類</label>
+            <div className="grid grid-cols-2 gap-1.5 mb-2">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, assigneeKind: 'PLAYER', assigneeId: '' })}
+                className={clsx(
+                  'px-3 py-1.5 text-[12px] rounded-lg border transition-colors',
+                  form.assigneeKind === 'PLAYER' ? 'bg-orange-50 border-orange-400 text-orange-800 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                )}
+              >
+                選手
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, assigneeKind: 'STAFF', assigneeId: '' })}
+                className={clsx(
+                  'px-3 py-1.5 text-[12px] rounded-lg border transition-colors',
+                  form.assigneeKind === 'STAFF' ? 'bg-indigo-50 border-indigo-400 text-indigo-800 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                )}
+              >
+                スタッフ（コーチ陣）
+              </button>
+            </div>
+            <label className="block text-[11px] font-medium text-gray-500 mb-1">
+              {form.assigneeKind === 'PLAYER' ? '担当選手' : '担当スタッフ'} <span className="text-red-500">*</span>
+            </label>
             <select
-              value={form.playerId}
-              onChange={(e) => setForm({ ...form, playerId: e.target.value })}
+              value={form.assigneeId}
+              onChange={(e) => setForm({ ...form, assigneeId: e.target.value })}
               required
               className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
             >
-              <option value="">選手を選択...</option>
-              {players.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
+              <option value="">{form.assigneeKind === 'PLAYER' ? '選手を選択...' : 'スタッフを選択...'}</option>
+              {form.assigneeKind === 'PLAYER'
+                ? players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)
+                : staff.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}（{s.role === 'TEAM_MANAGER' ? 'チーム管理者' : s.role === 'COACH' ? 'コーチ' : 'ゲストコーチ'}）
+                    </option>
+                  ))}
             </select>
+            {form.assigneeKind === 'STAFF' && staff.length === 0 && (
+              <p className="text-[10px] text-gray-400 mt-1">このチームに登録されているスタッフがいません。</p>
+            )}
           </div>
 
           <div>
@@ -399,7 +466,7 @@ function CreateTaskModal({ players, onClose, onCreated }) {
             </button>
             <button
               type="submit"
-              disabled={submitting || !form.playerId || !form.title.trim()}
+              disabled={submitting || !form.assigneeId || !form.title.trim()}
               className="px-4 py-2 text-[12px] font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? '作成中...' : '作成'}
