@@ -68,20 +68,24 @@ router.get('/', authenticate, async (req, res) => {
 
 router.get('/my-tasks', authenticate, async (req, res) => {
   try {
-    const player = await prisma.player.findFirst({
-      where: { userId: req.user.id }
+    const ownPlayers = await prisma.player.findMany({
+      where: { userId: req.user.id },
+      select: { id: true }
     });
+    const childPlayerIds = (req.user.parentPlayers || []).map(pp => pp.playerId).filter(Boolean);
+    const playerIds = Array.from(new Set([...ownPlayers.map(p => p.id), ...childPlayerIds]));
 
-    if (!player) {
+    if (playerIds.length === 0) {
       return res.json([]);
     }
 
     const tasks = await prisma.task.findMany({
-      where: { 
-        playerId: player.id,
+      where: {
+        playerId: { in: playerIds },
         status: { not: 'CANCELLED' }
       },
       include: {
+        player: { select: { id: true, name: true } },
         assigner: { select: { id: true, name: true } }
       },
       orderBy: [
@@ -146,11 +150,17 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { playerId, title, description, dueDate } = req.body;
+    const { playerId, title, description, dueDate, targetType, targetUrl } = req.body;
 
     if (!playerId || !title?.trim()) {
       return res.status(400).json({ error: 'Player ID and title are required' });
     }
+
+    const ALLOWED_TYPES = ['EVALUATION', 'VIDEO', 'MEETING', 'GOAL', 'MENTORING', 'OTHER'];
+    if (targetType && !ALLOWED_TYPES.includes(targetType)) {
+      return res.status(400).json({ error: 'Invalid targetType' });
+    }
+    const safeUrl = (typeof targetUrl === 'string' && targetUrl.startsWith('/') && !targetUrl.startsWith('//')) ? targetUrl : null;
 
     const player = await prisma.player.findUnique({
       where: { id: playerId },
@@ -161,8 +171,8 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Player not found' });
     }
 
-    const canAssign = isOperator(req.user) || 
-      await canEvaluatePlayer(req.user, playerId);
+    const canAssign = isOperator(req.user) ||
+      await canEvaluatePlayer(req.user, playerId, player.teamId);
 
     if (!canAssign) {
       return res.status(403).json({ error: 'この選手に課題を設定する権限がありません' });
@@ -174,7 +184,9 @@ router.post('/', authenticate, async (req, res) => {
         assignedBy: req.user.id,
         title: title.trim(),
         description: description?.trim() || null,
-        dueDate: dueDate ? new Date(dueDate) : null
+        dueDate: dueDate ? new Date(dueDate) : null,
+        targetType: targetType || null,
+        targetUrl: safeUrl
       },
       include: {
         player: { select: { id: true, name: true } },
@@ -201,7 +213,11 @@ router.post('/', authenticate, async (req, res) => {
 
 router.put('/:id', authenticate, async (req, res) => {
   try {
-    const { title, description, dueDate, status } = req.body;
+    const { title, description, dueDate, status, targetType, targetUrl } = req.body;
+    const ALLOWED_TYPES = ['EVALUATION', 'VIDEO', 'MEETING', 'GOAL', 'MENTORING', 'OTHER'];
+    if (targetType !== undefined && targetType !== null && !ALLOWED_TYPES.includes(targetType)) {
+      return res.status(400).json({ error: 'Invalid targetType' });
+    }
 
     const task = await prisma.task.findUnique({
       where: { id: req.params.id },
@@ -214,17 +230,25 @@ router.put('/:id', authenticate, async (req, res) => {
 
     const isAssigner = task.assignedBy === req.user.id;
     const isPlayer = task.player.userId === req.user.id;
+    const isParent = (req.user.parentPlayers || []).some(pp => pp.playerId === task.player.id);
     const isCoach = hasTeamAccess(req.user, task.player.teamId, ['TEAM_MANAGER', 'COACH']);
     const isOp = isOperator(req.user);
+    const canEditMeta = isAssigner || isCoach || isOp;
 
-    if (!isAssigner && !isPlayer && !isCoach && !isOp) {
+    if (!canEditMeta && !isPlayer && !isParent) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
     const updateData = {};
-    if (title !== undefined) updateData.title = title.trim();
-    if (description !== undefined) updateData.description = description?.trim() || null;
-    if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null;
+    if (canEditMeta) {
+      if (title !== undefined) updateData.title = title.trim();
+      if (description !== undefined) updateData.description = description?.trim() || null;
+      if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null;
+      if (targetType !== undefined) updateData.targetType = targetType || null;
+      if (targetUrl !== undefined) {
+        updateData.targetUrl = (typeof targetUrl === 'string' && targetUrl.startsWith('/') && !targetUrl.startsWith('//')) ? targetUrl : null;
+      }
+    }
     if (status !== undefined) {
       updateData.status = status;
       if (status === 'COMPLETED') {
@@ -232,6 +256,10 @@ router.put('/:id', authenticate, async (req, res) => {
       } else {
         updateData.completedAt = null;
       }
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'No updatable fields' });
     }
 
     const updated = await prisma.task.update({

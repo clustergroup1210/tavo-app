@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Building2, Upload, Edit2, Users, ClipboardList, Video, Calendar, ChevronRight } from 'lucide-react';
 import EvaluationMatrixTable from '../components/EvaluationMatrixTable';
+import TaskListWidget from '../components/TaskListWidget';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -222,6 +223,8 @@ export default function Dashboard() {
           );
         })}
       </div>
+
+      <TaskListWidget />
 
       <EvaluationMatrixTable />
     </div>
