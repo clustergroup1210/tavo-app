@@ -56,7 +56,7 @@ export default function TaskListWidget() {
 
   useEffect(() => {
     fetchTasks();
-  }, [teamId, playerMode]);
+  }, [teamId]);
 
   useEffect(() => {
     if (canAssign && teamId) {
@@ -68,11 +68,7 @@ export default function TaskListWidget() {
   const fetchTasks = async () => {
     setLoading(true);
     try {
-      const url = playerMode
-        ? '/api/tasks/my-tasks'
-        : (teamId ? `/api/tasks?teamId=${teamId}` : '');
-      if (!url) { setTasks([]); setLoading(false); return; }
-      const res = await fetch(url, { credentials: 'include' });
+      const res = await fetch('/api/tasks/my-tasks', { credentials: 'include' });
       const data = await res.json();
       setTasks(Array.isArray(data) ? data : []);
     } catch (e) {
