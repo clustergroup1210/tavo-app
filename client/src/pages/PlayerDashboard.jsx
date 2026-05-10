@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
-  BarChart3, TrendingUp, Target, Bell, ChevronRight, User, Award, Zap
+  BarChart3, TrendingUp, Target, Bell, ChevronRight, User, Award, Zap, ClipboardList
 } from 'lucide-react';
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
@@ -10,6 +10,7 @@ import {
   ResponsiveContainer, BarChart, Bar, Cell, Area, AreaChart
 } from 'recharts';
 import PlayerMatrix from '../components/PlayerMatrix';
+import TaskListWidget from '../components/TaskListWidget';
 
 const COLORS = {
   coach: '#3b82f6',
@@ -20,10 +21,26 @@ const COLORS = {
 
 const categoryColors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
 
+const VALID_TABS = ['summary', 'tasks', 'evaluation', 'progress'];
+
 export default function PlayerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('summary');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = VALID_TABS.includes(searchParams.get('tab')) ? searchParams.get('tab') : 'summary';
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (VALID_TABS.includes(t) && t !== activeTab) {
+      setActiveTab(t);
+    }
+  }, [searchParams]);
+
+  const changeTab = (id) => {
+    setActiveTab(id);
+    setSearchParams(id === 'summary' ? {} : { tab: id }, { replace: true });
+  };
   const [data, setData] = useState(null);
   const [achievementData, setAchievementData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -100,6 +117,7 @@ export default function PlayerDashboard() {
 
   const tabs = [
     { id: 'summary', label: 'ダッシュボード', icon: BarChart3 },
+    { id: 'tasks', label: 'タスク', icon: ClipboardList },
     { id: 'evaluation', label: '評価分析', icon: Target },
     { id: 'progress', label: '上達状況', icon: TrendingUp }
   ];
@@ -120,7 +138,7 @@ export default function PlayerDashboard() {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => changeTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'border-primary-600 text-primary-600'
@@ -135,6 +153,11 @@ export default function PlayerDashboard() {
       </div>
 
       {activeTab === 'summary' && <SummaryTab data={data} achievementData={achievementData} navigate={navigate} playerId={playerId} />}
+      {activeTab === 'tasks' && (
+        <div className="max-w-2xl">
+          <TaskListWidget />
+        </div>
+      )}
       {activeTab === 'evaluation' && <EvaluationTab data={data} />}
       {activeTab === 'progress' && (
         <ProgressTab 
