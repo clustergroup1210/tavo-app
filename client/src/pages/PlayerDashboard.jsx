@@ -46,6 +46,26 @@ export default function PlayerDashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [playerId, setPlayerId] = useState(null);
+  const [openTaskCount, setOpenTaskCount] = useState(0);
+
+  const fetchOpenTaskCount = async () => {
+    try {
+      const res = await fetch('/api/tasks/my-tasks', { credentials: 'include' });
+      if (res.ok) {
+        const list = await res.json();
+        const open = (Array.isArray(list) ? list : []).filter(
+          t => t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
+        ).length;
+        setOpenTaskCount(open);
+      }
+    } catch (err) {
+      console.error('Failed to fetch task count:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchOpenTaskCount();
+  }, [activeTab]);
 
   useEffect(() => {
     fetchPlayerInfo();
@@ -117,7 +137,7 @@ export default function PlayerDashboard() {
 
   const tabs = [
     { id: 'summary', label: 'ダッシュボード', icon: BarChart3 },
-    { id: 'tasks', label: 'タスク', icon: ClipboardList },
+    { id: 'tasks', label: 'タスク', icon: ClipboardList, badge: openTaskCount },
     { id: 'evaluation', label: '評価分析', icon: Target },
     { id: 'progress', label: '上達状況', icon: TrendingUp }
   ];
@@ -147,6 +167,11 @@ export default function PlayerDashboard() {
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
+              {tab.badge > 0 && (
+                <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-semibold text-white bg-red-500 rounded-full">
+                  {tab.badge}
+                </span>
+              )}
             </button>
           ))}
         </nav>
