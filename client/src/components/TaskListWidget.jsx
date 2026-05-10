@@ -51,6 +51,8 @@ export default function TaskListWidget() {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [confirmingId, setConfirmingId] = useState(null);
+  const [completingId, setCompletingId] = useState(null);
 
   const playerMode = (isPlayer() || isParent()) && !canAssign;
 
@@ -116,8 +118,19 @@ export default function TaskListWidget() {
     [tasks]
   );
 
+  const askConfirm = (taskId, e) => {
+    e?.stopPropagation();
+    setConfirmingId(taskId);
+  };
+
+  const cancelConfirm = (e) => {
+    e?.stopPropagation();
+    setConfirmingId(null);
+  };
+
   const handleComplete = async (taskId, e) => {
     e?.stopPropagation();
+    setCompletingId(taskId);
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
@@ -125,11 +138,22 @@ export default function TaskListWidget() {
         credentials: 'include',
         body: JSON.stringify({ status: 'COMPLETED' })
       });
-      if (res.ok) setTasks(prev => prev.filter(t => t.id !== taskId));
+      if (res.ok) {
+        setTasks(prev => prev.filter(t => t.id !== taskId));
+        setConfirmingId(null);
+      }
     } catch (err) {
       console.error('Failed to complete task:', err);
+    } finally {
+      setCompletingId(null);
     }
   };
+
+  useEffect(() => {
+    if (!confirmingId) return;
+    const timer = setTimeout(() => setConfirmingId(null), 6000);
+    return () => clearTimeout(timer);
+  }, [confirmingId]);
 
   const handleNavigate = (task) => {
     if (task.targetUrl) navigate(task.targetUrl);
@@ -182,23 +206,34 @@ export default function TaskListWidget() {
             const due = formatDueDate(task.dueDate);
             const typeMeta = TARGET_TYPES.find(t => t.value === task.targetType);
             const TypeIcon = typeMeta?.icon;
-            const clickable = !!task.targetUrl;
+            const isConfirming = confirmingId === task.id;
+            const isCompleting = completingId === task.id;
+            const clickable = !!task.targetUrl && !isConfirming;
             return (
               <div
                 key={task.id}
                 onClick={() => clickable && handleNavigate(task)}
                 className={clsx(
                   'flex items-center gap-3 px-4 sm:px-5 py-3 transition-colors',
-                  clickable ? 'cursor-pointer hover:bg-gray-50' : ''
+                  clickable ? 'cursor-pointer hover:bg-gray-50' : '',
+                  isConfirming && 'bg-green-50/40'
                 )}
               >
                 <button
-                  onClick={(e) => handleComplete(task.id, e)}
-                  className="flex-shrink-0 w-5 h-5 rounded-md border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 flex items-center justify-center transition-colors group"
-                  aria-label="完了にする"
-                  title="完了にする"
+                  onClick={(e) => isConfirming ? cancelConfirm(e) : askConfirm(task.id, e)}
+                  className={clsx(
+                    'flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors group',
+                    isConfirming
+                      ? 'border-green-500 bg-green-100'
+                      : 'border-gray-300 hover:border-green-500 hover:bg-green-50'
+                  )}
+                  aria-label={isConfirming ? '完了をキャンセル' : '完了にする'}
+                  title={isConfirming ? '完了をキャンセル' : '完了にする'}
                 >
-                  <Check className="w-3 h-3 text-transparent group-hover:text-green-600" />
+                  <Check className={clsx(
+                    'w-3 h-3',
+                    isConfirming ? 'text-green-700' : 'text-transparent group-hover:text-green-600'
+                  )} />
                 </button>
 
                 <div className="flex-1 min-w-0">
@@ -241,7 +276,25 @@ export default function TaskListWidget() {
                   </div>
                 </div>
 
-                {clickable && (
+                {isConfirming ? (
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                      onClick={(e) => handleComplete(task.id, e)}
+                      disabled={isCompleting}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-white bg-green-600 hover:bg-green-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Check className="w-3 h-3" />
+                      {isCompleting ? '処理中...' : 'タスク完了とする'}
+                    </button>
+                    <button
+                      onClick={cancelConfirm}
+                      disabled={isCompleting}
+                      className="inline-flex items-center px-2 py-1 text-[11px] text-gray-600 bg-white border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      キャンセル
+                    </button>
+                  </div>
+                ) : clickable && (
                   <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
                 )}
               </div>
