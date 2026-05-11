@@ -6,8 +6,9 @@ import {
   UserCircle, Building2, Calendar, Ruler, Scale, Footprints, User, AlertCircle, FileText
 } from 'lucide-react';
 import clsx from 'clsx';
+import AppealPreviewPanel from '../components/AppealPreviewPanel';
 
-function AppealPreviewPanel({ token, onClose }) {
+function _LegacyAppealPreviewPanel({ token, onClose }) {
   const [appeal, setAppeal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

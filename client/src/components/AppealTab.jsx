@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Link2, ExternalLink, Copy, Check, Edit2, Star, Eye, EyeOff } from 'lucide-react';
 import clsx from 'clsx';
+import AppealPreviewPanel from './AppealPreviewPanel';
 
 export default function AppealTab({ player, isSelf, isCoachOrAdmin, onCreateAppeal, onRefresh }) {
   const [copiedId, setCopiedId] = useState(null);
   const [editingLink, setEditingLink] = useState(null);
   const [recommendationText, setRecommendationText] = useState('');
   const [saving, setSaving] = useState(false);
+  const [previewToken, setPreviewToken] = useState(null);
 
   const copyToClipboard = async (url, id) => {
     try {
@@ -164,12 +166,19 @@ export default function AppealTab({ player, isSelf, isCoachOrAdmin, onCreateAppe
                   >
                     {copiedId === link.id ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   </button>
+                  <button
+                    onClick={() => setPreviewToken(link.token)}
+                    className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition"
+                    title="プレビュー"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
                   <a
                     href={`/appeal/${link.token}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition"
-                    title="プレビュー"
+                    title="新しいタブで開く"
                   >
                     <ExternalLink className="w-4 h-4" />
                   </a>
@@ -222,6 +231,10 @@ export default function AppealTab({ player, isSelf, isCoachOrAdmin, onCreateAppe
             }
           </p>
         </div>
+      )}
+
+      {previewToken && (
+        <AppealPreviewPanel token={previewToken} onClose={() => setPreviewToken(null)} />
       )}
 
       {editingLink && (
