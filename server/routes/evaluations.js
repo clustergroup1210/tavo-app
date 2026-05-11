@@ -1,11 +1,25 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
+const multer = require('multer');
+const Papa = require('papaparse');
 const { authenticate, hasTeamAccess, canEvaluatePlayer } = require('../middleware/auth');
 const { createNotification } = require('../services/notificationService');
 const { filterDataByVisibility } = require('../services/dataVisibilityService');
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+      cb(null, true);
+    } else {
+      cb(new Error('CSVファイルのみアップロードできます'), false);
+    }
+  }
+});
 
 async function getPlayerTeamMembershipPeriods(playerId, teamId) {
   const team = await prisma.team.findUnique({
@@ -232,6 +246,146 @@ router.post('/items', authenticate, async (req, res) => {
     res.json(item);
   } catch (error) {
     res.status(500).json({ error: 'Failed to create evaluation item' });
+  }
+});
+
+router.post('/items/import-csv', authenticate, csvUpload.single('file'), async (req, res) => {
+  try {
+    const { teamId } = req.query;
+    const mode = (req.query.mode || 'append').toLowerCase();
+
+    if (!teamId) return res.status(400).json({ error: 'teamId is required' });
+    if (!req.file) return res.status(400).json({ error: 'CSVファイルを添付してください' });
+    if (!['append', 'replace'].includes(mode)) {
+      return res.status(400).json({ error: 'mode must be append or replace' });
+    }
+
+    if (!hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH']) && !isOperator(req.user)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const csvText = req.file.buffer.toString('utf-8').replace(/^\uFEFF/, '');
+    const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true, transformHeader: h => h.trim() });
+    if (parsed.errors && parsed.errors.length > 0) {
+      return res.status(400).json({ error: 'CSV解析に失敗しました', details: parsed.errors.slice(0, 5) });
+    }
+
+    const required = ['category', 'subCategory', 'name'];
+    const headers = parsed.meta?.fields || [];
+    const missing = required.filter(c => !headers.includes(c));
+    if (missing.length) {
+      return res.status(400).json({ error: `必須列が不足しています: ${missing.join(', ')}` });
+    }
+
+    const rowErrors = [];
+    const cleanedRows = [];
+    parsed.data.forEach((row, idx) => {
+      const lineNo = idx + 2;
+      const category = (row.category || '').trim();
+      const subCategory = (row.subCategory || '').trim();
+      const name = (row.name || '').trim();
+      const description = (row.description || '').trim();
+      if (!category || !subCategory || !name) {
+        rowErrors.push({ line: lineNo, error: 'category/subCategory/name はいずれも必須です' });
+        return;
+      }
+      cleanedRows.push({ category, subCategory, name, description });
+    });
+
+    if (cleanedRows.length === 0) {
+      return res.status(400).json({ error: '有効な行が1件もありません', rowErrors });
+    }
+
+    const created = await prisma.$transaction(async (tx) => {
+      if (mode === 'replace') {
+        const existing = await tx.evaluationItem.findMany({
+          where: { teamId },
+          select: { id: true }
+        });
+        const ids = existing.map(e => e.id);
+        if (ids.length > 0) {
+          const inUse = await tx.evaluation.count({ where: { itemId: { in: ids } } });
+          if (inUse > 0) {
+            throw Object.assign(new Error('既存の評価データがあるため全件入れ替えできません。append モードを使うか、既存評価を整理してください。'), { httpStatus: 409 });
+          }
+          await tx.evaluationItem.deleteMany({ where: { teamId } });
+        }
+      }
+
+      const existingItems = await tx.evaluationItem.findMany({
+        where: { teamId, isActive: true },
+        select: { id: true, name: true, parentId: true }
+      });
+      const topByName = new Map();
+      const subByParentName = new Map();
+      existingItems.forEach(it => {
+        if (!it.parentId) topByName.set(it.name, it.id);
+      });
+      existingItems.forEach(it => {
+        if (it.parentId) subByParentName.set(`${it.parentId}::${it.name}`, it.id);
+      });
+
+      let topOrder = topByName.size;
+      const subOrderByParent = new Map();
+      const leafOrderByParent = new Map();
+
+      let leafCount = 0;
+
+      for (const row of cleanedRows) {
+        let topId = topByName.get(row.category);
+        if (!topId) {
+          const top = await tx.evaluationItem.create({
+            data: { teamId, parentId: null, name: row.category, sortOrder: topOrder++ }
+          });
+          topId = top.id;
+          topByName.set(row.category, topId);
+        }
+
+        const subKey = `${topId}::${row.subCategory}`;
+        let subId = subByParentName.get(subKey);
+        if (!subId) {
+          const order = subOrderByParent.get(topId) ?? 0;
+          const sub = await tx.evaluationItem.create({
+            data: { teamId, parentId: topId, name: row.subCategory, sortOrder: order }
+          });
+          subOrderByParent.set(topId, order + 1);
+          subId = sub.id;
+          subByParentName.set(subKey, subId);
+        }
+
+        const leafKey = `${subId}::${row.name}`;
+        if (!subByParentName.has(leafKey)) {
+          const order = leafOrderByParent.get(subId) ?? 0;
+          await tx.evaluationItem.create({
+            data: {
+              teamId,
+              parentId: subId,
+              name: row.name,
+              description: row.description || null,
+              maxScore: 5,
+              sortOrder: order
+            }
+          });
+          leafOrderByParent.set(subId, order + 1);
+          subByParentName.set(leafKey, true);
+          leafCount++;
+        }
+      }
+
+      return { leafCount };
+    });
+
+    res.json({
+      success: true,
+      mode,
+      imported: created.leafCount,
+      processedRows: cleanedRows.length,
+      rowErrors
+    });
+  } catch (error) {
+    if (error.httpStatus) return res.status(error.httpStatus).json({ error: error.message });
+    console.error('Import CSV error:', error);
+    res.status(500).json({ error: error.message || 'CSVインポートに失敗しました' });
   }
 });
 

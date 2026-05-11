@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Edit2, ChevronDown, ChevronRight, Download, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react';
+import { Plus, Edit2, ChevronDown, ChevronRight, Download, ToggleLeft, ToggleRight, Trash2, Upload, FileText, X } from 'lucide-react';
 
 const LEVEL_LABELS = ['大項目', '中項目', '小項目'];
 const LEVEL_COLORS = [
@@ -21,6 +21,12 @@ export default function EvaluationItems() {
   const [importing, setImporting] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
   const [addLevel, setAddLevel] = useState(0);
+  const [showCsvModal, setShowCsvModal] = useState(false);
+  const [csvFile, setCsvFile] = useState(null);
+  const [csvMode, setCsvMode] = useState('append');
+  const [csvUploading, setCsvUploading] = useState(false);
+  const [csvResult, setCsvResult] = useState(null);
+  const [csvError, setCsvError] = useState(null);
   const [newItem, setNewItem] = useState({
     name: '',
     description: '',
@@ -71,6 +77,58 @@ export default function EvaluationItems() {
     } catch (error) {
       console.error('Failed to fetch templates:', error);
     }
+  };
+
+  const downloadCsvTemplate = () => {
+    const sample = [
+      'category,subCategory,name,description',
+      '心,プレーメンタル,執着心,ボールに最後まで足を止めずに食らいついている',
+      '技,個人技術,ルックアップ,ボールを受ける前に周囲を確認している',
+      '体,インテンシティ,球際の強さ,1対1で身体を当てて競り勝っている'
+    ].join('\n');
+    const blob = new Blob(['\uFEFF' + sample], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'evaluation_criteria_template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCsvUpload = async () => {
+    if (!csvFile || !currentTeam) return;
+    if (csvMode === 'replace' && !confirm('既存の評価項目を全件削除して入れ替えます。よろしいですか？\n（既存評価データがある場合は失敗します）')) return;
+    setCsvUploading(true);
+    setCsvError(null);
+    setCsvResult(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', csvFile);
+      const res = await fetch(`/api/evaluations/items/import-csv?teamId=${currentTeam.id}&mode=${csvMode}`, {
+        method: 'POST',
+        credentials: 'include',
+        body: fd
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCsvError(data.error || 'インポートに失敗しました');
+        return;
+      }
+      setCsvResult(data);
+      fetchItems();
+    } catch (err) {
+      setCsvError(err.message);
+    } finally {
+      setCsvUploading(false);
+    }
+  };
+
+  const closeCsvModal = () => {
+    setShowCsvModal(false);
+    setCsvFile(null);
+    setCsvMode('append');
+    setCsvResult(null);
+    setCsvError(null);
   };
 
   const handleImportTemplate = async (templateTeamId) => {
@@ -407,6 +465,14 @@ export default function EvaluationItems() {
               無効項目も表示
             </label>
             <button
+              onClick={() => setShowCsvModal(true)}
+              className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+              title="CSVから一括登録"
+            >
+              <Upload className="w-4 h-4" />
+              CSVインポート
+            </button>
+            <button
               onClick={handleAddTopLevel}
               className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
             >
@@ -416,6 +482,110 @@ export default function EvaluationItems() {
           </div>
         )}
       </div>
+
+      {showCsvModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+              <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                <Upload className="w-4 h-4 text-primary-600" />
+                評価項目を CSV から一括登録
+              </h3>
+              <button onClick={closeCsvModal} className="p-1 text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600 space-y-1">
+                <p className="font-medium text-gray-700">CSVフォーマット (UTF-8)</p>
+                <code className="block font-mono bg-white px-2 py-1 rounded border border-gray-200">category,subCategory,name,description</code>
+                <p>例: 「心,プレーメンタル,執着心,ボールに最後まで足を止めずに食らいついている」</p>
+                <p>同じ category / subCategory は自動的にまとめられます。description は省略可。</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={downloadCsvTemplate}
+                className="inline-flex items-center gap-1.5 text-xs text-primary-600 hover:underline"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                テンプレートCSVをダウンロード
+              </button>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">CSVファイル</label>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => { setCsvFile(e.target.files?.[0] || null); setCsvResult(null); setCsvError(null); }}
+                  className="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">登録モード</label>
+                <div className="space-y-1.5">
+                  <label className="flex items-start gap-2 text-sm cursor-pointer">
+                    <input type="radio" checked={csvMode === 'append'} onChange={() => setCsvMode('append')} className="mt-0.5" />
+                    <span>
+                      <span className="font-medium">追加 (推奨)</span>
+                      <span className="block text-xs text-gray-500">既存の項目に追加し、同名の大/中項目は再利用します</span>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 text-sm cursor-pointer">
+                    <input type="radio" checked={csvMode === 'replace'} onChange={() => setCsvMode('replace')} className="mt-0.5" />
+                    <span>
+                      <span className="font-medium text-red-700">全件入れ替え</span>
+                      <span className="block text-xs text-gray-500">既存の項目を全削除して入れ替え（既存評価がある場合は失敗）</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              {csvError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                  {csvError}
+                </div>
+              )}
+
+              {csvResult && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+                  <p className="font-medium">インポートが完了しました</p>
+                  <p className="text-xs mt-1">処理行数: {csvResult.processedRows} / 新規評価項目: {csvResult.imported}</p>
+                  {csvResult.rowErrors?.length > 0 && (
+                    <details className="mt-2">
+                      <summary className="text-xs cursor-pointer text-amber-700">スキップ {csvResult.rowErrors.length} 件</summary>
+                      <ul className="mt-1 text-xs text-amber-700 list-disc pl-5">
+                        {csvResult.rowErrors.slice(0, 10).map((e, i) => (
+                          <li key={i}>L{e.line}: {e.error}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-gray-100 flex justify-end gap-2">
+              <button
+                onClick={closeCsvModal}
+                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+                disabled={csvUploading}
+              >
+                {csvResult ? '閉じる' : 'キャンセル'}
+              </button>
+              {!csvResult && (
+                <button
+                  onClick={handleCsvUpload}
+                  disabled={!csvFile || csvUploading}
+                  className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {csvUploading ? 'アップロード中...' : 'インポート実行'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {canManage && (
         <div className="flex items-center gap-4 text-xs text-gray-500">

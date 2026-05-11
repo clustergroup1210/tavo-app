@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Save, Plus, X, Calendar, CheckCircle, HelpCircle, Trash2, Edit3, ChevronLeft, ChevronRight, ChevronDown, Users } from 'lucide-react';
+import { Save, Plus, X, Calendar, CheckCircle, HelpCircle, Info, Trash2, Edit3, ChevronLeft, ChevronRight, ChevronDown, Users } from 'lucide-react';
 import clsx from 'clsx';
 
 const getScoreColor = (score) => {
@@ -20,6 +20,14 @@ const getScoreBg = (score) => {
   if (score >= 3) return 'bg-yellow-50';
   if (score >= 2) return 'bg-orange-50';
   return 'bg-red-50';
+};
+
+const getScoreButtonSelectedClass = (score) => {
+  if (score >= 5) return 'bg-blue-500 text-white border border-blue-600';
+  if (score >= 4) return 'bg-green-500 text-white border border-green-600';
+  if (score >= 3) return 'bg-yellow-500 text-white border border-yellow-600';
+  if (score >= 2) return 'bg-orange-500 text-white border border-orange-600';
+  return 'bg-red-500 text-white border border-red-600';
 };
 
 export default function EvaluationEntry() {
@@ -305,6 +313,16 @@ export default function EvaluationEntry() {
   })), [items]);
 
   const [collapsedParents, setCollapsedParents] = useState(() => new Set());
+  const [openInfoId, setOpenInfoId] = useState(null);
+
+  useEffect(() => {
+    if (!openInfoId) return;
+    const onDocClick = (e) => {
+      if (!e.target.closest('[data-info-popover]')) setOpenInfoId(null);
+    };
+    document.addEventListener('click', onDocClick);
+    return () => document.removeEventListener('click', onDocClick);
+  }, [openInfoId]);
 
   const toggleParentCollapsed = (parentId) => {
     setCollapsedParents(prev => {
@@ -551,7 +569,7 @@ export default function EvaluationEntry() {
                         {r.name.replace(/年/, '/').replace(/月/, '')}
                       </th>
                     ))}
-                    <th className="border-b border-gray-200 px-1 py-2 text-center font-semibold text-primary-700 min-w-[60px] w-[60px] bg-primary-50 whitespace-nowrap">
+                    <th className="border-b border-gray-200 px-1 py-2 text-center font-semibold text-primary-700 min-w-[230px] w-[230px] bg-primary-50 whitespace-nowrap">
                       {rounds.find(r => r.id === selectedRound)?.name.replace(/年/, '/').replace(/月/, '') || '今回'}
                     </th>
                   </tr>
@@ -608,7 +626,33 @@ export default function EvaluationEntry() {
                               </td>
                             )}
                             <td className="sticky left-[90px] z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 text-gray-700 text-[11px]">
-                              {row.leaf.name}
+                              <div className="flex items-center gap-1">
+                                <span className="truncate">{row.leaf.name}</span>
+                                {row.leaf.description && (
+                                  <span className="relative inline-block" data-info-popover>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); setOpenInfoId(openInfoId === row.leaf.id ? null : row.leaf.id); }}
+                                      className="text-gray-400 hover:text-primary-600 flex-shrink-0"
+                                      aria-label="キーファクターを表示"
+                                      title="キーファクターを表示"
+                                    >
+                                      <Info className="w-3 h-3" />
+                                    </button>
+                                    {openInfoId === row.leaf.id && (
+                                      <div className="absolute left-0 top-full mt-1 z-50 w-64 max-w-[80vw] p-2.5 bg-white rounded-lg shadow-lg border border-gray-200 text-[11px] text-gray-700 leading-relaxed whitespace-pre-wrap">
+                                        <div className="font-semibold text-gray-900 text-[11px] mb-1 flex items-center justify-between">
+                                          <span>キーファクター</span>
+                                          <button onClick={() => setOpenInfoId(null)} className="text-gray-400 hover:text-gray-600">
+                                            <X className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                        {row.leaf.description}
+                                      </div>
+                                    )}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             {visibleHistoryRounds.map(r => {
                               const score = scoreMap[`${r.id}_${row.leaf.id}_${evaluatorType}`];
@@ -622,14 +666,28 @@ export default function EvaluationEntry() {
                             })}
                             <td className={clsx('border-b border-gray-200 px-1 py-1 text-center bg-primary-50/30')}>
                               {canEdit ? (
-                                <select
-                                  value={editScores[row.leaf.id] || ''}
-                                  onChange={(e) => handleScoreChange(row.leaf.id, e.target.value)}
-                                  className="w-12 px-0.5 py-0.5 border border-gray-300 rounded text-xs text-center bg-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                                >
-                                  <option value="">-</option>
-                                  {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
-                                </select>
+                                <div className="flex items-center justify-center gap-0.5">
+                                  {[1, 2, 3, 4, 5].map(n => {
+                                    const selected = editScores[row.leaf.id] === n;
+                                    return (
+                                      <button
+                                        key={n}
+                                        type="button"
+                                        onClick={() => handleScoreChange(row.leaf.id, selected ? '' : n)}
+                                        className={clsx(
+                                          'w-9 h-9 sm:w-8 sm:h-8 rounded text-xs sm:text-[11px] font-bold transition-colors',
+                                          selected
+                                            ? getScoreButtonSelectedClass(n)
+                                            : 'bg-white border border-gray-300 text-gray-500 hover:border-primary-400 hover:text-primary-600 active:bg-primary-50'
+                                        )}
+                                        aria-label={selected ? `${n}点 (タップで解除)` : `${n}点`}
+                                        aria-pressed={selected}
+                                      >
+                                        {n}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
                               ) : (
                                 <span className={clsx('inline-flex items-center justify-center w-6 h-5 rounded text-[11px] font-bold', editScores[row.leaf.id] ? getScoreColor(editScores[row.leaf.id]) : 'text-gray-300')}>
                                   {editScores[row.leaf.id] || '-'}
