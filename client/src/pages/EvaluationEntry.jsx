@@ -314,6 +314,10 @@ export default function EvaluationEntry() {
   })), [items]);
 
   const [collapsedParents, setCollapsedParents] = useState(() => new Set());
+
+  useEffect(() => {
+    setCollapsedParents(new Set(items.map(i => i.id)));
+  }, [items]);
   const [openInfoId, setOpenInfoId] = useState(null);
   const [infoAnchor, setInfoAnchor] = useState({ top: 0, left: 0 });
   const [infoText, setInfoText] = useState('');
