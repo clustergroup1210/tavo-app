@@ -7,7 +7,6 @@ export default function Placeholder() {
   const titles = {
     '/announcements': 'お知らせ',
     '/permissions': '権限管理',
-    '/master': 'マスタ設定',
     '/settings': 'システム設定',
   };
 

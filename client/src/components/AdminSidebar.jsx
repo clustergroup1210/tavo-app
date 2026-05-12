@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   LayoutDashboard, Building2, Users, UserCog, Settings, 
-  Database, Shield, LogOut, Bell, X
+  Shield, LogOut, Bell, X
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -25,7 +25,6 @@ export default function AdminSidebar({ isOpen, onClose }) {
     ],
     settings: [
       { path: '/admin/organizations', label: '組織管理', icon: Shield },
-      { path: '/admin/master', label: 'マスタ設定', icon: Database },
       { path: '/admin/notifications', label: '通知管理', icon: Bell },
       { path: '/admin/settings', label: 'システム設定', icon: Settings },
     ],

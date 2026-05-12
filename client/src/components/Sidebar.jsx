@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   LayoutDashboard, Users, UserCircle, ClipboardList, Video, 
-  Bell, Settings, Building2, UserCog, ListChecks, Database,
+  Bell, Settings, Building2, UserCog, ListChecks,
   Link2, FileText, TrendingUp, LogOut, Megaphone, ArrowLeft, Shield, Trophy, Target,
   Calendar, UserPlus, X, Grid3X3
 } from 'lucide-react';
@@ -57,7 +57,6 @@ export default function Sidebar({ isOpen, onClose }) {
           { path: '/users', label: 'ユーザー管理', icon: UserCog },
           { path: '/permissions', label: '権限管理', icon: UserCog },
           { path: '/evaluations/items', label: '評価項目管理', icon: ListChecks },
-          { path: '/master', label: 'マスタ設定', icon: Database },
           { path: '/settings', label: 'システム設定', icon: Settings },
         ],
       };
@@ -79,7 +78,6 @@ export default function Sidebar({ isOpen, onClose }) {
           { path: '/users', label: 'ユーザー管理', icon: UserCog },
           { path: '/permissions', label: '権限管理', icon: Shield },
           { path: '/evaluations/items', label: '評価項目管理', icon: ListChecks },
-          { path: '/master', label: 'マスタ設定', icon: Database },
           { path: '/settings', label: 'システム設定', icon: Settings },
         ],
       };

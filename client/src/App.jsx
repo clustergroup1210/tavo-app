@@ -32,7 +32,6 @@ import Calendar from './pages/Calendar';
 import Announcements from './pages/Announcements';
 import TeamCategoryManagement from './pages/TeamCategoryManagement';
 import PlayerProgress from './pages/PlayerProgress';
-import MasterSettings from './pages/MasterSettings';
 import JoinRequests from './pages/JoinRequests';
 import AppealManagement from './pages/AppealManagement';
 import NotificationSettings from './pages/NotificationSettings';
@@ -133,7 +132,6 @@ export default function App() {
           <Route path="/admin/teams/:teamId/dashboard" element={<AdminTeamView />} />
           <Route path="/admin/users" element={<AdminUserManagement />} />
           <Route path="/admin/organizations" element={<Organizations />} />
-          <Route path="/admin/master" element={<MasterSettings />} />
           <Route path="/admin/notifications" element={<AdminNotificationManagement />} />
           <Route path="/admin/settings" element={<AdminSystemSettings />} />
         </Route>
@@ -158,7 +156,6 @@ export default function App() {
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/announcements" element={<Announcements />} />
           <Route path="/permissions" element={<Placeholder />} />
-          <Route path="/master" element={<MasterSettings />} />
           <Route path="/settings" element={<TeamSettings />} />
           <Route path="/goal-categories" element={<GoalCategoryManagement />} />
           <Route path="/staff" element={<StaffManagement />} />
