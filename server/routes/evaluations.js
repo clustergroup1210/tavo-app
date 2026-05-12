@@ -282,10 +282,27 @@ router.post('/items/import-csv', authenticate, csvUploadMiddleware, async (req, 
     }
 
     const csvText = req.file.buffer.toString('utf-8').replace(/^\uFEFF/, '');
+
+    // Map Japanese / common alias headers → canonical English keys
+    const HEADER_ALIASES = {
+      category: ['category', '大項目', '大分類', 'カテゴリ', 'カテゴリー', 'コーナー'],
+      subCategory: ['subcategory', 'sub_category', 'sub category', '中項目', '中分類', 'サブカテゴリ', 'サブカテゴリー', 'エレメント'],
+      name: ['name', '小項目', '評価項目', '項目', '項目名'],
+      description: ['description', '説明', 'キーファクター', 'キーファクタ', 'desc'],
+    };
+    const normalizeHeader = (raw) => {
+      const h = (raw || '').trim();
+      const lower = h.toLowerCase();
+      for (const [canonical, aliases] of Object.entries(HEADER_ALIASES)) {
+        if (aliases.some(a => a.toLowerCase() === lower)) return canonical;
+      }
+      return h;
+    };
+
     const parsed = Papa.parse(csvText, {
       header: true,
       skipEmptyLines: 'greedy',
-      transformHeader: h => (h || '').trim(),
+      transformHeader: normalizeHeader,
     });
     // PapaParse emits non-fatal warnings (TooFewFields/TooManyFields) for trailing
     // empty rows / extra commas — we only want to fail on truly fatal parser errors.

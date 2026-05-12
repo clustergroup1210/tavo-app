@@ -499,8 +499,9 @@ export default function EvaluationItems() {
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600 space-y-1">
                 <p className="font-medium text-gray-700">CSVフォーマット (UTF-8)</p>
                 <code className="block font-mono bg-white px-2 py-1 rounded border border-gray-200">category,subCategory,name,description</code>
+                <p className="text-[11px]">日本語ヘッダーも可: <code>大項目,中項目,小項目,キーファクター</code></p>
                 <p>例: 「心,プレーメンタル,執着心,ボールに最後まで足を止めずに食らいついている」</p>
-                <p>同じ category / subCategory は自動的にまとめられます。description は省略可。</p>
+                <p>同じ category / subCategory は自動的にまとめられます。description (キーファクター) は省略可。</p>
               </div>
 
               <button
