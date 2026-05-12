@@ -282,9 +282,21 @@ router.post('/items/import-csv', authenticate, csvUploadMiddleware, async (req, 
     }
 
     const csvText = req.file.buffer.toString('utf-8').replace(/^\uFEFF/, '');
-    const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true, transformHeader: h => h.trim() });
-    if (parsed.errors && parsed.errors.length > 0) {
-      return res.status(400).json({ error: 'CSV解析に失敗しました', details: parsed.errors.slice(0, 5) });
+    const parsed = Papa.parse(csvText, {
+      header: true,
+      skipEmptyLines: 'greedy',
+      transformHeader: h => (h || '').trim(),
+    });
+    // PapaParse emits non-fatal warnings (TooFewFields/TooManyFields) for trailing
+    // empty rows / extra commas — we only want to fail on truly fatal parser errors.
+    const fatal = (parsed.errors || []).filter(e =>
+      e.code !== 'TooFewFields' && e.code !== 'TooManyFields' && e.code !== 'UndetectableDelimiter'
+    );
+    if (fatal.length > 0) {
+      return res.status(400).json({ error: 'CSV解析に失敗しました', details: fatal.slice(0, 5) });
+    }
+    if (!parsed.data || parsed.data.length === 0) {
+      return res.status(400).json({ error: 'CSVに行データがありません' });
     }
 
     const required = ['category', 'subCategory', 'name'];
