@@ -539,7 +539,7 @@ router.get('/history/:playerId', authenticate, async (req, res) => {
       teamIds.push(player.team.parentId);
     }
 
-    const [allItems, rounds, evaluations] = await Promise.all([
+    const [allItems, roundsRaw, evaluations] = await Promise.all([
       prisma.evaluationItem.findMany({
         where: { teamId: { in: teamIds }, isActive: true },
         orderBy: { sortOrder: 'asc' }
@@ -553,6 +553,35 @@ router.get('/history/:playerId', authenticate, async (req, res) => {
         select: { itemId: true, roundId: true, score: true, raterType: true }
       })
     ]);
+
+    let rounds = roundsRaw;
+    try {
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const monthName = `${now.getFullYear()}年${now.getMonth() + 1}月`;
+      const hasCurrent = rounds.some(r =>
+        r.teamId === player.teamId &&
+        r.startDate.getFullYear() === now.getFullYear() &&
+        r.startDate.getMonth() === now.getMonth()
+      );
+      if (!hasCurrent) {
+        try {
+          const created = await prisma.evaluationRound.create({
+            data: { teamId: player.teamId, name: monthName, startDate: monthStart, endDate: monthEnd }
+          });
+          rounds = [...rounds, created].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+        } catch (createErr) {
+          const refetched = await prisma.evaluationRound.findMany({
+            where: { teamId: { in: teamIds } },
+            orderBy: { startDate: 'asc' }
+          });
+          rounds = refetched;
+        }
+      }
+    } catch (e) {
+      console.error('Auto-create monthly round failed:', e?.message);
+    }
 
     const scoreMap = {};
     evaluations.forEach(e => {

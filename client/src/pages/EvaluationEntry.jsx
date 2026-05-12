@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Save, Plus, X, Calendar, CheckCircle, HelpCircle, Info, Trash2, Edit3, ChevronLeft, ChevronRight, ChevronDown, Users } from 'lucide-react';
+import { X, CheckCircle, Info, Trash2, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import clsx from 'clsx';
 
 const getScoreColor = (score) => {
@@ -46,18 +46,16 @@ export default function EvaluationEntry() {
   const [selectedRound, setSelectedRound] = useState('');
   const [editScores, setEditScores] = useState({});
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [showAddRound, setShowAddRound] = useState(false);
-  const [newRoundYear, setNewRoundYear] = useState(new Date().getFullYear());
-  const [newRoundMonth, setNewRoundMonth] = useState(new Date().getMonth() + 1);
-  const [addingRound, setAddingRound] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState('');
   const tableRef = useRef(null);
+  const dirtyRef = useRef(false);
+  const autoSaveTimerRef = useRef(null);
+  const autoSaveVersionRef = useRef(0);
 
   const isSelfEval = isPlayer();
   const evaluatorType = isSelfEval ? 'SELF' : 'COACH';
+  const lsKey = `evalEntry.${user?.id || 'anon'}.${evaluatorType}`;
 
   useEffect(() => {
     if (isPlayer() && playerData) {
@@ -100,9 +98,7 @@ export default function EvaluationEntry() {
       setScoreMap({});
       setSelectedRound('');
       setEditScores({});
-      setIsEditing(false);
     }
-    setSuccess(false);
   }, [selectedPlayer]);
 
   useEffect(() => {
@@ -112,10 +108,89 @@ export default function EvaluationEntry() {
         const key = `${selectedRound}_${leaf.id}_${evaluatorType}`;
         if (scoreMap[key]) existing[leaf.id] = scoreMap[key];
       });
+      dirtyRef.current = false;
       setEditScores(existing);
-      setIsEditing(false);
     }
   }, [selectedRound]);
+
+  useEffect(() => { dirtyRef.current = false; }, [selectedPlayer]);
+
+  useEffect(() => {
+    if (!dirtyRef.current) return;
+    if (!selectedPlayer || !selectedRound) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    const playerSnap = selectedPlayer;
+    const roundSnap = selectedRound;
+    const raterSnap = evaluatorType;
+    const version = ++autoSaveVersionRef.current;
+    autoSaveTimerRef.current = setTimeout(async () => {
+      if (version !== autoSaveVersionRef.current) return;
+      const ctrl = new AbortController();
+      try {
+        setAutoSaveStatus('saving');
+        const evaluations = Object.entries(editScores)
+          .filter(([_, s]) => s > 0)
+          .map(([itemId, score]) => ({ itemId, score }));
+        const res = await fetch('/api/evaluations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ playerId: playerSnap, roundId: roundSnap, evaluations }),
+          signal: ctrl.signal,
+        });
+        if (version !== autoSaveVersionRef.current) return;
+        if (playerSnap !== selectedPlayer || roundSnap !== selectedRound) return;
+        if (res.ok) {
+          setScoreMap(prev => {
+            const next = { ...prev };
+            Object.keys(next).forEach(k => {
+              if (k.startsWith(`${roundSnap}_`) && k.endsWith(`_${raterSnap}`)) delete next[k];
+            });
+            evaluations.forEach(({ itemId, score }) => {
+              next[`${roundSnap}_${itemId}_${raterSnap}`] = score;
+            });
+            return next;
+          });
+          dirtyRef.current = false;
+          setAutoSaveStatus('saved');
+          setTimeout(() => {
+            if (version === autoSaveVersionRef.current) {
+              setAutoSaveStatus(s => (s === 'saved' ? '' : s));
+            }
+          }, 1500);
+        } else {
+          setAutoSaveStatus('error');
+        }
+      } catch {
+        if (version === autoSaveVersionRef.current) setAutoSaveStatus('error');
+      }
+    }, 700);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [editScores, selectedPlayer, selectedRound, evaluatorType]);
+
+  useEffect(() => {
+    if (!selectedPlayer) return;
+    try { localStorage.setItem(`${lsKey}.player`, selectedPlayer); } catch {}
+  }, [selectedPlayer, lsKey]);
+
+  useEffect(() => {
+    if (!selectedRound) return;
+    try { localStorage.setItem(`${lsKey}.round`, selectedRound); } catch {}
+  }, [selectedRound, lsKey]);
+
+  useEffect(() => {
+    if (isSelfEval) return;
+    if (selectedPlayer) return;
+    if (searchParams.get('playerId')) return;
+    try {
+      const saved = localStorage.getItem(`${lsKey}.player`);
+      if (saved && players.some(p => p.id === saved)) {
+        setSelectedPlayer(saved);
+      }
+    } catch {}
+  }, [players, isSelfEval]);
 
   const fetchBaseData = async () => {
     const teamId = isPlayer() && playerData ? playerData.teamId : currentTeam?.id;
@@ -156,8 +231,12 @@ export default function EvaluationEntry() {
         setRounds(newRounds);
         setScoreMap(data.scoreMap || {});
 
+        let savedRound = '';
+        try { savedRound = localStorage.getItem(`${lsKey}.round`) || ''; } catch {}
         if (preserveRound && newRounds.some(r => r.id === preserveRound)) {
           setSelectedRound(preserveRound);
+        } else if (savedRound && newRounds.some(r => r.id === savedRound)) {
+          setSelectedRound(savedRound);
         } else if (newRounds.length > 0) {
           setSelectedRound(newRounds[newRounds.length - 1].id);
         } else {
@@ -186,45 +265,11 @@ export default function EvaluationEntry() {
     });
   }, [selectedRound, scoreMap, leaves, evaluatorType]);
 
-  const canEdit = !hasExistingEvals || isEditing;
+  const canEdit = true;
 
   const handleScoreChange = (itemId, value) => {
+    dirtyRef.current = true;
     setEditScores(prev => ({ ...prev, [itemId]: parseInt(value) || 0 }));
-  };
-
-  const handleSubmit = async () => {
-    if (!selectedPlayer || !selectedRound) {
-      alert(isSelfEval ? '評価期間を選択してください' : '選手と評価期間を選択してください');
-      return;
-    }
-    setSaving(true);
-    setSuccess(false);
-    try {
-      const evaluations = Object.entries(editScores)
-        .filter(([_, score]) => score > 0)
-        .map(([itemId, score]) => ({ itemId, score }));
-
-      const res = await fetch('/api/evaluations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ playerId: selectedPlayer, roundId: selectedRound, evaluations }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || '評価の保存に失敗しました');
-        return;
-      }
-
-      setSuccess(true);
-      setIsEditing(false);
-      await fetchHistory(selectedRound);
-    } catch (error) {
-      alert('評価の保存に失敗しました');
-    } finally {
-      setSaving(false);
-    }
   };
 
   const handleDelete = async () => {
@@ -244,8 +289,6 @@ export default function EvaluationEntry() {
         return;
       }
       setEditScores({});
-      setIsEditing(false);
-      setSuccess(false);
       await fetchHistory(selectedRound);
     } catch (error) {
       alert('削除に失敗しました');
@@ -254,35 +297,6 @@ export default function EvaluationEntry() {
     }
   };
 
-  const handleAddRound = async () => {
-    const teamId = isPlayer() && playerData ? playerData.teamId : currentTeam?.id;
-    if (!teamId) return;
-    setAddingRound(true);
-    try {
-      const startDate = new Date(newRoundYear, newRoundMonth - 1, 1);
-      const endDate = new Date(newRoundYear, newRoundMonth, 0);
-      const name = `${newRoundYear}年${newRoundMonth}月`;
-      const res = await fetch('/api/evaluations/rounds', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ teamId, name, startDate: startDate.toISOString(), endDate: endDate.toISOString() }),
-      });
-      if (res.ok) {
-        const round = await res.json();
-        setShowAddRound(false);
-        await fetchHistory();
-        setSelectedRound(round.id);
-      } else {
-        const error = await res.json();
-        alert(error.error || '評価期間の追加に失敗しました');
-      }
-    } catch (error) {
-      alert('評価期間の追加に失敗しました');
-    } finally {
-      setAddingRound(false);
-    }
-  };
 
   const buildRowsForParent = (parent) => {
     if (!parent.children || parent.children.length === 0) {
@@ -427,10 +441,6 @@ export default function EvaluationEntry() {
     return historyRounds;
   }, [rounds, selectedRoundIdx]);
 
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
-  const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
-
   const canEvaluatePlayerId = (pid) => {
     if (evaluableInfo.all) return true;
     if (forcedPlayer && forcedPlayer.id === pid) return true;
@@ -443,6 +453,27 @@ export default function EvaluationEntry() {
   }, [players, forcedPlayer]);
 
   const filteredPlayers = mergedPlayers.filter(p => !filterCategory || p.teamCategoryId === filterCategory);
+
+  const evaluablePlayers = useMemo(
+    () => filteredPlayers
+      .filter(p => canEvaluatePlayerId(p.id))
+      .slice()
+      .sort((a, b) => {
+        const an = a.number != null && a.number !== '' ? Number(a.number) : Number.POSITIVE_INFINITY;
+        const bn = b.number != null && b.number !== '' ? Number(b.number) : Number.POSITIVE_INFINITY;
+        if (an !== bn) return an - bn;
+        return (a.name || '').localeCompare(b.name || '', 'ja');
+      }),
+    [filteredPlayers, evaluableInfo, forcedPlayer]
+  );
+
+  const playerIdx = evaluablePlayers.findIndex(p => p.id === selectedPlayer);
+  const goPrevPlayer = () => { if (playerIdx > 0) setSelectedPlayer(evaluablePlayers[playerIdx - 1].id); };
+  const goNextPlayer = () => { if (playerIdx >= 0 && playerIdx < evaluablePlayers.length - 1) setSelectedPlayer(evaluablePlayers[playerIdx + 1].id); };
+
+  const roundIdx = rounds.findIndex(r => r.id === selectedRound);
+  const goPrevRound = () => { if (roundIdx > 0) setSelectedRound(rounds[roundIdx - 1].id); };
+  const goNextRound = () => { if (roundIdx >= 0 && roundIdx < rounds.length - 1) setSelectedRound(rounds[roundIdx + 1].id); };
 
   const selectedPlayerObj = mergedPlayers.find(p => p.id === selectedPlayer) || (isSelfEval && playerData ? playerData : null);
 
@@ -477,22 +508,40 @@ export default function EvaluationEntry() {
                 </div>
               )}
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">選手</label>
-                <select
-                  value={selectedPlayer}
-                  onChange={(e) => setSelectedPlayer(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                >
-                  <option value="">選択してください</option>
-                  {filteredPlayers
-                    .filter(p => canEvaluatePlayerId(p.id))
-                    .map(player => (
+                <label className="block text-xs font-medium text-gray-600 mb-1">選手（背番号順）</label>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={goPrevPlayer}
+                    disabled={playerIdx <= 0}
+                    className="px-2 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="前の選手"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <select
+                    value={selectedPlayer}
+                    onChange={(e) => setSelectedPlayer(e.target.value)}
+                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value="">選択してください</option>
+                    {evaluablePlayers.map(player => (
                       <option key={player.id} value={player.id}>
                         {player.number ? `#${player.number} ` : ''}{player.name}
                         {player.teamCategory ? ` (${player.teamCategory.name})` : ''}
                       </option>
                     ))}
-                </select>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={goNextPlayer}
+                    disabled={playerIdx < 0 || playerIdx >= evaluablePlayers.length - 1}
+                    className="px-2 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="次の選手"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
                 {!evaluableInfo.all && evaluableInfo.playerIds.length === 0 && (
                   <p className="mt-1 text-xs text-amber-600">
                     担当選手が割り当てられていません。チーム管理者に指導者体制の設定を依頼してください。
@@ -507,61 +556,40 @@ export default function EvaluationEntry() {
             </>
           )}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">評価期間</label>
-            <div className="flex gap-2">
+            <label className="block text-xs font-medium text-gray-600 mb-1">評価期間（毎月自動）</label>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={goPrevRound}
+                disabled={roundIdx <= 0}
+                className="px-2 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="前月"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
               <select
                 value={selectedRound}
                 onChange={(e) => setSelectedRound(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               >
                 <option value="">選択してください</option>
                 {rounds.map(round => (
                   <option key={round.id} value={round.id}>{round.name}</option>
                 ))}
               </select>
-              {!isSelfEval && (
-                <button
-                  onClick={() => setShowAddRound(true)}
-                  className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                  title="新しい期間を追加"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={goNextRound}
+                disabled={roundIdx < 0 || roundIdx >= rounds.length - 1}
+                className="px-2 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="次月"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
 
-        {showAddRound && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-semibold text-gray-900 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5" />
-                新しい評価期間を追加
-              </h3>
-              <button onClick={() => setShowAddRound(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="flex items-end gap-2">
-              <div>
-                <label className="block text-[10px] font-medium text-gray-500 mb-1">年</label>
-                <select value={newRoundYear} onChange={(e) => setNewRoundYear(parseInt(e.target.value))} className="px-2 py-1.5 border border-gray-300 rounded text-sm">
-                  {years.map(year => <option key={year} value={year}>{year}年</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-medium text-gray-500 mb-1">月</label>
-                <select value={newRoundMonth} onChange={(e) => setNewRoundMonth(parseInt(e.target.value))} className="px-2 py-1.5 border border-gray-300 rounded text-sm">
-                  {monthOptions.map(month => <option key={month} value={month}>{month}月</option>)}
-                </select>
-              </div>
-              <button onClick={handleAddRound} disabled={addingRound} className="px-3 py-1.5 bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 text-sm font-medium">
-                {addingRound ? '追加中...' : '追加'}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {loading && (
@@ -572,38 +600,34 @@ export default function EvaluationEntry() {
 
       {!loading && selectedPlayer && selectedRound && items.length > 0 && (
         <>
-          {hasExistingEvals && !isEditing && (
-            <div className="p-3 rounded-lg text-sm bg-green-50 text-green-700 border border-green-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4" />
-                <span className="text-xs">この期間の評価は入力済みです</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => { setIsEditing(true); setSuccess(false); }} className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700">
-                  <Edit3 className="w-3 h-3" />
-                  編集
-                </button>
-                <button onClick={handleDelete} disabled={deleting} className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700 disabled:opacity-50">
-                  <Trash2 className="w-3 h-3" />
-                  {deleting ? '...' : '削除'}
-                </button>
-              </div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[11px] flex items-center gap-1.5">
+              {autoSaveStatus === 'saving' && (
+                <span className="text-gray-500 inline-flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                  保存中…
+                </span>
+              )}
+              {autoSaveStatus === 'saved' && (
+                <span className="text-green-600 inline-flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" />
+                  保存しました
+                </span>
+              )}
+              {autoSaveStatus === 'error' && (
+                <span className="text-red-600">保存に失敗しました</span>
+              )}
+              {!autoSaveStatus && (
+                <span className="text-gray-400">入力すると自動保存されます</span>
+              )}
             </div>
-          )}
-
-          {isEditing && (
-            <div className="p-3 rounded-lg text-xs bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-2">
-              <Edit3 className="w-3.5 h-3.5" />
-              編集モード：点数を変更して保存してください
-            </div>
-          )}
-
-          {success && (
-            <div className="p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-xs flex items-center gap-2">
-              <CheckCircle className="w-3.5 h-3.5" />
-              評価を保存しました
-            </div>
-          )}
+            {hasExistingEvals && (
+              <button onClick={handleDelete} disabled={deleting} className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-600 border border-red-200 rounded text-xs font-medium hover:bg-red-100 disabled:opacity-50">
+                <Trash2 className="w-3 h-3" />
+                {deleting ? '...' : 'この期間の評価を削除'}
+              </button>
+            )}
+          </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-200 bg-gray-50">
@@ -631,8 +655,10 @@ export default function EvaluationEntry() {
               <table className="w-full border-collapse text-xs">
                 <thead>
                   <tr className="bg-gray-50">
-                    <th className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-2 text-left font-semibold text-gray-700 min-w-[90px] w-[90px]">中分類</th>
-                    <th className="sticky left-[90px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-2 text-left font-semibold text-gray-700 min-w-[120px] w-[120px]">評価項目</th>
+                    <th className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 px-1 py-2 text-center font-semibold text-gray-700 min-w-[34px] w-[34px]">
+                      <span style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }} className="inline-block tracking-wider">中分類</span>
+                    </th>
+                    <th className="sticky left-[34px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-2 text-left font-semibold text-gray-700 min-w-[120px] w-[120px]">評価項目</th>
                     {visibleHistoryRounds.map(r => (
                       <th key={r.id} className="border-b border-r border-gray-200 px-1 py-2 text-center font-medium text-gray-400 min-w-[52px] w-[52px] whitespace-nowrap">
                         {r.name.replace(/年/, '/').replace(/月/, '')}
@@ -670,8 +696,13 @@ export default function EvaluationEntry() {
                                 <ChevronDown className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" />
                               )}
                               <span className="font-semibold text-gray-900 text-[12px]">{group.parent.name}</span>
-                              <span className="text-[11px] text-gray-500 ml-auto">
-                                {filledCount}/{totalLeaves} 入力済
+                              <span className={clsx(
+                                'text-[11px] ml-auto font-semibold',
+                                totalLeaves > 0 && filledCount === totalLeaves ? 'text-gray-500' : 'text-red-600'
+                              )}>
+                                {totalLeaves > 0 && filledCount === totalLeaves
+                                  ? '完了'
+                                  : `${filledCount}/${totalLeaves} 入力`}
                               </span>
                             </div>
                           </td>
@@ -681,20 +712,22 @@ export default function EvaluationEntry() {
                             {row.isFirstChild && row.childName && (
                               <td
                                 rowSpan={row.childRowSpan}
-                                className="sticky left-0 z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 align-top text-gray-600 text-[11px]"
+                                className="sticky left-0 z-10 bg-white border-b border-r border-gray-200 px-1 py-1.5 text-center align-middle text-gray-700 text-[11px] min-w-[34px] w-[34px]"
                               >
-                                {row.childName}
+                                <span style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }} className="inline-block leading-tight tracking-wider">
+                                  {row.childName}
+                                </span>
                               </td>
                             )}
                             {row.isFirstChild && !row.childName && (
                               <td
                                 rowSpan={row.childRowSpan || 1}
-                                className="sticky left-0 z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 align-top text-gray-400 text-[11px]"
+                                className="sticky left-0 z-10 bg-white border-b border-r border-gray-200 px-1 py-1.5 text-center align-middle text-gray-400 text-[11px] min-w-[34px] w-[34px]"
                               >
                                 -
                               </td>
                             )}
-                            <td className="sticky left-[90px] z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 text-gray-700 text-[11px]">
+                            <td className="sticky left-[34px] z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 text-gray-700 text-[11px]">
                               <div className="flex items-center gap-1">
                                 <span className="truncate">{row.leaf.name}</span>
                                 {row.leaf.description && (
@@ -777,35 +810,6 @@ export default function EvaluationEntry() {
             </div>
           </div>
 
-          <div className="flex justify-end gap-2">
-            {isEditing && (
-              <button
-                onClick={() => {
-                  setIsEditing(false);
-                  const existing = {};
-                  leaves.forEach(leaf => {
-                    const key = `${selectedRound}_${leaf.id}_${evaluatorType}`;
-                    if (scoreMap[key]) existing[leaf.id] = scoreMap[key];
-                  });
-                  setEditScores(existing);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
-              >
-                <X className="w-4 h-4" />
-                キャンセル
-              </button>
-            )}
-            {canEdit && (
-              <button
-                onClick={handleSubmit}
-                disabled={saving || !selectedPlayer || !selectedRound}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 text-sm font-medium"
-              >
-                <Save className="w-4 h-4" />
-                {saving ? '保存中...' : hasExistingEvals ? '更新' : '保存'}
-              </button>
-            )}
-          </div>
         </>
       )}
 
