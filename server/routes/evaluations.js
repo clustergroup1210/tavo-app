@@ -13,13 +13,30 @@ const csvUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+    const name = (file.originalname || '').toLowerCase();
+    const mt = file.mimetype || '';
+    if (
+      name.endsWith('.csv') ||
+      mt === 'text/csv' ||
+      mt === 'application/csv' ||
+      mt === 'application/vnd.ms-excel' ||
+      mt.startsWith('text/')
+    ) {
       cb(null, true);
     } else {
       cb(new Error('CSVファイルのみアップロードできます'), false);
     }
   }
 });
+
+function csvUploadMiddleware(req, res, next) {
+  csvUpload.single('file')(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message || 'ファイルアップロードに失敗しました' });
+    }
+    next();
+  });
+}
 
 async function getPlayerTeamMembershipPeriods(playerId, teamId) {
   const team = await prisma.team.findUnique({
@@ -249,7 +266,7 @@ router.post('/items', authenticate, async (req, res) => {
   }
 });
 
-router.post('/items/import-csv', authenticate, csvUpload.single('file'), async (req, res) => {
+router.post('/items/import-csv', authenticate, csvUploadMiddleware, async (req, res) => {
   try {
     const { teamId } = req.query;
     const mode = (req.query.mode || 'append').toLowerCase();
@@ -297,6 +314,8 @@ router.post('/items/import-csv', authenticate, csvUpload.single('file'), async (
     }
 
     const created = await prisma.$transaction(async (tx) => {
+      // Long timeout: large CSVs loop many awaits inside the tx
+
       if (mode === 'replace') {
         const existing = await tx.evaluationItem.findMany({
           where: { teamId },
@@ -373,7 +392,7 @@ router.post('/items/import-csv', authenticate, csvUpload.single('file'), async (
       }
 
       return { leafCount };
-    });
+    }, { timeout: 60000, maxWait: 10000 });
 
     res.json({
       success: true,
