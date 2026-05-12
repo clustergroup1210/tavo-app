@@ -584,28 +584,28 @@ export default function AdminTeamManagement() {
         </div>
 
         <div className="hidden md:block overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full text-xs">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">
                   チーム名
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider w-20">
                   状態
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">
                   リーグ
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  拠点地域
+                <th className="px-2 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">
+                  拠点
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  選手数
+                <th className="px-2 py-2 text-right text-[11px] font-medium text-gray-500 uppercase tracking-wider w-16">
+                  選手
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  カテゴリー数
+                <th className="px-2 py-2 text-right text-[11px] font-medium text-gray-500 uppercase tracking-wider w-20">
+                  カテゴリ
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-2 text-right text-[11px] font-medium text-gray-500 uppercase tracking-wider w-32">
                   操作
                 </th>
               </tr>
@@ -614,66 +614,67 @@ export default function AdminTeamManagement() {
               {filteredTeams.length > 0 ? (
                 filteredTeams.map((team) => (
                   <tr key={team.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
                         {team.logoUrl ? (
                           <img
                             src={team.logoUrl}
                             alt=""
-                            className="w-10 h-10 rounded-lg object-cover"
+                            className="w-7 h-7 rounded object-cover flex-shrink-0"
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
-                            <Building2 className="w-5 h-5 text-gray-400" />
+                          <div className="w-7 h-7 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                            <Building2 className="w-4 h-4 text-gray-400" />
                           </div>
                         )}
                         <div className="min-w-0">
-                          <p className="font-medium text-gray-900">{team.name}</p>
-                          <div className="flex items-center gap-2 text-xs">
+                          <p className="font-medium text-gray-900 text-sm truncate">{team.name}</p>
+                          <div className="flex items-center gap-1.5 text-[10px]">
                             {team.teamCode && (
-                              <span className="font-mono text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">{team.teamCode}</span>
+                              <span className="font-mono text-gray-700 bg-gray-100 px-1 py-px rounded">{team.teamCode}</span>
                             )}
                             <span className="text-gray-500 truncate">{team.organization?.name}</span>
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <td className="px-2 py-2 whitespace-nowrap">
                       {team.status === 'PENDING' ? (
-                        <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-xs font-medium">仮登録</span>
+                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded text-[10px] font-medium">仮登録</span>
                       ) : (
-                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-xs font-medium">本登録</span>
+                        <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[10px] font-medium">本登録</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    <td className="px-2 py-2 whitespace-nowrap text-gray-600">
                       {team.league ? (
-                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{team.league}</span>
+                        <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px]">{team.league}</span>
                       ) : <span className="text-gray-400">-</span>}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    <td className="px-2 py-2 whitespace-nowrap text-gray-600">
                       {team.region ? (
-                        <span className="px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs">{team.region}</span>
+                        <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px]">{team.region}</span>
                       ) : <span className="text-gray-400">-</span>}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {team.playerCount || 0}人
+                    <td className="px-2 py-2 whitespace-nowrap text-right text-gray-600 tabular-nums">
+                      {team.playerCount || 0}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    <td className="px-2 py-2 whitespace-nowrap text-right text-gray-600 tabular-nums">
                       {team.categoryCount || 0}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-3 py-2 whitespace-nowrap text-right">
+                      <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => handleViewTeamDashboard(team.id)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors text-sm font-medium"
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 text-primary-700 rounded hover:bg-primary-100 transition-colors text-[11px] font-medium"
+                          title="管理画面を開く"
                         >
-                          <ExternalLink className="w-4 h-4" />
-                          管理画面
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          管理
                         </button>
                         <div className="relative" ref={openMenuId === team.id ? menuRef : null}>
                           <button
                             onClick={() => setOpenMenuId(openMenuId === team.id ? null : team.id)}
-                            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
                           >
                             <MoreVertical className="w-4 h-4" />
                           </button>
