@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Save, Plus, X, Calendar, CheckCircle, HelpCircle, Info, Trash2, Edit3, ChevronLeft, ChevronRight, ChevronDown, Users } from 'lucide-react';
@@ -314,14 +315,40 @@ export default function EvaluationEntry() {
 
   const [collapsedParents, setCollapsedParents] = useState(() => new Set());
   const [openInfoId, setOpenInfoId] = useState(null);
+  const [infoAnchor, setInfoAnchor] = useState({ top: 0, left: 0 });
+  const [infoText, setInfoText] = useState('');
+
+  const openInfoPopover = (id, text, e) => {
+    e.stopPropagation();
+    if (openInfoId === id) {
+      setOpenInfoId(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const popoverWidth = Math.min(288, window.innerWidth - 24);
+    let left = rect.left;
+    if (left + popoverWidth > window.innerWidth - 12) {
+      left = Math.max(12, window.innerWidth - popoverWidth - 12);
+    }
+    setInfoAnchor({ top: rect.bottom + 6, left });
+    setInfoText(text);
+    setOpenInfoId(id);
+  };
 
   useEffect(() => {
     if (!openInfoId) return;
     const onDocClick = (e) => {
       if (!e.target.closest('[data-info-popover]')) setOpenInfoId(null);
     };
+    const onScrollOrResize = () => setOpenInfoId(null);
     document.addEventListener('click', onDocClick);
-    return () => document.removeEventListener('click', onDocClick);
+    window.addEventListener('resize', onScrollOrResize);
+    window.addEventListener('scroll', onScrollOrResize, true);
+    return () => {
+      document.removeEventListener('click', onDocClick);
+      window.removeEventListener('resize', onScrollOrResize);
+      window.removeEventListener('scroll', onScrollOrResize, true);
+    };
   }, [openInfoId]);
 
   const toggleParentCollapsed = (parentId) => {
@@ -629,28 +656,16 @@ export default function EvaluationEntry() {
                               <div className="flex items-center gap-1">
                                 <span className="truncate">{row.leaf.name}</span>
                                 {row.leaf.description && (
-                                  <span className="relative inline-block" data-info-popover>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => { e.stopPropagation(); setOpenInfoId(openInfoId === row.leaf.id ? null : row.leaf.id); }}
-                                      className="text-gray-400 hover:text-primary-600 flex-shrink-0"
-                                      aria-label="キーファクターを表示"
-                                      title="キーファクターを表示"
-                                    >
-                                      <Info className="w-3 h-3" />
-                                    </button>
-                                    {openInfoId === row.leaf.id && (
-                                      <div className="absolute left-0 top-full mt-1 z-50 w-64 max-w-[80vw] p-2.5 bg-white rounded-lg shadow-lg border border-gray-200 text-[11px] text-gray-700 leading-relaxed whitespace-pre-wrap">
-                                        <div className="font-semibold text-gray-900 text-[11px] mb-1 flex items-center justify-between">
-                                          <span>キーファクター</span>
-                                          <button onClick={() => setOpenInfoId(null)} className="text-gray-400 hover:text-gray-600">
-                                            <X className="w-3 h-3" />
-                                          </button>
-                                        </div>
-                                        {row.leaf.description}
-                                      </div>
-                                    )}
-                                  </span>
+                                  <button
+                                    type="button"
+                                    data-info-popover
+                                    onClick={(e) => openInfoPopover(row.leaf.id, row.leaf.description, e)}
+                                    className="text-gray-400 hover:text-primary-600 flex-shrink-0"
+                                    aria-label="キーファクターを表示"
+                                    title="キーファクターを表示"
+                                  >
+                                    <Info className="w-3 h-3" />
+                                  </button>
                                 )}
                               </div>
                             </td>
@@ -740,6 +755,29 @@ export default function EvaluationEntry() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
           <p className="text-sm text-gray-500">評価項目が設定されていません</p>
         </div>
+      )}
+
+      {openInfoId && createPortal(
+        <div
+          data-info-popover
+          className="fixed z-[1000] w-72 max-w-[calc(100vw-24px)] p-3 bg-white rounded-lg shadow-xl border border-gray-200 text-xs text-gray-700 leading-relaxed whitespace-pre-wrap"
+          style={{ top: infoAnchor.top, left: infoAnchor.left }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="font-semibold text-gray-900 mb-1.5 flex items-center justify-between gap-2">
+            <span>キーファクター</span>
+            <button
+              type="button"
+              onClick={() => setOpenInfoId(null)}
+              className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+              aria-label="閉じる"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="break-words">{infoText}</div>
+        </div>,
+        document.body
       )}
     </div>
   );
