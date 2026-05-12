@@ -321,6 +321,44 @@ export default function EvaluationEntry() {
   const [openInfoId, setOpenInfoId] = useState(null);
   const [infoAnchor, setInfoAnchor] = useState({ top: 0, left: 0 });
   const [infoText, setInfoText] = useState('');
+  const [openScoreId, setOpenScoreId] = useState(null);
+  const [scoreAnchor, setScoreAnchor] = useState({ top: 0, left: 0 });
+
+  const openScorePicker = (leafId, e) => {
+    e.stopPropagation();
+    if (openScoreId === leafId) {
+      setOpenScoreId(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pickerWidth = 56;
+    const pickerHeight = 6 * 44 + 12;
+    let left = rect.left + rect.width / 2 - pickerWidth / 2;
+    if (left < 8) left = 8;
+    if (left + pickerWidth > window.innerWidth - 8) left = window.innerWidth - pickerWidth - 8;
+    let top = rect.bottom + 4;
+    if (top + pickerHeight > window.innerHeight - 8) {
+      top = Math.max(8, rect.top - pickerHeight - 4);
+    }
+    setScoreAnchor({ top, left });
+    setOpenScoreId(leafId);
+  };
+
+  useEffect(() => {
+    if (!openScoreId) return;
+    const onDocClick = (e) => {
+      if (!e.target.closest('[data-score-picker]')) setOpenScoreId(null);
+    };
+    const onScrollOrResize = () => setOpenScoreId(null);
+    document.addEventListener('click', onDocClick);
+    window.addEventListener('resize', onScrollOrResize);
+    window.addEventListener('scroll', onScrollOrResize, true);
+    return () => {
+      document.removeEventListener('click', onDocClick);
+      window.removeEventListener('resize', onScrollOrResize);
+      window.removeEventListener('scroll', onScrollOrResize, true);
+    };
+  }, [openScoreId]);
 
   const openInfoPopover = (id, text, e) => {
     e.stopPropagation();
@@ -600,7 +638,7 @@ export default function EvaluationEntry() {
                         {r.name.replace(/年/, '/').replace(/月/, '')}
                       </th>
                     ))}
-                    <th className="border-b border-gray-200 px-1 py-2 text-center font-semibold text-primary-700 min-w-[230px] w-[230px] bg-primary-50 whitespace-nowrap">
+                    <th className="border-b border-gray-200 px-1 py-2 text-center font-semibold text-primary-700 min-w-[64px] w-[64px] sm:min-w-[230px] sm:w-[230px] bg-primary-50 whitespace-nowrap">
                       {rounds.find(r => r.id === selectedRound)?.name.replace(/年/, '/').replace(/月/, '') || '今回'}
                     </th>
                   </tr>
@@ -685,28 +723,44 @@ export default function EvaluationEntry() {
                             })}
                             <td className={clsx('border-b border-gray-200 px-1 py-1 text-center bg-primary-50/30')}>
                               {canEdit ? (
-                                <div className="flex items-center justify-center gap-0.5">
-                                  {[1, 2, 3, 4, 5].map(n => {
-                                    const selected = editScores[row.leaf.id] === n;
-                                    return (
-                                      <button
-                                        key={n}
-                                        type="button"
-                                        onClick={() => handleScoreChange(row.leaf.id, selected ? '' : n)}
-                                        className={clsx(
-                                          'w-9 h-9 sm:w-8 sm:h-8 rounded text-xs sm:text-[11px] font-bold transition-colors',
-                                          selected
-                                            ? getScoreButtonSelectedClass(n)
-                                            : 'bg-white border border-gray-300 text-gray-500 hover:border-primary-400 hover:text-primary-600 active:bg-primary-50'
-                                        )}
-                                        aria-label={selected ? `${n}点 (タップで解除)` : `${n}点`}
-                                        aria-pressed={selected}
-                                      >
-                                        {n}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
+                                <>
+                                  <div className="hidden sm:flex items-center justify-center gap-0.5">
+                                    {[1, 2, 3, 4, 5].map(n => {
+                                      const selected = editScores[row.leaf.id] === n;
+                                      return (
+                                        <button
+                                          key={n}
+                                          type="button"
+                                          onClick={() => handleScoreChange(row.leaf.id, selected ? '' : n)}
+                                          className={clsx(
+                                            'w-8 h-8 rounded text-[11px] font-bold transition-colors',
+                                            selected
+                                              ? getScoreButtonSelectedClass(n)
+                                              : 'bg-white border border-gray-300 text-gray-500 hover:border-primary-400 hover:text-primary-600 active:bg-primary-50'
+                                          )}
+                                          aria-label={selected ? `${n}点 (タップで解除)` : `${n}点`}
+                                          aria-pressed={selected}
+                                        >
+                                          {n}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    data-score-picker
+                                    onClick={(e) => openScorePicker(row.leaf.id, e)}
+                                    className={clsx(
+                                      'sm:hidden inline-flex items-center justify-center w-12 h-9 rounded text-sm font-bold transition-colors',
+                                      editScores[row.leaf.id]
+                                        ? getScoreButtonSelectedClass(editScores[row.leaf.id])
+                                        : 'bg-white border border-dashed border-gray-300 text-gray-400 active:bg-primary-50'
+                                    )}
+                                    aria-label="点数を選択"
+                                  >
+                                    {editScores[row.leaf.id] || '−'}
+                                  </button>
+                                </>
                               ) : (
                                 <span className={clsx('inline-flex items-center justify-center w-6 h-5 rounded text-[11px] font-bold', editScores[row.leaf.id] ? getScoreColor(editScores[row.leaf.id]) : 'text-gray-300')}>
                                   {editScores[row.leaf.id] || '-'}
@@ -759,6 +813,44 @@ export default function EvaluationEntry() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
           <p className="text-sm text-gray-500">評価項目が設定されていません</p>
         </div>
+      )}
+
+      {openScoreId && createPortal(
+        <div
+          data-score-picker
+          className="fixed z-[1000] flex flex-col gap-1 p-1.5 bg-white rounded-lg shadow-2xl border border-gray-200"
+          style={{ top: scoreAnchor.top, left: scoreAnchor.left, width: 56 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {[5, 4, 3, 2, 1].map(n => {
+            const selected = editScores[openScoreId] === n;
+            return (
+              <button
+                key={n}
+                type="button"
+                onClick={() => { handleScoreChange(openScoreId, selected ? '' : n); setOpenScoreId(null); }}
+                className={clsx(
+                  'w-full h-10 rounded text-base font-bold transition-colors',
+                  selected
+                    ? getScoreButtonSelectedClass(n)
+                    : 'bg-white border border-gray-300 text-gray-700 active:bg-primary-50'
+                )}
+                aria-label={`${n}点`}
+                aria-pressed={selected}
+              >
+                {n}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => { handleScoreChange(openScoreId, ''); setOpenScoreId(null); }}
+            className="w-full h-8 rounded text-xs text-gray-500 border border-gray-200 hover:bg-gray-50"
+          >
+            −
+          </button>
+        </div>,
+        document.body
       )}
 
       {openInfoId && createPortal(
