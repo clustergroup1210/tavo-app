@@ -497,7 +497,21 @@ export default function EvaluationEntry() {
                   <label className="block text-xs font-medium text-gray-600 mb-1">カテゴリー</label>
                   <select
                     value={filterCategory}
-                    onChange={(e) => { setFilterCategory(e.target.value); setSelectedPlayer(''); }}
+                    onChange={(e) => {
+                      const newCat = e.target.value;
+                      setFilterCategory(newCat);
+                      const stillIn = mergedPlayers.find(p => p.id === selectedPlayer && (!newCat || p.teamCategoryId === newCat));
+                      if (stillIn) return;
+                      const firstInCat = mergedPlayers
+                        .filter(p => (!newCat || p.teamCategoryId === newCat) && canEvaluatePlayerId(p.id))
+                        .slice()
+                        .sort((a, b) => {
+                          const an = a.number != null && a.number !== '' ? Number(a.number) : Number.POSITIVE_INFINITY;
+                          const bn = b.number != null && b.number !== '' ? Number(b.number) : Number.POSITIVE_INFINITY;
+                          return an !== bn ? an - bn : (a.name || '').localeCompare(b.name || '', 'ja');
+                        })[0];
+                      setSelectedPlayer(firstInCat ? firstInCat.id : '');
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   >
                     <option value="">全カテゴリー</option>
@@ -505,10 +519,23 @@ export default function EvaluationEntry() {
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
                   </select>
+                  {filterCategory && (
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      このカテゴリーに{evaluablePlayers.length}名（▶ で順送り）
+                    </p>
+                  )}
                 </div>
               )}
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">選手（背番号順）</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  選手（背番号順）
+                  {playerIdx >= 0 && evaluablePlayers.length > 0 && (
+                    <span className="ml-2 text-[10px] font-normal text-gray-400">
+                      {playerIdx + 1} / {evaluablePlayers.length}人
+                      {filterCategory ? `（${teamCategories.find(c => c.id === filterCategory)?.name || ''}）` : ''}
+                    </span>
+                  )}
+                </label>
                 <div className="flex gap-1">
                   <button
                     type="button"
