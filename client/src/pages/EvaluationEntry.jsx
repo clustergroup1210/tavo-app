@@ -692,10 +692,10 @@ export default function EvaluationEntry() {
               <table className="w-full border-collapse text-xs">
                 <thead>
                   <tr className="bg-gray-50">
-                    <th className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 px-1 py-2 text-center font-semibold text-gray-700 min-w-[34px] w-[34px]">
-                      <span style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }} className="inline-block tracking-wider">中分類</span>
+                    <th className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 px-1 py-2 text-center font-semibold text-gray-700 min-w-[36px] w-[36px]">
+                      <span style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }} className="inline-block tracking-wider whitespace-nowrap">中分類</span>
                     </th>
-                    <th className="sticky left-[34px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-2 text-left font-semibold text-gray-700 min-w-[150px] w-[150px] sm:min-w-[200px] sm:w-[200px]">評価項目</th>
+                    <th className="sticky left-[36px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-2 text-left font-semibold text-gray-700 min-w-[150px] w-[150px] sm:min-w-[200px] sm:w-[200px]">評価項目</th>
                     {visibleHistoryRounds.map(r => (
                       <th key={r.id} className="border-b border-r border-gray-200 px-1 py-2 text-center font-medium text-gray-400 min-w-[52px] w-[52px] whitespace-nowrap">
                         {r.name.replace(/年/, '/').replace(/月/, '')}
@@ -749,22 +749,27 @@ export default function EvaluationEntry() {
                             {row.isFirstChild && row.childName && (
                               <td
                                 rowSpan={row.childRowSpan}
-                                className="sticky left-0 z-10 bg-white border-b border-r border-gray-200 px-1 py-1.5 text-center align-middle text-gray-700 text-[11px] min-w-[34px] w-[34px]"
+                                className="sticky left-0 z-10 bg-white border-b border-r border-gray-200 px-1 py-2 text-center align-top text-gray-700 text-[11px] min-w-[36px] w-[36px]"
                               >
-                                <span style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }} className="inline-block leading-tight tracking-wider">
-                                  {row.childName}
-                                </span>
+                                <div className="sticky top-2 inline-block">
+                                  <span
+                                    style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
+                                    className="inline-block leading-tight tracking-wider whitespace-nowrap font-medium"
+                                  >
+                                    {row.childName}
+                                  </span>
+                                </div>
                               </td>
                             )}
                             {row.isFirstChild && !row.childName && (
                               <td
                                 rowSpan={row.childRowSpan || 1}
-                                className="sticky left-0 z-10 bg-white border-b border-r border-gray-200 px-1 py-1.5 text-center align-middle text-gray-400 text-[11px] min-w-[34px] w-[34px]"
+                                className="sticky left-0 z-10 bg-white border-b border-r border-gray-200 px-1 py-1.5 text-center align-top text-gray-400 text-[11px] min-w-[36px] w-[36px]"
                               >
-                                -
+                                <div className="sticky top-2 inline-block">-</div>
                               </td>
                             )}
-                            <td className="sticky left-[34px] z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 text-gray-700 text-[11px] max-w-[150px] sm:max-w-none">
+                            <td className="sticky left-[36px] z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 text-gray-700 text-[11px] max-w-[150px] sm:max-w-none">
                               <div className="flex items-start gap-1">
                                 <span className="leading-snug break-words flex-1 min-w-0">{row.leaf.name}</span>
                                 {row.leaf.description && (
