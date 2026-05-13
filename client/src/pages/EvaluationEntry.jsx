@@ -528,13 +528,15 @@ export default function EvaluationEntry() {
               )}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                  選手（背番号順）
-                  {playerIdx >= 0 && evaluablePlayers.length > 0 && (
-                    <span className="ml-2 text-[10px] font-normal text-gray-400">
-                      {playerIdx + 1} / {evaluablePlayers.length}人
-                      {filterCategory ? `（${teamCategories.find(c => c.id === filterCategory)?.name || ''}）` : ''}
-                    </span>
-                  )}
+                  <span className="inline-flex items-center flex-wrap gap-x-2 gap-y-0.5">
+                    <span>選手（背番号順）</span>
+                    {playerIdx >= 0 && evaluablePlayers.length > 0 && (
+                      <span className="text-[10px] font-normal text-gray-400">
+                        {playerIdx + 1} / {evaluablePlayers.length}人
+                        {filterCategory ? `（${teamCategories.find(c => c.id === filterCategory)?.name || ''}）` : ''}
+                      </span>
+                    )}
+                  </span>
                 </label>
                 <div className="flex gap-1">
                   <button
@@ -627,8 +629,8 @@ export default function EvaluationEntry() {
 
       {!loading && selectedPlayer && selectedRound && items.length > 0 && (
         <>
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-[11px] flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-[11px] flex items-center gap-1.5 min-w-0">
               {autoSaveStatus === 'saving' && (
                 <span className="text-gray-500 inline-flex items-center gap-1">
                   <span className="inline-block w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
@@ -649,30 +651,38 @@ export default function EvaluationEntry() {
               )}
             </div>
             {hasExistingEvals && (
-              <button onClick={handleDelete} disabled={deleting} className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-600 border border-red-200 rounded text-xs font-medium hover:bg-red-100 disabled:opacity-50">
+              <button onClick={handleDelete} disabled={deleting} className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-600 border border-red-200 rounded text-xs font-medium hover:bg-red-100 disabled:opacity-50 whitespace-nowrap flex-shrink-0">
                 <Trash2 className="w-3 h-3" />
-                {deleting ? '...' : 'この期間の評価を削除'}
+                {deleting ? '...' : (
+                  <>
+                    <span className="hidden sm:inline">この期間の評価を削除</span>
+                    <span className="sm:hidden">削除</span>
+                  </>
+                )}
               </button>
             )}
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-200 bg-gray-50">
-              <div className="text-[11px] text-gray-500">
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-3 py-2 border-b border-gray-200 bg-gray-50">
+              <div className="text-[11px] text-gray-500 hidden sm:block">
                 大分類のヘッダーをタップして開閉できます
               </div>
-              <div className="flex items-center gap-2">
+              <div className="text-[11px] text-gray-500 sm:hidden">
+                大分類タップで開閉
+              </div>
+              <div className="flex items-center gap-1 ml-auto">
                 <button
                   type="button"
                   onClick={collapseAllParents}
-                  className="text-[11px] text-gray-600 hover:text-gray-900 px-2 py-1 rounded hover:bg-gray-100"
+                  className="text-[11px] text-gray-600 hover:text-gray-900 px-2 py-1 rounded hover:bg-gray-100 whitespace-nowrap"
                 >
                   全て折りたたむ
                 </button>
                 <button
                   type="button"
                   onClick={expandAllParents}
-                  className="text-[11px] text-gray-600 hover:text-gray-900 px-2 py-1 rounded hover:bg-gray-100"
+                  className="text-[11px] text-gray-600 hover:text-gray-900 px-2 py-1 rounded hover:bg-gray-100 whitespace-nowrap"
                 >
                   全て展開
                 </button>
@@ -685,7 +695,7 @@ export default function EvaluationEntry() {
                     <th className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 px-1 py-2 text-center font-semibold text-gray-700 min-w-[34px] w-[34px]">
                       <span style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }} className="inline-block tracking-wider">中分類</span>
                     </th>
-                    <th className="sticky left-[34px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-2 text-left font-semibold text-gray-700 min-w-[120px] w-[120px]">評価項目</th>
+                    <th className="sticky left-[34px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-2 text-left font-semibold text-gray-700 min-w-[150px] w-[150px] sm:min-w-[200px] sm:w-[200px]">評価項目</th>
                     {visibleHistoryRounds.map(r => (
                       <th key={r.id} className="border-b border-r border-gray-200 px-1 py-2 text-center font-medium text-gray-400 min-w-[52px] w-[52px] whitespace-nowrap">
                         {r.name.replace(/年/, '/').replace(/月/, '')}
@@ -754,15 +764,15 @@ export default function EvaluationEntry() {
                                 -
                               </td>
                             )}
-                            <td className="sticky left-[34px] z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 text-gray-700 text-[11px]">
-                              <div className="flex items-center gap-1">
-                                <span className="truncate">{row.leaf.name}</span>
+                            <td className="sticky left-[34px] z-10 bg-white border-b border-r border-gray-200 px-2 py-1.5 text-gray-700 text-[11px] max-w-[150px] sm:max-w-none">
+                              <div className="flex items-start gap-1">
+                                <span className="leading-snug break-words flex-1 min-w-0">{row.leaf.name}</span>
                                 {row.leaf.description && (
                                   <button
                                     type="button"
                                     data-info-popover
                                     onClick={(e) => openInfoPopover(row.leaf.id, row.leaf.description, e)}
-                                    className="text-gray-400 hover:text-primary-600 flex-shrink-0"
+                                    className="text-gray-400 hover:text-primary-600 flex-shrink-0 mt-0.5"
                                     aria-label="キーファクターを表示"
                                     title="キーファクターを表示"
                                   >
