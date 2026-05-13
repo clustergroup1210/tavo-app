@@ -242,15 +242,38 @@ router.put('/:id', authenticate, async (req, res) => {
     }
 
     const isSelf = player.userId === req.user.id;
-    const isCoachOrAdmin = hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH', 'COACH']);
+    const isCoachOrAdminDirect = hasTeamAccess(req.user, player.teamId, ['TEAM_MANAGER', 'COACH']);
     const isOperator = req.user.organizations?.some(o => 
       ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(o.role)
     );
-    
+
+    // Allow any ancestor-team TEAM_MANAGER/COACH to manage descendant-team players
+    // (mirrors team-categories includeChildren scope so the assignment modal can save).
+    let isCoachOrAdminViaAncestor = false;
+    if (!isCoachOrAdminDirect && !isOperator) {
+      const seen = new Set([player.teamId]);
+      let cursor = await prisma.team.findUnique({
+        where: { id: player.teamId },
+        select: { parentId: true }
+      });
+      while (cursor?.parentId && !seen.has(cursor.parentId)) {
+        seen.add(cursor.parentId);
+        if (hasTeamAccess(req.user, cursor.parentId, ['TEAM_MANAGER', 'COACH'])) {
+          isCoachOrAdminViaAncestor = true;
+          break;
+        }
+        cursor = await prisma.team.findUnique({
+          where: { id: cursor.parentId },
+          select: { parentId: true }
+        });
+      }
+    }
+    const isCoachOrAdmin = isCoachOrAdminDirect || isCoachOrAdminViaAncestor;
+
     if (!isSelf && !isCoachOrAdmin && !isOperator) {
       return res.status(403).json({ error: 'Access denied' });
     }
-    
+
     const canChangeTeam = isOperator;
 
     const updateData = {};
