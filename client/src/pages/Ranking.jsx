@@ -128,8 +128,9 @@ export default function Ranking() {
                 ? 'bg-primary-600 text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
+            title="全選手共通の評価項目のみで比較（GK専用などのポジション専用項目は除外）"
           >
-            フィールドプレイヤー
+            総合
           </button>
           {gkRanking.length > 0 && (
             <button
@@ -139,6 +140,7 @@ export default function Ranking() {
                   ? 'bg-green-600 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
+              title="GK選手のみ・GK専用項目を含めた評価"
             >
               GK
             </button>

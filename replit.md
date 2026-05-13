@@ -46,6 +46,7 @@ The system is built on a team-centric display and robust role-based access contr
 -   **Video Comment System**: Enables users to comment on videos, with notifications for uploaders and players.
 -   **Player Dashboard**: A multi-tab dashboard offering a summary, career achievement tracking (XP-style cumulative rate), evaluation analysis (radar charts, gap analysis), and progress tracking (score trends). Accessible by players and parents.
 -   **Coach Assignment System**: Manages head coach designations and individual coach-player assignments to control evaluation permissions.
+-   **Ranking System**: `GET /api/evaluations/ranking?teamId=` returns two views — **総合ランキング** (`ranking`) includes ALL players (GK + フィールドプレーヤー合同) but is scored only on **共通項目** (items where every cohort player position satisfies `isPositionAllowed`; ポジション未設定選手が居る場合は targetPositions が空の項目のみが共通項目となる)。これにより全員が同じ項目数・同じ分母で比較される。**GKランキング** (`gkRanking`) は GK選手のみを対象に、`filterItemsForPosition('GK')` で共通＋GK専用項目を含むフルセットで集計。`isPositionAllowed` は親→子へ `targetPositions` 制約を継承する（親が GK のみなら配下の小項目も自動的に GK 専用）。集計ロジックは `buildPlayerEntry(player, itemSet)` に集約し、`itemSet` を差し替えることで総合/GK の両ランキングを同一コードパスで生成。フロントの `/ranking` は「総合」「GK」タブで切替（`client/src/pages/Ranking.jsx`）。
 
 ### UI/UX Decisions
 -   **Sidebar Navigation**: Dark navy fixed sidebar with dynamic menu based on user role, responsive for desktop and mobile.

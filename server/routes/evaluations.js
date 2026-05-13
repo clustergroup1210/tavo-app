@@ -1506,6 +1506,26 @@ router.get('/ranking', authenticate, async (req, res) => {
       return leafItems.filter(item => isPositionAllowed(item, pos));
     };
 
+    // 総合ランキング用: 全選手を同じ項目数で比較するため、
+    // 出場ポジションすべてで評価可能な項目のみを共通項目とする。
+    // ポジション未設定(null)の選手は制約のない項目しか評価できないため、
+    // null ポジションが居る場合は targetPositions が空の項目だけが共通項目となる。
+    const cohortPositions = Array.from(new Set(players.map(p => p.position)));
+    const commonItems = leafItems.filter(item =>
+      cohortPositions.every(pos => {
+        if (pos == null) {
+          // 制約あり項目はポジション未設定選手には適用不可
+          const hasRestriction = (it) => {
+            if (it.targetPositions && it.targetPositions.length > 0) return true;
+            if (it.parentId && allItemsById[it.parentId]) return hasRestriction(allItemsById[it.parentId]);
+            return false;
+          };
+          return !hasRestriction(item);
+        }
+        return isPositionAllowed(item, pos);
+      })
+    );
+
     const buildCategoryInfo = (filteredItems) => {
       const catItems = {};
       let maxTotal = 0;
@@ -1528,10 +1548,10 @@ router.get('/ranking', authenticate, async (req, res) => {
       evalByPlayer[e.playerId].push(e);
     });
 
-    const ranking = players.map(player => {
-      const playerItems = filterItemsForPosition(player.position);
-      const playerItemIds = new Set(playerItems.map(i => i.id));
-      const { categories: playerCategories, monthlyMaxScoreTotal } = buildCategoryInfo(playerItems);
+    // ランキング集計（itemSet: 採点対象項目セットを差し替え可能にする）
+    const buildPlayerEntry = (player, itemSet) => {
+      const itemIds = new Set(itemSet.map(i => i.id));
+      const { categories: playerCategories, monthlyMaxScoreTotal } = buildCategoryInfo(itemSet);
 
       const hasPeriod = !!(player.joinedAt && player.graduationDate);
       let totalMonths = null;
@@ -1544,14 +1564,14 @@ router.get('/ranking', authenticate, async (req, res) => {
         careerDenominator = totalMonths * monthlyMaxScoreTotal;
       }
 
-      const playerEvals = (evalByPlayer[player.id] || []).filter(e => playerItemIds.has(e.itemId));
+      const playerEvals = (evalByPlayer[player.id] || []).filter(e => itemIds.has(e.itemId));
       let totalActual = 0;
       const catActuals = {};
       playerCategories.forEach(cat => { catActuals[cat.id] = 0; });
 
       playerEvals.forEach(e => {
         totalActual += e.score;
-        const item = playerItems.find(i => i.id === e.itemId);
+        const item = itemSet.find(i => i.id === e.itemId);
         if (item && catActuals[item.parentId] !== undefined) {
           catActuals[item.parentId] += e.score;
         }
@@ -1594,34 +1614,33 @@ router.get('/ranking', authenticate, async (req, res) => {
         hasPeriod,
         categoryRates
       };
-    });
+    };
 
-    const gkRanking = ranking.filter(r => r.player.position === 'GK');
-    const fpRanking = ranking.filter(r => r.player.position !== 'GK');
+    // 総合ランキング: 全選手 × 共通項目（GK専用項目を除外）
+    const totalRanking = players.map(p => buildPlayerEntry(p, commonItems));
+    // GKランキング: GK選手のみ × そのGK選手が評価対象となる全項目（共通+GK専用）
+    const gkRanking = players
+      .filter(p => p.position === 'GK')
+      .map(p => buildPlayerEntry(p, filterItemsForPosition('GK')));
 
-    fpRanking.sort((a, b) => {
-      const aRate = a.achievementRate !== null ? a.achievementRate : -1;
-      const bRate = b.achievementRate !== null ? b.achievementRate : -1;
-      return bRate - aRate;
-    });
-    fpRanking.forEach((item, idx) => { item.rank = idx + 1; });
+    const sortByRate = (arr) => {
+      arr.sort((a, b) => {
+        const aRate = a.achievementRate !== null ? a.achievementRate : -1;
+        const bRate = b.achievementRate !== null ? b.achievementRate : -1;
+        return bRate - aRate;
+      });
+      arr.forEach((item, idx) => { item.rank = idx + 1; });
+    };
+    sortByRate(totalRanking);
+    sortByRate(gkRanking);
 
-    gkRanking.sort((a, b) => {
-      const aRate = a.achievementRate !== null ? a.achievementRate : -1;
-      const bRate = b.achievementRate !== null ? b.achievementRate : -1;
-      return bRate - aRate;
-    });
-    gkRanking.forEach((item, idx) => { item.rank = idx + 1; });
-
-    const fpItems = filterItemsForPosition('FW');
-    const gkItems = filterItemsForPosition('GK');
-    const fpCategoryInfo = buildCategoryInfo(fpItems);
-    const gkCategoryInfo = buildCategoryInfo(gkItems);
+    const totalCategoryInfo = buildCategoryInfo(commonItems);
+    const gkCategoryInfo = buildCategoryInfo(filterItemsForPosition('GK'));
 
     res.json({
-      ranking: fpRanking,
+      ranking: totalRanking,
       gkRanking,
-      categories: fpCategoryInfo.categories.map(c => ({ id: c.id, name: c.name })),
+      categories: totalCategoryInfo.categories.map(c => ({ id: c.id, name: c.name })),
       gkCategories: gkCategoryInfo.categories.map(c => ({ id: c.id, name: c.name })),
       teamCategories
     });
