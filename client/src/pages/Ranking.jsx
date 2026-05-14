@@ -21,7 +21,9 @@ export default function Ranking() {
   const [ranking, setRanking] = useState([]);
   const [gkRanking, setGkRanking] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [topCategories, setTopCategories] = useState([]);
   const [gkCategories, setGkCategories] = useState([]);
+  const [gkTopCategories, setGkTopCategories] = useState([]);
   const [teamCategories, setTeamCategories] = useState([]);
   const [selectedTeamCategory, setSelectedTeamCategory] = useState('');
   const [selectedPosition, setSelectedPosition] = useState('');
@@ -52,7 +54,9 @@ export default function Ranking() {
         setRanking(data.ranking || []);
         setGkRanking(data.gkRanking || []);
         setCategories(data.categories || []);
+        setTopCategories(data.topCategories || []);
         setGkCategories(data.gkCategories || []);
+        setGkTopCategories(data.gkTopCategories || []);
         setTeamCategories(data.teamCategories || []);
       }
     } catch (error) {
@@ -64,30 +68,68 @@ export default function Ranking() {
 
   const activeRanking = rankingView === 'gk' ? gkRanking : ranking;
   const activeCategories = rankingView === 'gk' ? gkCategories : categories;
+  const activeTopCategories = rankingView === 'gk' ? gkTopCategories : topCategories;
+
+  // sortBy 値の規約:
+  //   'total'      : 総合達成率
+  //   'top:<id>'   : 大項目単位の達成率 (player.topCategoryRates)
+  //   '<id>'       : 中項目単位の達成率 (player.categoryRates) — 後方互換
+  const getSortRate = (entry, key) => {
+    if (key === 'total') return entry.achievementRate;
+    if (key.startsWith('top:')) {
+      const id = key.slice(4);
+      return entry.topCategoryRates?.[id]?.rate ?? null;
+    }
+    return entry.categoryRates?.[key]?.rate ?? null;
+  };
+
+  // ソート選択肢が無くなった場合は 'total' に自動フォールバック
+  // （評価項目管理で項目が削除/追加されてもUIが壊れないように）
+  useEffect(() => {
+    if (sortBy === 'total') return;
+    if (sortBy.startsWith('top:')) {
+      const id = sortBy.slice(4);
+      if (!activeTopCategories.some(t => t.id === id)) setSortBy('total');
+    } else {
+      if (!activeCategories.some(c => c.id === sortBy)) setSortBy('total');
+    }
+  }, [activeCategories, activeTopCategories, sortBy]);
 
   const sortedRanking = useMemo(() => {
     if (!activeRanking.length) return [];
     const sorted = [...activeRanking];
-    if (sortBy === 'total') {
-      sorted.sort((a, b) => {
-        const aRate = a.achievementRate !== null ? a.achievementRate : -1;
-        const bRate = b.achievementRate !== null ? b.achievementRate : -1;
-        return bRate - aRate;
-      });
-    } else {
-      sorted.sort((a, b) => {
-        const rateA = a.categoryRates?.[sortBy]?.rate ?? -1;
-        const rateB = b.categoryRates?.[sortBy]?.rate ?? -1;
-        return rateB - rateA;
-      });
-    }
+    sorted.sort((a, b) => {
+      const aRate = getSortRate(a, sortBy);
+      const bRate = getSortRate(b, sortBy);
+      const aV = aRate !== null && aRate !== undefined ? aRate : -1;
+      const bV = bRate !== null && bRate !== undefined ? bRate : -1;
+      return bV - aV;
+    });
     sorted.forEach((item, idx) => { item.rank = idx + 1; });
     return sorted;
   }, [activeRanking, sortBy]);
 
-  const activeSortLabel = sortBy === 'total'
-    ? '総合'
-    : activeCategories.find(c => c.id === sortBy)?.name || '総合';
+  // 大項目→配下の中項目 でグループ化したソート選択肢
+  const sortOptionGroups = useMemo(() => {
+    const groups = activeTopCategories.map(t => ({
+      top: t,
+      mids: activeCategories.filter(c => c.topCategoryId === t.id)
+    }));
+    const orphans = activeCategories.filter(c => !c.topCategoryId);
+    if (orphans.length > 0) {
+      groups.push({ top: { id: '__orphans__', name: 'その他' }, mids: orphans });
+    }
+    return groups;
+  }, [activeTopCategories, activeCategories]);
+
+  const activeSortLabel = (() => {
+    if (sortBy === 'total') return '総合';
+    if (sortBy.startsWith('top:')) {
+      const id = sortBy.slice(4);
+      return activeTopCategories.find(t => t.id === id)?.name || '総合';
+    }
+    return activeCategories.find(c => c.id === sortBy)?.name || '総合';
+  })();
 
   const getRankBadge = (rank) => {
     if (rank === 1) return (
@@ -241,33 +283,37 @@ export default function Ranking() {
           </div>
         )}
 
-        {activeCategories.length > 0 && (
+        {(activeCategories.length > 0 || activeTopCategories.length > 0) && (
           <div className="mb-4 flex items-center gap-2 flex-wrap">
             <ArrowUpDown className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-gray-600">ソート：</span>
-            <button
-              onClick={() => setSortBy('total')}
-              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                sortBy === 'total'
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+            <label htmlFor="ranking-sort" className="text-sm text-gray-600">ソート：</label>
+            <select
+              id="ranking-sort"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 min-w-[180px]"
             >
-              総合
-            </button>
-            {activeCategories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setSortBy(cat.id)}
-                className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                  sortBy === cat.id
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {cat.name}
-              </button>
-            ))}
+              <option value="total">総合達成率</option>
+              {sortOptionGroups.map(group => (
+                <optgroup key={group.top.id} label={group.top.name}>
+                  {group.top.id !== '__orphans__' && (
+                    <option value={`top:${group.top.id}`}>
+                      {group.top.name}（大項目合計）
+                    </option>
+                  )}
+                  {group.mids.map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      {group.top.id !== '__orphans__' ? '　└ ' : ''}{cat.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            {sortBy !== 'total' && (
+              <span className="text-xs text-gray-500">
+                （{activeSortLabel} で並び替え中）
+              </span>
+            )}
           </div>
         )}
 
@@ -286,10 +332,10 @@ export default function Ranking() {
                     <th className="text-left py-3 px-2 font-medium text-gray-600">選手</th>
                     <th className="text-left py-3 px-2 font-medium text-gray-600 w-20">ポジション</th>
                     <th
-                      className={`text-left py-3 px-2 font-medium w-56 cursor-pointer hover:bg-gray-50 select-none ${sortBy === 'total' ? 'text-primary-600' : 'text-gray-600'}`}
+                      className={`text-left py-3 px-2 font-medium w-56 cursor-pointer hover:bg-gray-50 select-none ${sortBy === 'total' ? 'text-primary-600' : 'text-primary-600'}`}
                       onClick={() => setSortBy('total')}
                     >
-                      総合達成率{sortBy === 'total' ? ' ▼' : ''}
+                      {sortBy === 'total' ? '総合達成率 ▼' : `${activeSortLabel} ▼`}
                     </th>
                     {activeCategories.map((cat) => (
                       <th
@@ -304,9 +350,8 @@ export default function Ranking() {
                 </thead>
                 <tbody>
                   {sortedRanking.map((item) => {
-                    const displayRate = sortBy === 'total'
-                      ? item.achievementRate
-                      : (item.categoryRates?.[sortBy]?.rate ?? null);
+                    const rawRate = getSortRate(item, sortBy);
+                    const displayRate = rawRate !== null && rawRate !== undefined ? rawRate : null;
                     const hasRate = displayRate !== null;
 
                     return (
@@ -382,9 +427,8 @@ export default function Ranking() {
 
             <div className="md:hidden divide-y divide-gray-100">
               {sortedRanking.map((item) => {
-                const displayRate = sortBy === 'total'
-                  ? item.achievementRate
-                  : (item.categoryRates?.[sortBy]?.rate ?? null);
+                const rawRate = getSortRate(item, sortBy);
+                const displayRate = rawRate !== null && rawRate !== undefined ? rawRate : null;
                 const hasRate = displayRate !== null;
 
                 return (

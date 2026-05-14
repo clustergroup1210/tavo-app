@@ -1434,6 +1434,11 @@ router.get('/ranking', authenticate, async (req, res) => {
     });
     if (!team) return res.status(404).json({ error: 'Team not found' });
 
+    // チームメンバー（任意ロール）またはオペレーター以外は閲覧不可
+    if (!hasTeamAccess(req.user, teamId) && !isOperator(req.user)) {
+      return res.status(403).json({ error: 'このチームのランキングを閲覧する権限がありません' });
+    }
+
     const itemTeamIds = [teamId];
     if (team.parentId) itemTeamIds.push(team.parentId);
 
@@ -1528,18 +1533,42 @@ router.get('/ranking', authenticate, async (req, res) => {
 
     const buildCategoryInfo = (filteredItems) => {
       const catItems = {};
+      const topItems = {};
       let maxTotal = 0;
       filteredItems.forEach(item => {
-        const catName = item.parent?.name || 'その他';
+        const mid = item.parent;
+        const top = mid?.parent || null;
         const catId = item.parentId;
+        const catName = mid?.name || 'その他';
+        const topId = top?.id || null;
+        const topName = top?.name || null;
+        const topSort = top?.sortOrder ?? 0;
+        const midSort = mid?.sortOrder ?? 0;
+
         if (!catItems[catId]) {
-          catItems[catId] = { id: catId, name: catName, items: [], monthlyMax: 0 };
+          catItems[catId] = {
+            id: catId, name: catName, items: [], monthlyMax: 0,
+            topCategoryId: topId, topCategoryName: topName,
+            topSortOrder: topSort, sortOrder: midSort
+          };
         }
         catItems[catId].items.push(item);
         catItems[catId].monthlyMax += (item.maxScore || 5);
         maxTotal += (item.maxScore || 5);
+
+        if (topId) {
+          if (!topItems[topId]) {
+            topItems[topId] = { id: topId, name: topName, monthlyMax: 0, sortOrder: topSort };
+          }
+          topItems[topId].monthlyMax += (item.maxScore || 5);
+        }
       });
-      return { categories: Object.values(catItems), monthlyMaxScoreTotal: maxTotal };
+      const categories = Object.values(catItems).sort((a, b) => {
+        if (a.topSortOrder !== b.topSortOrder) return a.topSortOrder - b.topSortOrder;
+        return a.sortOrder - b.sortOrder;
+      });
+      const topCategories = Object.values(topItems).sort((a, b) => a.sortOrder - b.sortOrder);
+      return { categories, topCategories, monthlyMaxScoreTotal: maxTotal };
     };
 
     const evalByPlayer = {};
@@ -1549,9 +1578,12 @@ router.get('/ranking', authenticate, async (req, res) => {
     });
 
     // ランキング集計（itemSet: 採点対象項目セットを差し替え可能にする）
+    const itemSetById = new Map();
+    leafItems.forEach(it => itemSetById.set(it.id, it));
+
     const buildPlayerEntry = (player, itemSet) => {
       const itemIds = new Set(itemSet.map(i => i.id));
-      const { categories: playerCategories, monthlyMaxScoreTotal } = buildCategoryInfo(itemSet);
+      const { categories: playerCategories, topCategories: playerTopCategories, monthlyMaxScoreTotal } = buildCategoryInfo(itemSet);
 
       const hasPeriod = !!(player.joinedAt && player.graduationDate);
       let totalMonths = null;
@@ -1567,13 +1599,20 @@ router.get('/ranking', authenticate, async (req, res) => {
       const playerEvals = (evalByPlayer[player.id] || []).filter(e => itemIds.has(e.itemId));
       let totalActual = 0;
       const catActuals = {};
+      const topActuals = {};
       playerCategories.forEach(cat => { catActuals[cat.id] = 0; });
+      playerTopCategories.forEach(t => { topActuals[t.id] = 0; });
 
       playerEvals.forEach(e => {
         totalActual += e.score;
-        const item = itemSet.find(i => i.id === e.itemId);
-        if (item && catActuals[item.parentId] !== undefined) {
+        const item = itemSetById.get(e.itemId);
+        if (!item) return;
+        if (catActuals[item.parentId] !== undefined) {
           catActuals[item.parentId] += e.score;
+        }
+        const topId = item.parent?.parent?.id;
+        if (topId && topActuals[topId] !== undefined) {
+          topActuals[topId] += e.score;
         }
       });
 
@@ -1581,24 +1620,25 @@ router.get('/ranking', authenticate, async (req, res) => {
         ? Math.round((totalActual / careerDenominator) * 1000) / 10
         : null;
 
+      const computeRate = (actual, monthlyMax) => {
+        if (!hasPeriod || !totalMonths) {
+          return { actual, denominator: null, rate: null };
+        }
+        const denom = totalMonths * monthlyMax;
+        return {
+          actual,
+          denominator: denom,
+          rate: denom > 0 ? Math.round((actual / denom) * 1000) / 10 : 0
+        };
+      };
+
       const categoryRates = {};
       playerCategories.forEach(cat => {
-        if (hasPeriod && totalMonths) {
-          const catDenom = totalMonths * cat.monthlyMax;
-          categoryRates[cat.id] = {
-            name: cat.name,
-            actual: catActuals[cat.id],
-            denominator: catDenom,
-            rate: catDenom > 0 ? Math.round((catActuals[cat.id] / catDenom) * 1000) / 10 : 0
-          };
-        } else {
-          categoryRates[cat.id] = {
-            name: cat.name,
-            actual: catActuals[cat.id],
-            denominator: null,
-            rate: null
-          };
-        }
+        categoryRates[cat.id] = { name: cat.name, ...computeRate(catActuals[cat.id], cat.monthlyMax) };
+      });
+      const topCategoryRates = {};
+      playerTopCategories.forEach(t => {
+        topCategoryRates[t.id] = { name: t.name, ...computeRate(topActuals[t.id], t.monthlyMax) };
       });
 
       return {
@@ -1612,7 +1652,8 @@ router.get('/ranking', authenticate, async (req, res) => {
         achievementRate,
         totalMonths,
         hasPeriod,
-        categoryRates
+        categoryRates,
+        topCategoryRates
       };
     };
 
@@ -1637,11 +1678,19 @@ router.get('/ranking', authenticate, async (req, res) => {
     const totalCategoryInfo = buildCategoryInfo(commonItems);
     const gkCategoryInfo = buildCategoryInfo(filterItemsForPosition('GK'));
 
+    const mapCat = c => ({
+      id: c.id, name: c.name,
+      topCategoryId: c.topCategoryId, topCategoryName: c.topCategoryName
+    });
+    const mapTop = t => ({ id: t.id, name: t.name });
+
     res.json({
       ranking: totalRanking,
       gkRanking,
-      categories: totalCategoryInfo.categories.map(c => ({ id: c.id, name: c.name })),
-      gkCategories: gkCategoryInfo.categories.map(c => ({ id: c.id, name: c.name })),
+      categories: totalCategoryInfo.categories.map(mapCat),
+      topCategories: totalCategoryInfo.topCategories.map(mapTop),
+      gkCategories: gkCategoryInfo.categories.map(mapCat),
+      gkTopCategories: gkCategoryInfo.topCategories.map(mapTop),
       teamCategories
     });
   } catch (error) {
