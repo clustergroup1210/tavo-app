@@ -10,7 +10,7 @@ const LEVEL_COLORS = [
 ];
 
 export default function EvaluationItems() {
-  const { currentTeam, isOperator, isTeamAdmin } = useAuth();
+  const { currentTeam, isOperator, isTeamAdmin, isCoach } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -38,7 +38,7 @@ export default function EvaluationItems() {
 
   const POSITIONS = ['GK', 'DF', 'MF', 'FW'];
 
-  const canManage = isOperator() || (currentTeam && isTeamAdmin(currentTeam.id));
+  const canManage = isOperator() || (currentTeam && (isTeamAdmin(currentTeam.id) || isCoach(currentTeam.id)));
 
   useEffect(() => {
     if (currentTeam) {
@@ -388,33 +388,43 @@ export default function EvaluationItems() {
                 )}
               </div>
             </div>
-            {canManage && (
-              <div className="flex items-center gap-1 shrink-0 ml-2">
-                <button
-                  onClick={() => handleToggleActive(item)}
-                  className={`p-1.5 rounded-lg hover:bg-gray-100 ${item.isActive ? 'text-green-500' : 'text-gray-300'}`}
-                  title={item.isActive ? '無効化' : '有効化'}
-                >
-                  {item.isActive ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
-                </button>
-                <button
-                  onClick={() => handleEdit(item)}
-                  className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-                  title="編集"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                {level < 2 && (
+            {canManage && (() => {
+              const isInherited = currentTeam && item.teamId && item.teamId !== currentTeam.id;
+              if (isInherited) {
+                return (
+                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200" title="親チームから継承された項目のため、このチームでは編集できません">親チーム継承</span>
+                  </div>
+                );
+              }
+              return (
+                <div className="flex items-center gap-1 shrink-0 ml-2">
                   <button
-                    onClick={() => handleAddChild(item, level)}
-                    className="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-primary-50"
-                    title={`${LEVEL_LABELS[level + 1]}を追加`}
+                    onClick={() => handleToggleActive(item)}
+                    className={`p-1.5 rounded-lg hover:bg-gray-100 ${item.isActive ? 'text-green-500' : 'text-gray-300'}`}
+                    title={item.isActive ? '無効化' : '有効化'}
                   >
-                    <Plus className="w-4 h-4" />
+                    {item.isActive ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
                   </button>
-                )}
-              </div>
-            )}
+                  <button
+                    onClick={() => handleEdit(item)}
+                    className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                    title="編集"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  {level < 2 && (
+                    <button
+                      onClick={() => handleAddChild(item, level)}
+                      className="p-1.5 text-gray-400 hover:text-primary-600 rounded-lg hover:bg-primary-50"
+                      title={`${LEVEL_LABELS[level + 1]}を追加`}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
           {hasChildren && isExpanded && renderItems(item.children, level + 1)}
         </div>
@@ -718,16 +728,22 @@ export default function EvaluationItems() {
                     required
                   >
                     <option value="">選択してください</option>
-                    {addLevel === 1 && items.map(item => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
-                    ))}
-                    {addLevel === 2 && items.flatMap(parent =>
-                      (parent.children || []).map(child => (
-                        <option key={child.id} value={child.id}>
-                          {parent.name} &gt; {child.name}
-                        </option>
-                      ))
-                    )}
+                    {addLevel === 1 && items
+                      .filter(item => !currentTeam || !item.teamId || item.teamId === currentTeam.id)
+                      .map(item => (
+                        <option key={item.id} value={item.id}>{item.name}</option>
+                      ))}
+                    {addLevel === 2 && items
+                      .filter(parent => !currentTeam || !parent.teamId || parent.teamId === currentTeam.id)
+                      .flatMap(parent =>
+                        (parent.children || [])
+                          .filter(child => !currentTeam || !child.teamId || child.teamId === currentTeam.id)
+                          .map(child => (
+                            <option key={child.id} value={child.id}>
+                              {parent.name} &gt; {child.name}
+                            </option>
+                          ))
+                      )}
                   </select>
                 </div>
               )}

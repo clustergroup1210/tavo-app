@@ -28,6 +28,18 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 100 * 1024 * 1024 } });
 
+const fs = require('fs');
+const thumbUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.mimetype)) {
+      return cb(new Error('画像ファイルのみアップロードできます (jpeg/png/webp)'));
+    }
+    cb(null, true);
+  }
+});
+
 router.get('/', authenticate, async (req, res) => {
   try {
     const { teamId, playerId } = req.query;
@@ -202,6 +214,89 @@ router.post('/', authenticate, upload.single('video'), async (req, res) => {
 
 router.get('/r2-status', authenticate, async (req, res) => {
   res.json({ configured: isR2Configured() });
+});
+
+// サムネ画像アップロード（クライアント側で動画から1フレーム抽出 → ここに POST）
+// 認可チェックを multer メモリストレージ受信後・ディスク書込み前に行うことで
+// 未認可ユーザーによるディスク消費攻撃を防ぐ
+router.post('/:id/thumbnail', authenticate, (req, res) => {
+  thumbUpload.single('thumbnail')(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: err.message || 'サムネイルのアップロードに失敗しました' });
+    if (!req.file || !req.file.buffer) return res.status(400).json({ error: 'thumbnail file is required' });
+    try {
+      const video = await prisma.video.findUnique({
+        where: { id: req.params.id },
+        include: { player: true }
+      });
+      if (!video) return res.status(404).json({ error: 'Video not found' });
+
+      const isUploader = video.uploadedBy === req.user.id;
+      const teamScopeId = video.player?.teamId || video.teamId;
+      const isCoachUser = teamScopeId && hasTeamAccess(req.user, teamScopeId, ['TEAM_MANAGER', 'COACH']);
+      if (!isUploader && !isCoachUser && !isOperator(req.user)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      // ここで初めてディスクに書き込む
+      const filename = `thumb_${video.id}_${Date.now()}.jpg`;
+      const filePath = path.join(__dirname, '../../uploads', filename);
+      try {
+        await fs.promises.writeFile(filePath, req.file.buffer);
+      } catch (writeErr) {
+        console.error('Thumbnail write error:', writeErr);
+        return res.status(500).json({ error: 'Failed to save thumbnail' });
+      }
+
+      // 旧サムネがあればクリーンアップ
+      if (video.thumbnailKey) {
+        const oldPath = path.join(__dirname, '../../uploads', video.thumbnailKey);
+        fs.promises.unlink(oldPath).catch(() => {});
+      }
+
+      const thumbnailUrl = `/api/videos/${video.id}/thumbnail?v=${Date.now()}`;
+      const updated = await prisma.video.update({
+        where: { id: video.id },
+        data: { thumbnailUrl, thumbnailKey: filename }
+      });
+      res.json({ thumbnailUrl: updated.thumbnailUrl });
+    } catch (error) {
+      console.error('Thumbnail upload error:', error);
+      res.status(500).json({ error: 'Failed to save thumbnail' });
+    }
+  });
+});
+
+// サムネ配信（同一オリジン Cookie で認証 + 動画ストリームと同等の可視性チェック）
+router.get('/:id/thumbnail', authenticate, async (req, res) => {
+  try {
+    const video = await prisma.video.findUnique({
+      where: { id: req.params.id },
+      include: { player: { select: { id: true, teamId: true, userId: true } } }
+    });
+    if (!video || !video.thumbnailKey) return res.status(404).end();
+
+    const teamScopeId = video.player?.teamId || video.teamId;
+    const isUploader = video.uploadedBy === req.user.id;
+    const isSelf = video.player?.userId === req.user.id;
+    const isParent = req.user.parentPlayers?.some(pp => pp.playerId === video.playerId);
+    const isOp = isOperator(req.user);
+
+    if (!(isUploader || isSelf || isParent || isOp)) {
+      const hasAccess = teamScopeId && hasTeamAccess(req.user, teamScopeId);
+      if (!hasAccess) return res.status(403).end();
+      // 選手スコープ動画は在籍期間に基づく可視性も適用（/stream と同様）
+      if (video.player) {
+        const filtered = await filterDataByVisibility(req.user, video.playerId, [video], 'createdAt');
+        if (filtered.length === 0) return res.status(403).end();
+      }
+    }
+
+    res.set('Cache-Control', 'private, max-age=3600');
+    res.sendFile(path.join(__dirname, '../../uploads', video.thumbnailKey));
+  } catch (error) {
+    console.error('Thumbnail serve error:', error);
+    res.status(500).end();
+  }
 });
 
 router.get('/:id', authenticate, async (req, res) => {

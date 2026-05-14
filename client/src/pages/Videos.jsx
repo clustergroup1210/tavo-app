@@ -77,6 +77,60 @@ export default function Videos() {
     }
   };
 
+  const extractThumbnail = (file, atSec = 1) => {
+    return new Promise((resolve) => {
+      try {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.muted = true;
+        video.playsInline = true;
+        video.crossOrigin = 'anonymous';
+        const objectUrl = URL.createObjectURL(file);
+        video.src = objectUrl;
+        const cleanup = () => { try { URL.revokeObjectURL(objectUrl); } catch {} };
+        const fail = () => { cleanup(); resolve(null); };
+        video.onloadedmetadata = () => {
+          const target = Math.min(atSec, Math.max(0, (video.duration || 1) / 2));
+          try { video.currentTime = target; } catch { fail(); }
+        };
+        video.onseeked = () => {
+          try {
+            const maxW = 480;
+            const ratio = video.videoHeight && video.videoWidth ? video.videoHeight / video.videoWidth : 9 / 16;
+            const w = Math.min(maxW, video.videoWidth || maxW);
+            const h = Math.round(w * ratio);
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, w, h);
+            canvas.toBlob((blob) => { cleanup(); resolve(blob || null); }, 'image/jpeg', 0.82);
+          } catch { fail(); }
+        };
+        video.onerror = fail;
+        // 安全弁: 8秒で諦める
+        setTimeout(fail, 8000);
+      } catch {
+        resolve(null);
+      }
+    });
+  };
+
+  const uploadThumbnail = async (videoId, file) => {
+    try {
+      const blob = await extractThumbnail(file);
+      if (!blob) return;
+      const fd = new FormData();
+      fd.append('thumbnail', new File([blob], 'thumb.jpg', { type: 'image/jpeg' }));
+      await fetch(`/api/videos/${videoId}/thumbnail`, {
+        method: 'POST',
+        credentials: 'include',
+        body: fd,
+      });
+    } catch (err) {
+      console.warn('Thumbnail upload failed (non-fatal):', err);
+    }
+  };
+
   const handleUpload = async (e) => {
     e.preventDefault();
     if (!uploadData.file) return;
@@ -85,10 +139,15 @@ export default function Videos() {
     setUploadProgress(0);
 
     try {
+      let createdVideo;
       if (r2Available) {
-        await handleR2Upload();
+        createdVideo = await handleR2Upload();
       } else {
-        await handleLocalUpload();
+        createdVideo = await handleLocalUpload();
+      }
+
+      if (createdVideo?.id) {
+        await uploadThumbnail(createdVideo.id, uploadData.file);
       }
 
       setShowUploadModal(false);
@@ -126,7 +185,7 @@ export default function Videos() {
       throw new Error(err.error || 'Failed to get upload URL');
     }
 
-    const { uploadUrl } = await res.json();
+    const { uploadUrl, video: createdVideo } = await res.json();
     setUploadProgress(10);
 
     const xhr = new XMLHttpRequest();
@@ -150,6 +209,7 @@ export default function Videos() {
       xhr.setRequestHeader('Content-Type', uploadData.file.type);
       xhr.send(uploadData.file);
     });
+    return createdVideo;
   };
 
   const handleLocalUpload = async () => {
@@ -161,11 +221,13 @@ export default function Videos() {
     formData.append('playerTagIds', JSON.stringify(uploadData.playerTagIds));
     formData.append('categoryTagIds', JSON.stringify(uploadData.categoryTagIds));
 
-    await fetch('/api/videos', {
+    const res = await fetch('/api/videos', {
       method: 'POST',
       credentials: 'include',
       body: formData,
     });
+    if (!res.ok) throw new Error('Upload failed');
+    return await res.json();
   };
 
   const handleDelete = async (id) => {
@@ -348,9 +410,25 @@ export default function Videos() {
           <div key={video.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <button
               onClick={() => handlePlayVideo(video)}
-              className="w-full aspect-video bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors cursor-pointer"
+              className="relative w-full aspect-video bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors cursor-pointer overflow-hidden group"
             >
-              <Play className="w-10 h-10 text-gray-400" />
+              {video.thumbnailUrl ? (
+                <>
+                  <img
+                    src={video.thumbnailUrl}
+                    alt={video.title}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    loading="lazy"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                  <span className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                  <span className="relative z-10 w-12 h-12 rounded-full bg-black/40 group-hover:bg-black/60 flex items-center justify-center">
+                    <Play className="w-6 h-6 text-white" fill="white" />
+                  </span>
+                </>
+              ) : (
+                <Play className="w-10 h-10 text-gray-400" />
+              )}
             </button>
             <div className="p-3">
               <div className="flex items-start gap-2">

@@ -410,6 +410,7 @@ model Video {
   contentType String?
   fileSize    Int?
   thumbnailUrl String?
+  thumbnailKey String?
   duration    Int?
   uploadedBy  String
   createdAt   DateTime @default(now())
