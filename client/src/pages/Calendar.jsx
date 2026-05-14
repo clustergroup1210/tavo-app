@@ -330,6 +330,8 @@ export default function Calendar() {
   const [editingEvent, setEditingEvent] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [detailEvent, setDetailEvent] = useState(null);
+  const [savedLocations, setSavedLocations] = useState([]);
+  const [selectedSavedLocationId, setSelectedSavedLocationId] = useState('');
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -359,6 +361,75 @@ export default function Calendar() {
       fetchTeamCategories();
     }
   }, [currentTeamId, canCreate]);
+
+  useEffect(() => {
+    if (showModal && currentTeamId) {
+      fetchSavedLocations();
+    } else if (!showModal) {
+      setSelectedSavedLocationId('');
+    }
+  }, [showModal, currentTeamId]);
+
+  useEffect(() => {
+    setSelectedSavedLocationId('');
+    setSavedLocations([]);
+  }, [currentTeamId]);
+
+  const fetchSavedLocations = async () => {
+    try {
+      const res = await fetch(`/api/event-locations?teamId=${currentTeamId}`, { credentials: 'include' });
+      if (res.ok) setSavedLocations(await res.json());
+    } catch (err) {
+      console.error('Failed to fetch saved locations:', err);
+    }
+  };
+
+  const handleSaveLocation = async () => {
+    if (!form.location.trim() || !currentTeamId) return;
+    try {
+      const res = await fetch('/api/event-locations', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          teamId: currentTeamId,
+          name: form.location.trim(),
+          address: form.locationAddress.trim(),
+        }),
+      });
+      if (res.ok) {
+        await fetchSavedLocations();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || '場所の保存に失敗しました');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('場所の保存に失敗しました');
+    }
+  };
+
+  const handleDeleteSavedLocation = async (id) => {
+    if (!confirm('この登録済みの場所を削除しますか？')) return;
+    try {
+      const res = await fetch(`/api/event-locations/${id}`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok) {
+        if (selectedSavedLocationId === id) setSelectedSavedLocationId('');
+        await fetchSavedLocations();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handlePickSavedLocation = (id) => {
+    setSelectedSavedLocationId(id);
+    if (!id) return;
+    const loc = savedLocations.find(l => l.id === id);
+    if (loc) {
+      setForm(prev => ({ ...prev, location: loc.name, locationAddress: loc.address || '' }));
+    }
+  };
 
   const fetchEvents = async () => {
     try {
@@ -1047,12 +1118,41 @@ export default function Calendar() {
                 )}
               </div>
 
+              {savedLocations.length > 0 && (
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-500 mb-1">登録済みの場所から選択</label>
+                  <div className="flex gap-2">
+                    <select
+                      value={selectedSavedLocationId}
+                      onChange={(e) => handlePickSavedLocation(e.target.value)}
+                      className="flex-1 min-w-0 px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white"
+                    >
+                      <option value="">— 選択してください —</option>
+                      {savedLocations.map(l => (
+                        <option key={l.id} value={l.id}>
+                          {l.name}{l.address ? `（${l.address}）` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {canCreate && selectedSavedLocationId && savedLocations.some(l => l.id === selectedSavedLocationId) && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSavedLocation(selectedSavedLocationId)}
+                        className="px-3 py-2 text-[12px] font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 whitespace-nowrap"
+                      >
+                        削除
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-[11px] font-medium text-gray-500 mb-1">場所</label>
                 <input
                   type="text"
                   value={form.location}
-                  onChange={(e) => setForm({ ...form, location: e.target.value })}
+                  onChange={(e) => { setForm({ ...form, location: e.target.value }); setSelectedSavedLocationId(''); }}
                   className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                   placeholder="場所の名称（任意）"
                 />
@@ -1063,10 +1163,19 @@ export default function Calendar() {
                 <input
                   type="text"
                   value={form.locationAddress}
-                  onChange={(e) => setForm({ ...form, locationAddress: e.target.value })}
+                  onChange={(e) => { setForm({ ...form, locationAddress: e.target.value }); setSelectedSavedLocationId(''); }}
                   className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                   placeholder="住所（任意・Googleマップにリンクされます）"
                 />
+                {canCreate && form.location.trim() && currentTeamId && (
+                  <button
+                    type="button"
+                    onClick={handleSaveLocation}
+                    className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-primary-700 border border-primary-200 rounded-md hover:bg-primary-50"
+                  >
+                    ＋ この場所を登録済みに保存
+                  </button>
+                )}
               </div>
 
               <div>

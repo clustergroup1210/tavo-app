@@ -53,6 +53,7 @@ model Organization {
   teams          Team[]
   calendarEvents CalendarEvent[]
   announcements  Announcement[]
+  eventLocations EventLocation[]
 }
 
 model Team {
@@ -84,6 +85,7 @@ model Team {
   goalCategories    GoalCategory[]
   teamCategories    TeamCategory[]
   calendarEvents    CalendarEvent[]
+  eventLocations    EventLocation[]
   announcements     Announcement[]
   tasks             Task[]
   joinRequests      TeamJoinRequest[]
@@ -129,6 +131,7 @@ model User {
   evaluations          Evaluation[]
   playerNotes          PlayerNote[]
   calendarEvents       CalendarEvent[]
+  eventLocations       EventLocation[]      @relation("EventLocationAuthor")
   announcements        Announcement[]
   appealLinks          AppealLink[]
   joinRequests         TeamJoinRequest[]
@@ -532,6 +535,25 @@ model Goal {
 
   @@index([playerId])
   @@index([categoryId])
+}
+
+model EventLocation {
+  id             String   @id @default(uuid())
+  teamId         String?
+  organizationId String?
+  name           String
+  address        String?
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  team         Team?         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  author       User          @relation("EventLocationAuthor", fields: [createdBy], references: [id])
+
+  @@unique([teamId, name])
+  @@index([teamId])
+  @@index([organizationId])
 }
 
 model CalendarEvent {
