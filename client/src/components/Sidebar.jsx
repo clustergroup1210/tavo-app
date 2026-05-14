@@ -107,6 +107,11 @@ export default function Sidebar({ isOpen, onClose }) {
           { path: '/join-requests', label: '参加申請', icon: UserPlus },
           { path: '/team-categories', label: 'カテゴリー管理', icon: Users },
           { path: '/goal-categories', label: '目標カテゴリー管理', icon: Target },
+          { path: '/evaluations/items', label: '評価項目管理', icon: ListChecks },
+        ];
+      } else if (isCoach(currentTeam.id)) {
+        items.admin = [
+          { path: '/evaluations/items', label: '評価項目管理', icon: ListChecks },
         ];
       }
 
