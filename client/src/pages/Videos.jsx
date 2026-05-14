@@ -115,19 +115,73 @@ export default function Videos() {
     });
   };
 
+  const extractThumbnailFromUrl = (url, atSec = 1) => {
+    return new Promise((resolve) => {
+      try {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.muted = true;
+        video.playsInline = true;
+        video.crossOrigin = 'anonymous';
+        video.src = url;
+        const fail = () => resolve(null);
+        video.onloadedmetadata = () => {
+          const target = Math.min(atSec, Math.max(0, (video.duration || 1) / 2));
+          try { video.currentTime = target; } catch { fail(); }
+        };
+        video.onseeked = () => {
+          try {
+            const maxW = 480;
+            const ratio = video.videoHeight && video.videoWidth ? video.videoHeight / video.videoWidth : 9 / 16;
+            const w = Math.min(maxW, video.videoWidth || maxW);
+            const h = Math.round(w * ratio);
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, w, h);
+            canvas.toBlob((blob) => resolve(blob || null), 'image/jpeg', 0.82);
+          } catch { fail(); }
+        };
+        video.onerror = fail;
+        setTimeout(fail, 12000);
+      } catch {
+        resolve(null);
+      }
+    });
+  };
+
+  const postThumbnailBlob = async (videoId, blob) => {
+    if (!blob) return null;
+    const fd = new FormData();
+    fd.append('thumbnail', new File([blob], 'thumb.jpg', { type: 'image/jpeg' }));
+    const res = await fetch(`/api/videos/${videoId}/thumbnail`, {
+      method: 'POST',
+      credentials: 'include',
+      body: fd,
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    return data?.thumbnailUrl || null;
+  };
+
   const uploadThumbnail = async (videoId, file) => {
     try {
       const blob = await extractThumbnail(file);
-      if (!blob) return;
-      const fd = new FormData();
-      fd.append('thumbnail', new File([blob], 'thumb.jpg', { type: 'image/jpeg' }));
-      await fetch(`/api/videos/${videoId}/thumbnail`, {
-        method: 'POST',
-        credentials: 'include',
-        body: fd,
-      });
+      await postThumbnailBlob(videoId, blob);
     } catch (err) {
       console.warn('Thumbnail upload failed (non-fatal):', err);
+    }
+  };
+
+  const backfillThumbnailFromUrl = async (videoId, url) => {
+    try {
+      const blob = await extractThumbnailFromUrl(url);
+      const newUrl = await postThumbnailBlob(videoId, blob);
+      if (newUrl) {
+        setVideos(prev => prev.map(v => v.id === videoId ? { ...v, thumbnailUrl: newUrl } : v));
+      }
+    } catch (err) {
+      console.warn('Thumbnail backfill failed (non-fatal):', err);
     }
   };
 
@@ -254,6 +308,10 @@ export default function Videos() {
         }
       }
       setVideoUrl(url);
+      // 既存動画のサムネ未生成分はここでバックグラウンド生成
+      if (url && !video.thumbnailUrl) {
+        backfillThumbnailFromUrl(video.id, url);
+      }
     } catch (error) {
       console.error('Failed to get video URL:', error);
     }
