@@ -215,7 +215,7 @@ function generateRecurrenceDates(startDate, endDate, recurrence) {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { teamId, organizationId, title, description, startDate, endDate, allDay, eventType, location, categoryIds, isPersonal, color, recurrence } = req.body;
+    const { teamId, organizationId, title, description, startDate, endDate, allDay, eventType, location, locationAddress, categoryIds, isPersonal, color, recurrence } = req.body;
 
     const safeColor = (typeof color === 'string' && HEX_RE.test(color)) ? color : null;
     const start = new Date(startDate);
@@ -234,6 +234,7 @@ router.post('/', authenticate, async (req, res) => {
             allDay: allDay || false,
             eventType: eventType || 'personal',
             location,
+            locationAddress: locationAddress || null,
             isPersonal: true,
             color: safeColor,
             seriesId,
@@ -277,6 +278,7 @@ router.post('/', authenticate, async (req, res) => {
           allDay: allDay || false,
           eventType: eventType || 'event',
           location,
+          locationAddress: locationAddress || null,
           color: safeColor,
           seriesId,
           createdBy: req.user.id,
@@ -383,7 +385,7 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
     
-    const { title, description, startDate, endDate, allDay, eventType, location, categoryIds, color } = req.body;
+    const { title, description, startDate, endDate, allDay, eventType, location, locationAddress, categoryIds, color } = req.body;
     const scope = req.query.scope === 'series' && event.seriesId ? 'series' : 'single';
     const safeColor = color === null ? null : (typeof color === 'string' && HEX_RE.test(color)) ? color : undefined;
 
@@ -430,6 +432,7 @@ router.put('/:id', authenticate, async (req, res) => {
           allDay,
           eventType,
           location,
+          ...(locationAddress !== undefined && { locationAddress: locationAddress || null }),
           ...(safeColor !== undefined && { color: safeColor })
         }
       });
@@ -449,6 +452,7 @@ router.put('/:id', authenticate, async (req, res) => {
         allDay,
         eventType,
         location,
+        ...(locationAddress !== undefined && { locationAddress: locationAddress || null }),
         ...(safeColor !== undefined && { color: safeColor })
       },
       include: {

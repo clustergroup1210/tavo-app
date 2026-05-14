@@ -545,6 +545,7 @@ model CalendarEvent {
   allDay      Boolean  @default(false)
   eventType   String   @default("event")
   location    String?
+  locationAddress String?
   isPersonal  Boolean  @default(false)
   color       String?
   seriesId    String?

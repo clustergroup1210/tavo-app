@@ -200,10 +200,23 @@ function EventDetailModal({ event, onClose, onEdit, onDelete, canEdit }) {
             </div>
           )}
 
-          {event.location && (
+          {(event.location || event.locationAddress) && (
             <div>
               <p className="text-[11px] font-medium text-gray-400 mb-0.5">場所</p>
-              <p className="text-[13px] font-semibold text-green-600">{event.location}</p>
+              {event.location && (
+                <p className="text-[13px] font-semibold text-green-600">{event.location}</p>
+              )}
+              {event.locationAddress && (
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.locationAddress)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 mt-1 text-[12px] text-blue-600 hover:text-blue-700 hover:underline"
+                >
+                  <MapPin className="w-3 h-3" />
+                  {event.locationAddress}
+                </a>
+              )}
             </div>
           )}
 
@@ -283,10 +296,21 @@ function EventListItem({ event, onClick }) {
             {event.endDate && ` - ${formatTime(event.endDate)}`}
           </div>
         )}
-        {event.location && (
+        {(event.location || event.locationAddress) && (
           <div className="flex items-center gap-1 text-[11px] text-gray-500 mt-0.5">
             <MapPin className="w-3 h-3" />
-            {event.location}
+            {event.location && <span>{event.location}</span>}
+            {event.locationAddress && (
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.locationAddress)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="ml-1 text-blue-600 hover:underline"
+              >
+                {event.locationAddress}
+              </a>
+            )}
           </div>
         )}
       </div>
@@ -316,6 +340,7 @@ export default function Calendar() {
     allDay: false,
     eventType: 'event',
     location: '',
+    locationAddress: '',
     categoryIds: [],
     color: '',
     repeatFreq: 'none',
@@ -511,6 +536,7 @@ export default function Calendar() {
       allDay: false,
       eventType: canCreate ? 'event' : 'personal',
       location: '',
+      locationAddress: '',
       categoryIds: [],
       color: '',
       repeatFreq: 'none',
@@ -533,6 +559,7 @@ export default function Calendar() {
       allDay: event.allDay,
       eventType: event.eventType,
       location: event.location || '',
+      locationAddress: event.locationAddress || '',
       categoryIds: event.categoryTargets?.map(ct => ct.teamCategoryId) || [],
       color: event.color || '',
       repeatFreq: 'none',
@@ -566,6 +593,7 @@ export default function Calendar() {
         allDay: form.allDay,
         eventType: form.eventType,
         location: form.location,
+        locationAddress: form.locationAddress,
         categoryIds: isPersonalEvent ? [] : form.categoryIds,
         isPersonal: isPersonalEvent,
         color: form.color || null
@@ -667,7 +695,7 @@ export default function Calendar() {
           const isToday = date.toDateString() === new Date().toDateString();
           const isSelected = selectedDate?.toDateString() === date.toDateString();
           const dayOfWeek = date.getDay();
-          const maxVisible = 3;
+          const maxVisible = 5;
           const overflow = dayEvents.length - maxVisible;
 
           return (
@@ -1026,7 +1054,18 @@ export default function Calendar() {
                   value={form.location}
                   onChange={(e) => setForm({ ...form, location: e.target.value })}
                   className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                  placeholder="場所（任意）"
+                  placeholder="場所の名称（任意）"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-gray-500 mb-1">住所</label>
+                <input
+                  type="text"
+                  value={form.locationAddress}
+                  onChange={(e) => setForm({ ...form, locationAddress: e.target.value })}
+                  className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                  placeholder="住所（任意・Googleマップにリンクされます）"
                 />
               </div>
 
