@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   ChevronLeft, ChevronRight, Plus, X, Calendar as CalendarIcon, 
-  Clock, MapPin, Edit2, Trash2, Tag, FileText, Users, ChevronDown, Check, List
+  Clock, MapPin, Edit2, Trash2, Tag, FileText, Users, ChevronDown, Check, List, MapPinned
 } from 'lucide-react';
 
 const eventTypeColors = {
@@ -332,6 +332,11 @@ export default function Calendar() {
   const [detailEvent, setDetailEvent] = useState(null);
   const [savedLocations, setSavedLocations] = useState([]);
   const [selectedSavedLocationId, setSelectedSavedLocationId] = useState('');
+  const [showLocationsModal, setShowLocationsModal] = useState(false);
+  const [locationDraft, setLocationDraft] = useState({ name: '', address: '' });
+  const [editingLocationId, setEditingLocationId] = useState(null);
+  const [editingLocationDraft, setEditingLocationDraft] = useState({ name: '', address: '' });
+  const [locationModalError, setLocationModalError] = useState('');
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -363,12 +368,19 @@ export default function Calendar() {
   }, [currentTeamId, canCreate]);
 
   useEffect(() => {
-    if (showModal && currentTeamId) {
+    if ((showModal || showLocationsModal) && currentTeamId) {
       fetchSavedLocations();
-    } else if (!showModal) {
+    }
+    if (!showModal) {
       setSelectedSavedLocationId('');
     }
-  }, [showModal, currentTeamId]);
+    if (!showLocationsModal) {
+      setLocationDraft({ name: '', address: '' });
+      setEditingLocationId(null);
+      setEditingLocationDraft({ name: '', address: '' });
+      setLocationModalError('');
+    }
+  }, [showModal, showLocationsModal, currentTeamId]);
 
   useEffect(() => {
     setSelectedSavedLocationId('');
@@ -384,8 +396,13 @@ export default function Calendar() {
     }
   };
 
-  const handleSaveLocation = async () => {
-    if (!form.location.trim() || !currentTeamId) return;
+  const handleAddLocation = async () => {
+    setLocationModalError('');
+    const name = locationDraft.name.trim();
+    if (!name || !currentTeamId) {
+      setLocationModalError('場所の名称を入力してください');
+      return;
+    }
     try {
       const res = await fetch('/api/event-locations', {
         method: 'POST',
@@ -393,19 +410,59 @@ export default function Calendar() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           teamId: currentTeamId,
-          name: form.location.trim(),
-          address: form.locationAddress.trim(),
+          name,
+          address: locationDraft.address.trim(),
         }),
       });
       if (res.ok) {
+        setLocationDraft({ name: '', address: '' });
         await fetchSavedLocations();
       } else {
         const data = await res.json().catch(() => ({}));
-        alert(data.error || '場所の保存に失敗しました');
+        setLocationModalError(data.error || '場所の登録に失敗しました');
       }
     } catch (err) {
       console.error(err);
-      alert('場所の保存に失敗しました');
+      setLocationModalError('場所の登録に失敗しました');
+    }
+  };
+
+  const handleStartEditLocation = (loc) => {
+    setEditingLocationId(loc.id);
+    setEditingLocationDraft({ name: loc.name, address: loc.address || '' });
+    setLocationModalError('');
+  };
+
+  const handleCancelEditLocation = () => {
+    setEditingLocationId(null);
+    setEditingLocationDraft({ name: '', address: '' });
+  };
+
+  const handleUpdateLocation = async (id) => {
+    setLocationModalError('');
+    const name = editingLocationDraft.name.trim();
+    if (!name) {
+      setLocationModalError('場所の名称を入力してください');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/event-locations/${id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, address: editingLocationDraft.address.trim() }),
+      });
+      if (res.ok) {
+        setEditingLocationId(null);
+        setEditingLocationDraft({ name: '', address: '' });
+        await fetchSavedLocations();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setLocationModalError(data.error || '場所の更新に失敗しました');
+      }
+    } catch (err) {
+      console.error(err);
+      setLocationModalError('場所の更新に失敗しました');
     }
   };
 
@@ -415,6 +472,7 @@ export default function Calendar() {
       const res = await fetch(`/api/event-locations/${id}`, { method: 'DELETE', credentials: 'include' });
       if (res.ok) {
         if (selectedSavedLocationId === id) setSelectedSavedLocationId('');
+        if (editingLocationId === id) handleCancelEditLocation();
         await fetchSavedLocations();
       }
     } catch (err) {
@@ -950,13 +1008,24 @@ export default function Calendar() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-800">カレンダー</h1>
-        <button
-          onClick={openCreateModal}
-          className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          予定を追加
-        </button>
+        <div className="flex items-center gap-2">
+          {canCreate && currentTeamId && (
+            <button
+              onClick={() => setShowLocationsModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors shadow-sm"
+            >
+              <MapPinned className="w-4 h-4" />
+              場所を管理
+            </button>
+          )}
+          <button
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            予定を追加
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -1121,29 +1190,23 @@ export default function Calendar() {
               {savedLocations.length > 0 && (
                 <div>
                   <label className="block text-[11px] font-medium text-gray-500 mb-1">登録済みの場所から選択</label>
-                  <div className="flex gap-2">
-                    <select
-                      value={selectedSavedLocationId}
-                      onChange={(e) => handlePickSavedLocation(e.target.value)}
-                      className="flex-1 min-w-0 px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                    >
-                      <option value="">— 選択してください —</option>
-                      {savedLocations.map(l => (
-                        <option key={l.id} value={l.id}>
-                          {l.name}{l.address ? `（${l.address}）` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    {canCreate && selectedSavedLocationId && savedLocations.some(l => l.id === selectedSavedLocationId) && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteSavedLocation(selectedSavedLocationId)}
-                        className="px-3 py-2 text-[12px] font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 whitespace-nowrap"
-                      >
-                        削除
-                      </button>
-                    )}
-                  </div>
+                  <select
+                    value={selectedSavedLocationId}
+                    onChange={(e) => handlePickSavedLocation(e.target.value)}
+                    className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white"
+                  >
+                    <option value="">— 選択してください —</option>
+                    {savedLocations.map(l => (
+                      <option key={l.id} value={l.id}>
+                        {l.name}{l.address ? `（${l.address}）` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {canCreate && (
+                    <p className="mt-1 text-[10.5px] text-gray-400">
+                      場所の追加・編集・削除はカレンダー画面右上の「場所を管理」から行えます。
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -1167,15 +1230,6 @@ export default function Calendar() {
                   className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
                   placeholder="住所（任意・Googleマップにリンクされます）"
                 />
-                {canCreate && form.location.trim() && currentTeamId && (
-                  <button
-                    type="button"
-                    onClick={handleSaveLocation}
-                    className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-primary-700 border border-primary-200 rounded-md hover:bg-primary-50"
-                  >
-                    ＋ この場所を登録済みに保存
-                  </button>
-                )}
               </div>
 
               <div>
@@ -1305,6 +1359,143 @@ export default function Calendar() {
                   {editingEvent ? '更新' : '作成'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showLocationsModal && (
+        <div
+          className="fixed inset-0 bg-black/50 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setShowLocationsModal(false)}
+        >
+          <div
+            className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <h2 className="text-[15px] font-semibold text-gray-800 flex items-center gap-2">
+                <MapPinned className="w-4 h-4 text-primary-600" />
+                場所の管理
+              </h2>
+              <button
+                onClick={() => setShowLocationsModal(false)}
+                className="p-1 text-gray-500 hover:text-gray-800 rounded"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+              <p className="text-[11px] text-gray-500 mb-2">
+                ここで登録した場所は、予定を作成・編集する際に「登録済みの場所から選択」のドロップダウンに表示されます。
+              </p>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={locationDraft.name}
+                  onChange={(e) => setLocationDraft({ ...locationDraft, name: e.target.value })}
+                  placeholder="場所の名称（例：第一グラウンド）"
+                  className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                />
+                <input
+                  type="text"
+                  value={locationDraft.address}
+                  onChange={(e) => setLocationDraft({ ...locationDraft, address: e.target.value })}
+                  placeholder="住所（任意・Googleマップにリンクされます）"
+                  className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddLocation}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-[12px] font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  登録する
+                </button>
+                {locationModalError && (
+                  <p className="text-[12px] text-red-600">{locationModalError}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 py-3">
+              {savedLocations.length === 0 ? (
+                <p className="text-[13px] text-gray-500 text-center py-6">
+                  まだ場所が登録されていません。
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {savedLocations.map((loc) => (
+                    <li
+                      key={loc.id}
+                      className="border border-gray-200 rounded-lg px-3 py-2.5"
+                    >
+                      {editingLocationId === loc.id ? (
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={editingLocationDraft.name}
+                            onChange={(e) => setEditingLocationDraft({ ...editingLocationDraft, name: e.target.value })}
+                            placeholder="場所の名称"
+                            className="w-full px-2 py-1.5 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                          />
+                          <input
+                            type="text"
+                            value={editingLocationDraft.address}
+                            onChange={(e) => setEditingLocationDraft({ ...editingLocationDraft, address: e.target.value })}
+                            placeholder="住所（任意）"
+                            className="w-full px-2 py-1.5 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                          />
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={handleCancelEditLocation}
+                              className="px-3 py-1 text-[12px] text-gray-600 border border-gray-200 rounded hover:bg-gray-50"
+                            >
+                              キャンセル
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateLocation(loc.id)}
+                              className="px-3 py-1 text-[12px] text-white bg-primary-600 rounded hover:bg-primary-700"
+                            >
+                              保存
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[13px] font-medium text-gray-800 truncate">{loc.name}</div>
+                            {loc.address && (
+                              <div className="text-[11.5px] text-gray-500 mt-0.5 break-all">{loc.address}</div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditLocation(loc)}
+                              className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded"
+                              title="編集"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSavedLocation(loc.id)}
+                              className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                              title="削除"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </div>
