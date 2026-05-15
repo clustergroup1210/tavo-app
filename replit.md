@@ -28,6 +28,8 @@ Team-centric display, comprehensive RBAC, separation of internal IDs from displa
 - **User code**: each user has a human-readable `userCode` (operator-supplied like `COACH-TARO` or auto-generated `U-NNNNNN`). Resolved via `server/services/userCode.js#resolveUserCode`. Searchable in the admin user list and editable in user create/edit modals.
 - **Team code**: each team has a unique `teamCode` (operator-supplied like `FCV-U15` or auto `T-NNNNNN`); editable on the admin team list and supported as an optional CSV column.
 - **Account management**: operators can edit user accounts; users manage their own email/password.
+- **Unified team user page** (`/users`): merges former ユーザー管理 / スタッフ管理 / 招待URL管理 into one screen with two tabs (`?tab=invitations` deep-link). Columns: ユーザー / メール / 役割 (inline select) / 最終ログイン (relative + native title tooltip) / 状態 / 操作. `User.lastLoginAt` is fire-and-forget updated by `POST /api/auth/login`. Header actions: 「既存ユーザーを追加」 (POST `/api/teams/:id/members`) and 「招待URL発行」 (existing invitation flow inline).
+- **退団 (soft-leave)**: 削除の代わりに `POST /api/users/:id/leave-team { teamId, leftAt }` が `UserTeam.isActive=false` + `UserTeam.leftAt` を設定し、同チームの `Player.deletedAt=leftAt`、必要なら `Team.headCoachId` をクリア（全て `$transaction`）。`authenticate` ミドルウェアと `/api/auth/login` は `teams: { where: { isActive: true } }` でフィルタするため、退団者はそのチームの `hasTeamAccess` を失う一方で、過去の評価・動画・タスクなどのデータは保持される。`POST /api/users/:id/restore-team` で復帰（`isActive=true`、`leftAt=null`、`Player.deletedAt=null`）。退団操作は TEAM_MANAGER または operator のみ、自分自身は退団不可。
 
 #### Team & Membership
 - **Team management**: profiles, rosters, league/region tags, sub-team hierarchy, and per-team invitation links.

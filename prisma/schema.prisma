@@ -121,6 +121,7 @@ model User {
   avatarUrl      String?
   resetToken     String?   @unique
   resetExpiresAt DateTime?
+  lastLoginAt    DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -183,6 +184,7 @@ model UserTeam {
   teamId    String
   role      RoleType
   isActive  Boolean  @default(true)
+  leftAt    DateTime?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

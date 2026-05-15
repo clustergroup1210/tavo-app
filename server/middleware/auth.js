@@ -30,6 +30,7 @@ const authenticate = async (req, res, next) => {
       include: {
         organizations: true,
         teams: {
+          where: { isActive: true },
           include: { team: true }
         },
         players: true,

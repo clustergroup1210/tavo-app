@@ -149,7 +149,7 @@ export default function App() {
           <Route path="/evaluations/matrix" element={<EvaluationMatrix />} />
           <Route path="/ranking" element={<Ranking />} />
           <Route path="/users" element={<UserManagement />} />
-          <Route path="/invitations" element={<Invitations />} />
+          <Route path="/invitations" element={<Navigate to="/users?tab=invitations" replace />} />
           <Route path="/videos" element={<Videos />} />
           <Route path="/mypage" element={<MyPage />} />
           <Route path="/organizations" element={<Organizations />} />
@@ -158,7 +158,7 @@ export default function App() {
           <Route path="/permissions" element={<Placeholder />} />
           <Route path="/settings" element={<TeamSettings />} />
           <Route path="/goal-categories" element={<GoalCategoryManagement />} />
-          <Route path="/staff" element={<StaffManagement />} />
+          <Route path="/staff" element={<Navigate to="/users" replace />} />
           <Route path="/coach-assignments" element={<CoachAssignmentManagement />} />
           <Route path="/team-categories" element={<TeamCategoryManagement />} />
           <Route path="/progress" element={<PlayerProgress />} />

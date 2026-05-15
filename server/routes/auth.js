@@ -106,7 +106,7 @@ router.post('/login', async (req, res) => {
       where: { email },
       include: {
         organizations: true,
-        teams: { include: { team: true } },
+        teams: { where: { isActive: true }, include: { team: true } },
         players: true,
         parentPlayers: { include: { player: true } }
       }
@@ -115,6 +115,11 @@ router.post('/login', async (req, res) => {
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() }
+    }).catch((err) => console.error('Failed to update lastLoginAt:', err));
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
     res.cookie('token', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'none', secure: true });

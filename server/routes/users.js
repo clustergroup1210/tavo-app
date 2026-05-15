@@ -64,7 +64,8 @@ router.get('/', authenticate, async (req, res) => {
           teams: { some: { teamId } }
         },
         include: {
-          teams: { where: { teamId }, include: { team: true } }
+          teams: { where: { teamId }, include: { team: true } },
+          players: { where: { teamId }, select: { id: true, name: true, deletedAt: true } }
         }
       });
     } else {
@@ -77,8 +78,10 @@ router.get('/', authenticate, async (req, res) => {
       userCode: u.userCode,
       name: u.name,
       avatarUrl: u.avatarUrl,
+      lastLoginAt: u.lastLoginAt,
       organizations: u.organizations,
-      teams: u.teams
+      teams: u.teams,
+      players: u.players,
     })));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch users' });
@@ -218,6 +221,91 @@ router.post('/', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Create user error:', error);
     res.status(500).json({ error: 'ユーザーの作成に失敗しました' });
+  }
+});
+
+// Mark a user as having left a team (soft removal). Their team data is preserved
+// but they lose all team access. Optionally accepts `leftAt` (ISO date).
+router.post('/:id/leave-team', authenticate, async (req, res) => {
+  try {
+    const { teamId, leftAt } = req.body;
+    if (!teamId) return res.status(400).json({ error: 'teamId is required' });
+
+    if (!hasTeamAccess(req.user, teamId, ['TEAM_MANAGER'])) {
+      return res.status(403).json({ error: '退団処理はチーム管理者または運営者のみ実行できます' });
+    }
+
+    const userId = req.params.id;
+    if (userId === req.user.id) {
+      return res.status(400).json({ error: '自分自身を退団させることはできません' });
+    }
+
+    const leftDate = leftAt ? new Date(leftAt) : new Date();
+    if (isNaN(leftDate.getTime())) {
+      return res.status(400).json({ error: '退団日が不正です' });
+    }
+
+    const memberships = await prisma.userTeam.findMany({
+      where: { userId, teamId }
+    });
+    if (memberships.length === 0) {
+      return res.status(404).json({ error: 'このユーザーはチームに所属していません' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.userTeam.updateMany({
+        where: { userId, teamId },
+        data: { isActive: false, leftAt: leftDate }
+      });
+
+      // If this user has Player records on this team, soft-delete them too
+      // so they disappear from rosters but data is preserved.
+      await tx.player.updateMany({
+        where: { userId, teamId, deletedAt: null },
+        data: { deletedAt: leftDate }
+      });
+
+      // If they were head coach, clear that link.
+      const team = await tx.team.findUnique({ where: { id: teamId }, select: { headCoachId: true } });
+      if (team?.headCoachId === userId) {
+        await tx.team.update({ where: { id: teamId }, data: { headCoachId: null } });
+      }
+    });
+
+    res.json({ success: true, leftAt: leftDate });
+  } catch (error) {
+    console.error('Leave team error:', error);
+    res.status(500).json({ error: '退団処理に失敗しました' });
+  }
+});
+
+// Reverse a 退団 — restores membership and undeletes any linked Player.
+router.post('/:id/restore-team', authenticate, async (req, res) => {
+  try {
+    const { teamId } = req.body;
+    if (!teamId) return res.status(400).json({ error: 'teamId is required' });
+
+    if (!hasTeamAccess(req.user, teamId, ['TEAM_MANAGER'])) {
+      return res.status(403).json({ error: 'チーム管理者または運営者のみ実行できます' });
+    }
+
+    const userId = req.params.id;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.userTeam.updateMany({
+        where: { userId, teamId },
+        data: { isActive: true, leftAt: null }
+      });
+      await tx.player.updateMany({
+        where: { userId, teamId, deletedAt: { not: null } },
+        data: { deletedAt: null }
+      });
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Restore team error:', error);
+    res.status(500).json({ error: '復帰処理に失敗しました' });
   }
 });
 
