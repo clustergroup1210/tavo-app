@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Check, ClipboardList, Calendar, ChevronRight, X, Video, Target, MessageSquare, Tag, StickyNote } from 'lucide-react';
+import { Plus, Check, ClipboardList, Calendar, ChevronRight, X, Video, Target, MessageSquare, Tag, StickyNote, Users } from 'lucide-react';
 import clsx from 'clsx';
 
 const TARGET_TYPES = [
@@ -49,6 +49,7 @@ export default function TaskListWidget() {
   const [tasks, setTasks] = useState([]);
   const [players, setPlayers] = useState([]);
   const [staff, setStaff] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [confirmingId, setConfirmingId] = useState(null);
@@ -64,8 +65,21 @@ export default function TaskListWidget() {
     if (canAssign && teamId) {
       fetchPlayers();
       fetchStaff();
+      fetchCategories();
     }
   }, [teamId, canAssign]);
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch(`/api/team-categories?teamId=${teamId}`, { credentials: 'include' });
+      if (!res.ok) { setCategories([]); return; }
+      const data = await res.json();
+      const list = (Array.isArray(data) ? data : []).filter(c => c.teamId === teamId);
+      setCategories(list);
+    } catch (e) {
+      console.error('Failed to fetch categories:', e);
+    }
+  };
 
   const fetchTasks = async () => {
     setLoading(true);
@@ -312,17 +326,25 @@ export default function TaskListWidget() {
         <CreateTaskModal
           players={players}
           staff={staff}
+          categories={categories}
           teamId={teamId}
           currentUser={user}
           onClose={() => setShowModal(false)}
-          onCreated={(t) => { setTasks(prev => [t, ...prev]); setShowModal(false); }}
+          onCreated={(payload) => {
+            if (Array.isArray(payload)) {
+              setTasks(prev => [...payload, ...prev]);
+            } else {
+              setTasks(prev => [payload, ...prev]);
+            }
+            setShowModal(false);
+          }}
         />
       )}
     </div>
   );
 }
 
-function CreateTaskModal({ players, staff, teamId, currentUser, onClose, onCreated }) {
+function CreateTaskModal({ players, staff, categories, teamId, currentUser, onClose, onCreated }) {
   const [form, setForm] = useState({
     assigneeKind: 'SELF',
     assigneeId: currentUser?.id || '',
@@ -352,13 +374,32 @@ function CreateTaskModal({ players, staff, teamId, currentUser, onClose, onCreat
     setSubmitting(true);
     setError('');
     try {
-      const body = {
+      const baseBody = {
         title: form.title.trim(),
         description: form.description.trim() || null,
         dueDate: form.dueDate || null,
         targetType: form.targetType || null,
         targetUrl: form.targetType ? (form.targetUrl || targetUrlAuto || null) : null
       };
+
+      if (form.assigneeKind === 'CATEGORY') {
+        const res = await fetch('/api/tasks/bulk-by-category', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ ...baseBody, teamCategoryId: form.assigneeId }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setError(data.error || 'タスクの作成に失敗しました');
+          return;
+        }
+        const data = await res.json();
+        onCreated(data.tasks || []);
+        return;
+      }
+
+      const body = { ...baseBody };
       if (form.assigneeKind === 'PLAYER') {
         body.playerId = form.assigneeId;
       } else if (form.assigneeKind === 'STAFF') {
@@ -402,7 +443,7 @@ function CreateTaskModal({ players, staff, teamId, currentUser, onClose, onCreat
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
             <label className="block text-[11px] font-medium text-gray-500 mb-1.5">担当者の種類</label>
-            <div className="grid grid-cols-3 gap-1.5 mb-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2">
               <button
                 type="button"
                 onClick={() => setKind('SELF')}
@@ -416,6 +457,16 @@ function CreateTaskModal({ players, staff, teamId, currentUser, onClose, onCreat
               </button>
               <button
                 type="button"
+                onClick={() => setKind('STAFF')}
+                className={clsx(
+                  'px-2 py-1.5 text-[12px] rounded-lg border transition-colors',
+                  form.assigneeKind === 'STAFF' ? 'bg-indigo-50 border-indigo-400 text-indigo-800 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                )}
+              >
+                スタッフ
+              </button>
+              <button
+                type="button"
                 onClick={() => setKind('PLAYER')}
                 className={clsx(
                   'px-2 py-1.5 text-[12px] rounded-lg border transition-colors',
@@ -426,19 +477,45 @@ function CreateTaskModal({ players, staff, teamId, currentUser, onClose, onCreat
               </button>
               <button
                 type="button"
-                onClick={() => setKind('STAFF')}
+                onClick={() => setKind('CATEGORY')}
                 className={clsx(
-                  'px-2 py-1.5 text-[12px] rounded-lg border transition-colors',
-                  form.assigneeKind === 'STAFF' ? 'bg-indigo-50 border-indigo-400 text-indigo-800 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                  'inline-flex items-center justify-center gap-1 px-2 py-1.5 text-[12px] rounded-lg border transition-colors',
+                  form.assigneeKind === 'CATEGORY' ? 'bg-emerald-50 border-emerald-400 text-emerald-800 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                 )}
               >
-                スタッフ
+                <Users className="w-3 h-3" />
+                カテゴリー
               </button>
             </div>
             {form.assigneeKind === 'SELF' ? (
               <p className="text-[11px] text-gray-500 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
                 自分専用のメモタスクとして登録します。他のユーザーには通知されません。
               </p>
+            ) : form.assigneeKind === 'CATEGORY' ? (
+              <>
+                <label className="block text-[11px] font-medium text-gray-500 mb-1">
+                  対象カテゴリー <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={form.assigneeId}
+                  onChange={(e) => setForm({ ...form, assigneeId: e.target.value })}
+                  required
+                  className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                >
+                  <option value="">カテゴリーを選択...</option>
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}{typeof c._count?.players === 'number' ? `（${c._count.players}名）` : ''}
+                    </option>
+                  ))}
+                </select>
+                {categories.length === 0 && (
+                  <p className="text-[10px] text-gray-400 mt-1">このチームに登録されているカテゴリーがありません。</p>
+                )}
+                <p className="text-[10px] text-gray-400 mt-1">
+                  選択したカテゴリーに在籍中の選手それぞれにタスクを作成します。各選手が個別に完了でき、完了すると通知が届きます。
+                </p>
+              </>
             ) : (
               <>
                 <label className="block text-[11px] font-medium text-gray-500 mb-1">
@@ -462,9 +539,7 @@ function CreateTaskModal({ players, staff, teamId, currentUser, onClose, onCreat
                 {form.assigneeKind === 'STAFF' && staff.length === 0 && (
                   <p className="text-[10px] text-gray-400 mt-1">このチームに登録されているスタッフがいません。</p>
                 )}
-                {form.assigneeKind !== 'SELF' && (
-                  <p className="text-[10px] text-gray-400 mt-1">担当者がタスクを完了すると、あなたに完了通知が届きます。</p>
-                )}
+                <p className="text-[10px] text-gray-400 mt-1">担当者がタスクを完了すると、あなたに完了通知が届きます。</p>
               </>
             )}
           </div>

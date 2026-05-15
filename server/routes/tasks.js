@@ -244,6 +244,84 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
+router.post('/bulk-by-category', authenticate, async (req, res) => {
+  try {
+    const { teamCategoryId, title, description, dueDate, targetType, targetUrl } = req.body;
+
+    if (!title?.trim()) return res.status(400).json({ error: 'Title is required' });
+    if (!teamCategoryId) return res.status(400).json({ error: 'teamCategoryId is required' });
+    if (targetType && !ALLOWED_TYPES.includes(targetType)) {
+      return res.status(400).json({ error: 'Invalid targetType' });
+    }
+
+    const category = await prisma.teamCategory.findUnique({
+      where: { id: teamCategoryId },
+      select: { id: true, name: true, teamId: true, isActive: true },
+    });
+    if (!category || !category.isActive) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+
+    const canAssign =
+      isOperator(req.user) ||
+      hasTeamAccess(req.user, category.teamId, ['TEAM_MANAGER', 'COACH']);
+    if (!canAssign) {
+      return res.status(403).json({ error: 'このカテゴリーにタスクを設定する権限がありません' });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const players = await prisma.player.findMany({
+      where: {
+        teamCategoryId,
+        deletedAt: null,
+        OR: [{ graduationDate: null }, { graduationDate: { gt: today } }],
+      },
+      select: { id: true, name: true, userId: true },
+    });
+
+    if (players.length === 0) {
+      return res.status(400).json({ error: 'このカテゴリーに在籍中の選手がいません' });
+    }
+
+    const baseData = {
+      assignedBy: req.user.id,
+      title: title.trim(),
+      description: description?.trim() || null,
+      dueDate: dueDate ? new Date(dueDate) : null,
+      targetType: targetType || null,
+      targetUrl: safeTargetUrl(targetUrl),
+    };
+
+    const created = await prisma.$transaction(
+      players.map((p) =>
+        prisma.task.create({
+          data: { ...baseData, playerId: p.id },
+          include: TASK_INCLUDE,
+        })
+      )
+    );
+
+    const notifyTargets = players.filter((p) => p.userId);
+    await Promise.all(
+      notifyTargets.map((p) =>
+        createNotification({
+          userId: p.userId,
+          type: 'TASK',
+          title: '新しいタスクが設定されました',
+          message: `${req.user.name}さんからタスク「${title.trim()}」が設定されました（${category.name}）`,
+          linkUrl: '/player-dashboard?tab=tasks',
+        }).catch((err) => console.error('Notify failed:', err))
+      )
+    );
+
+    res.json({ count: created.length, categoryName: category.name, tasks: created });
+  } catch (error) {
+    console.error('Bulk create tasks by category error:', error);
+    res.status(500).json({ error: 'Failed to create tasks' });
+  }
+});
+
 router.put('/:id', authenticate, async (req, res) => {
   try {
     const { title, description, dueDate, status, targetType, targetUrl } = req.body;
