@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Check, ClipboardList, Calendar, ChevronRight, X, Video, Target, MessageSquare, Tag, StickyNote, Users } from 'lucide-react';
+import { Plus, Check, ClipboardList, Calendar, ChevronRight, X, Video, Target, MessageSquare, Tag, StickyNote, Users, Repeat } from 'lucide-react';
 import clsx from 'clsx';
 
 const TARGET_TYPES = [
@@ -261,6 +261,15 @@ export default function TaskListWidget() {
                     <span className="text-[13px] font-medium text-gray-900 truncate">
                       {task.title}
                     </span>
+                    {task.seriesId && (
+                      <span
+                        className="inline-flex items-center gap-0.5 px-1 py-px text-[9px] bg-sky-50 text-sky-700 rounded"
+                        title="繰り返しタスク"
+                      >
+                        <Repeat className="w-2.5 h-2.5" />
+                        繰り返し
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 mt-0.5">
                     {!playerMode && (task.player || task.assignee) && (() => {
@@ -352,7 +361,9 @@ function CreateTaskModal({ players, staff, categories, teamId, currentUser, onCl
     description: '',
     dueDate: '',
     targetType: '',
-    targetUrl: ''
+    targetUrl: '',
+    recurrenceFreq: 'none',
+    recurrenceUntil: ''
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -374,12 +385,16 @@ function CreateTaskModal({ players, staff, categories, teamId, currentUser, onCl
     setSubmitting(true);
     setError('');
     try {
+      const recurrenceEnabled = form.recurrenceFreq !== 'none' && !!form.dueDate && !!form.recurrenceUntil;
       const baseBody = {
         title: form.title.trim(),
         description: form.description.trim() || null,
         dueDate: form.dueDate || null,
         targetType: form.targetType || null,
-        targetUrl: form.targetType ? (form.targetUrl || targetUrlAuto || null) : null
+        targetUrl: form.targetType ? (form.targetUrl || targetUrlAuto || null) : null,
+        recurrence: recurrenceEnabled
+          ? { freq: form.recurrenceFreq, until: form.recurrenceUntil }
+          : null
       };
 
       if (form.assigneeKind === 'CATEGORY') {
@@ -601,6 +616,59 @@ function CreateTaskModal({ players, staff, categories, teamId, currentUser, onCl
               onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
               className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
             />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-medium text-gray-500 mb-1.5 flex items-center gap-1">
+              <Repeat className="w-3 h-3" />
+              繰り返し（任意）
+            </label>
+            <div className="grid grid-cols-3 gap-1.5 mb-2">
+              {[
+                { value: 'none', label: 'なし' },
+                { value: 'weekly', label: '毎週' },
+                { value: 'monthly', label: '毎月' },
+              ].map(opt => {
+                const active = form.recurrenceFreq === opt.value;
+                const disabled = opt.value !== 'none' && !form.dueDate;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => setForm({ ...form, recurrenceFreq: opt.value, recurrenceUntil: opt.value === 'none' ? '' : form.recurrenceUntil })}
+                    className={clsx(
+                      'px-2 py-1.5 text-[12px] rounded-lg border transition-colors',
+                      active ? 'bg-sky-50 border-sky-400 text-sky-800 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50',
+                      disabled && 'opacity-40 cursor-not-allowed hover:bg-white'
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            {form.recurrenceFreq !== 'none' && (
+              <>
+                <label className="block text-[11px] font-medium text-gray-500 mb-1">
+                  繰り返し終了日 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={form.recurrenceUntil}
+                  min={form.dueDate || undefined}
+                  onChange={(e) => setForm({ ...form, recurrenceUntil: e.target.value })}
+                  required
+                  className="w-full px-3 py-2 text-[13px] border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                />
+                <p className="text-[10px] text-gray-400 mt-1">
+                  期限日を起点に{form.recurrenceFreq === 'weekly' ? '毎週' : '毎月'}同じ曜日／日付で、終了日まで自動的にタスクを作成します（最大24件）。
+                </p>
+              </>
+            )}
+            {form.recurrenceFreq === 'none' && !form.dueDate && (
+              <p className="text-[10px] text-gray-400">繰り返しを設定するには、まず期限日を指定してください。</p>
+            )}
           </div>
 
           <div>

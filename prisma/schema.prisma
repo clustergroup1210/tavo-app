@@ -482,6 +482,7 @@ model Task {
   completedAt     DateTime?
   targetType      String?
   targetUrl       String?
+  seriesId        String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -495,6 +496,7 @@ model Task {
   @@index([teamId])
   @@index([assignedBy])
   @@index([status])
+  @@index([seriesId])
 }
 
 enum TaskStatus {

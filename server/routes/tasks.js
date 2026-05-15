@@ -8,6 +8,44 @@ const prisma = new PrismaClient();
 
 const ALLOWED_TYPES = ['EVALUATION', 'VIDEO', 'MEETING', 'GOAL', 'MENTORING', 'OTHER'];
 const STAFF_ROLES = ['TEAM_MANAGER', 'COACH', 'GUEST_COACH'];
+const RECURRENCE_FREQS = ['weekly', 'monthly'];
+const MAX_RECURRENCE_OCCURRENCES = 24;
+
+function generateRecurrenceDueDates(firstDueDate, recurrence) {
+  if (!firstDueDate || !recurrence || !recurrence.freq || recurrence.freq === 'none') {
+    return [firstDueDate];
+  }
+  const out = [];
+  const cursor = new Date(firstDueDate);
+  const until = new Date(recurrence.until);
+  until.setHours(23, 59, 59, 999);
+  while (cursor <= until && out.length < MAX_RECURRENCE_OCCURRENCES) {
+    out.push(new Date(cursor));
+    if (recurrence.freq === 'weekly') cursor.setDate(cursor.getDate() + 7);
+    else cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return out.length > 0 ? out : [firstDueDate];
+}
+
+function validateRecurrence(recurrence, dueDate) {
+  if (!recurrence || !recurrence.freq || recurrence.freq === 'none') return null;
+  if (!dueDate) return '繰り返しを設定するには期限の指定が必要です';
+  if (!RECURRENCE_FREQS.includes(recurrence.freq)) return 'Invalid recurrence frequency';
+  if (!recurrence.until) return '繰り返しの終了日を指定してください';
+  const until = new Date(recurrence.until);
+  if (isNaN(until.getTime())) return '繰り返しの終了日が不正です';
+  const due = new Date(dueDate);
+  until.setHours(23, 59, 59, 999);
+  if (until < due) return '繰り返しの終了日は期限日以降にしてください';
+  return null;
+}
+
+function recurrenceLabel(recurrence, count) {
+  if (!recurrence || !recurrence.freq || count <= 1) return '';
+  if (recurrence.freq === 'weekly') return `（毎週・全${count}回）`;
+  if (recurrence.freq === 'monthly') return `（毎月・全${count}回）`;
+  return '';
+}
 
 function isOperator(user) {
   return user.organizations?.some(o =>
@@ -149,7 +187,7 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { playerId, assigneeUserId, teamId, title, description, dueDate, targetType, targetUrl } = req.body;
+    const { playerId, assigneeUserId, teamId, title, description, dueDate, targetType, targetUrl, recurrence } = req.body;
 
     if (!title?.trim()) {
       return res.status(400).json({ error: 'Title is required' });
@@ -160,6 +198,8 @@ router.post('/', authenticate, async (req, res) => {
     if (targetType && !ALLOWED_TYPES.includes(targetType)) {
       return res.status(400).json({ error: 'Invalid targetType' });
     }
+    const recurrenceError = validateRecurrence(recurrence, dueDate);
+    if (recurrenceError) return res.status(400).json({ error: recurrenceError });
     const safeUrl = safeTargetUrl(targetUrl);
 
     let createData = {
@@ -171,7 +211,6 @@ router.post('/', authenticate, async (req, res) => {
       targetUrl: safeUrl
     };
     let notifyUserId = null;
-    let assigneeName = '';
 
     if (playerId) {
       const player = await prisma.player.findUnique({
@@ -186,7 +225,6 @@ router.post('/', authenticate, async (req, res) => {
       }
       createData.playerId = playerId;
       notifyUserId = player.userId;
-      assigneeName = player.name;
     } else if (assigneeUserId === req.user.id) {
       createData.assigneeUserId = req.user.id;
       if (teamId) {
@@ -196,7 +234,6 @@ router.post('/', authenticate, async (req, res) => {
         createData.teamId = teamId;
       }
       notifyUserId = null;
-      assigneeName = req.user.name;
     } else {
       if (!teamId) {
         return res.status(400).json({ error: 'teamId is required when assigning to a staff user' });
@@ -219,25 +256,36 @@ router.post('/', authenticate, async (req, res) => {
       createData.assigneeUserId = assigneeUserId;
       createData.teamId = teamId;
       notifyUserId = assigneeUserId;
-      assigneeName = assignee.name;
     }
 
-    const task = await prisma.task.create({
-      data: createData,
-      include: TASK_INCLUDE
-    });
+    const occurrences = generateRecurrenceDueDates(createData.dueDate, recurrence);
+    const seriesId = occurrences.length > 1 ? require('crypto').randomUUID() : null;
+
+    const created = await prisma.$transaction(
+      occurrences.map((due) =>
+        prisma.task.create({
+          data: { ...createData, dueDate: due, seriesId },
+          include: TASK_INCLUDE,
+        })
+      )
+    );
 
     if (notifyUserId) {
+      const suffix = recurrenceLabel(recurrence, occurrences.length);
       await createNotification({
         userId: notifyUserId,
         type: 'TASK',
         title: '新しいタスクが設定されました',
-        message: `${req.user.name}さんからタスク「${title}」が設定されました`,
+        message: `${req.user.name}さんからタスク「${title}」が設定されました${suffix}`,
         linkUrl: playerId ? `/player-dashboard?tab=tasks` : `/dashboard`
-      });
+      }).catch((err) => console.error('Notify failed:', err));
     }
 
-    res.json(task);
+    if (seriesId) {
+      res.json({ ...created[0], _series: { count: created.length, seriesId } });
+    } else {
+      res.json(created[0]);
+    }
   } catch (error) {
     console.error('Create task error:', error);
     res.status(500).json({ error: 'Failed to create task' });
@@ -246,13 +294,15 @@ router.post('/', authenticate, async (req, res) => {
 
 router.post('/bulk-by-category', authenticate, async (req, res) => {
   try {
-    const { teamCategoryId, title, description, dueDate, targetType, targetUrl } = req.body;
+    const { teamCategoryId, title, description, dueDate, targetType, targetUrl, recurrence } = req.body;
 
     if (!title?.trim()) return res.status(400).json({ error: 'Title is required' });
     if (!teamCategoryId) return res.status(400).json({ error: 'teamCategoryId is required' });
     if (targetType && !ALLOWED_TYPES.includes(targetType)) {
       return res.status(400).json({ error: 'Invalid targetType' });
     }
+    const recurrenceError = validateRecurrence(recurrence, dueDate);
+    if (recurrenceError) return res.status(400).json({ error: recurrenceError });
 
     const category = await prisma.teamCategory.findUnique({
       where: { id: teamCategoryId },
@@ -293,15 +343,30 @@ router.post('/bulk-by-category', authenticate, async (req, res) => {
       targetUrl: safeTargetUrl(targetUrl),
     };
 
-    const created = await prisma.$transaction(
-      players.map((p) =>
-        prisma.task.create({
-          data: { ...baseData, playerId: p.id },
-          include: TASK_INCLUDE,
-        })
-      )
-    );
+    const occurrences = generateRecurrenceDueDates(baseData.dueDate, recurrence);
+    const totalToCreate = players.length * occurrences.length;
+    if (totalToCreate > 1000) {
+      return res.status(400).json({ error: `作成タスク数が多すぎます（${totalToCreate}件）。期間を短くするか選手を絞ってください。` });
+    }
+    const isRecurring = occurrences.length > 1;
 
+    const ops = [];
+    for (const p of players) {
+      // Distinct seriesId per player so PUT/DELETE ?scope=series only affects
+      // that player's series, not the entire bulk-created cohort.
+      const playerSeriesId = isRecurring ? require('crypto').randomUUID() : null;
+      for (const due of occurrences) {
+        ops.push(
+          prisma.task.create({
+            data: { ...baseData, dueDate: due, playerId: p.id, seriesId: playerSeriesId },
+            include: TASK_INCLUDE,
+          })
+        );
+      }
+    }
+    const created = await prisma.$transaction(ops);
+
+    const suffix = recurrenceLabel(recurrence, occurrences.length);
     const notifyTargets = players.filter((p) => p.userId);
     await Promise.all(
       notifyTargets.map((p) =>
@@ -309,7 +374,7 @@ router.post('/bulk-by-category', authenticate, async (req, res) => {
           userId: p.userId,
           type: 'TASK',
           title: '新しいタスクが設定されました',
-          message: `${req.user.name}さんからタスク「${title.trim()}」が設定されました（${category.name}）`,
+          message: `${req.user.name}さんからタスク「${title.trim()}」が設定されました（${category.name}）${suffix}`,
           linkUrl: '/player-dashboard?tab=tasks',
         }).catch((err) => console.error('Notify failed:', err))
       )
@@ -349,28 +414,51 @@ router.put('/:id', authenticate, async (req, res) => {
 
     if (!canChangeStatus) return res.status(403).json({ error: 'Access denied' });
 
-    const updateData = {};
-    if (canEditMeta) {
-      if (title !== undefined) updateData.title = title.trim();
-      if (description !== undefined) updateData.description = description?.trim() || null;
-      if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null;
-      if (targetType !== undefined) updateData.targetType = targetType || null;
-      if (targetUrl !== undefined) updateData.targetUrl = safeTargetUrl(targetUrl);
+    const seriesScope = req.query.scope === 'series' && task.seriesId;
+    if (seriesScope && !canEditMeta) {
+      return res.status(403).json({ error: 'シリーズ全体を編集する権限がありません' });
     }
+
+    const metaUpdate = {};
+    if (canEditMeta) {
+      if (title !== undefined) metaUpdate.title = title.trim();
+      if (description !== undefined) metaUpdate.description = description?.trim() || null;
+      if (targetType !== undefined) metaUpdate.targetType = targetType || null;
+      if (targetUrl !== undefined) metaUpdate.targetUrl = safeTargetUrl(targetUrl);
+    }
+    const singleUpdate = { ...metaUpdate };
+    if (canEditMeta && dueDate !== undefined) singleUpdate.dueDate = dueDate ? new Date(dueDate) : null;
     if (status !== undefined) {
-      updateData.status = status;
+      singleUpdate.status = status;
       if (status === 'COMPLETED' && !task.completedAt) {
-        updateData.completedAt = new Date();
+        singleUpdate.completedAt = new Date();
       }
     }
 
-    if (Object.keys(updateData).length === 0) {
+    if (Object.keys(singleUpdate).length === 0) {
       return res.status(400).json({ error: 'No updatable fields' });
+    }
+
+    if (seriesScope) {
+      // Apply meta to all open siblings; status changes are NOT propagated across series.
+      if (Object.keys(metaUpdate).length > 0) {
+        await prisma.task.updateMany({
+          where: { seriesId: task.seriesId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
+          data: metaUpdate,
+        });
+      }
+      // Always apply the single-task update (including status) to the targeted task.
+      const updated = await prisma.task.update({
+        where: { id: req.params.id },
+        data: singleUpdate,
+        include: TASK_INCLUDE,
+      });
+      return res.json(updated);
     }
 
     const updated = await prisma.task.update({
       where: { id: req.params.id },
-      data: updateData,
+      data: singleUpdate,
       include: TASK_INCLUDE
     });
 
@@ -412,6 +500,11 @@ router.delete('/:id', authenticate, async (req, res) => {
 
     if (!isAssigner && !isCoach && !isOp) {
       return res.status(403).json({ error: 'Access denied' });
+    }
+
+    if (req.query.scope === 'series' && task.seriesId) {
+      const result = await prisma.task.deleteMany({ where: { seriesId: task.seriesId } });
+      return res.json({ success: true, deletedCount: result.count });
     }
 
     await prisma.task.delete({ where: { id: req.params.id } });
