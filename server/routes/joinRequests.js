@@ -23,6 +23,17 @@ router.get('/', authenticate, async (req, res) => {
       whereClause.status = status;
     }
 
+    const enrich = async (requests) => {
+      const teamIds = [...new Set(requests.map(r => r.teamId))];
+      if (teamIds.length === 0) return requests;
+      const mgrs = await prisma.userTeam.findMany({
+        where: { teamId: { in: teamIds }, role: 'TEAM_MANAGER', isActive: true },
+        select: { teamId: true }
+      });
+      const hasMgr = new Set(mgrs.map(m => m.teamId));
+      return requests.map(r => ({ ...r, hasTeamManager: hasMgr.has(r.teamId) }));
+    };
+
     if (isOperator && !teamId) {
       const requests = await prisma.teamJoinRequest.findMany({
         where: whereClause,
@@ -33,7 +44,7 @@ router.get('/', authenticate, async (req, res) => {
         },
         orderBy: { createdAt: 'desc' }
       });
-      return res.json(requests);
+      return res.json(await enrich(requests));
     }
 
     if (teamId) {
@@ -51,7 +62,7 @@ router.get('/', authenticate, async (req, res) => {
         },
         orderBy: { createdAt: 'desc' }
       });
-      return res.json(requests);
+      return res.json(await enrich(requests));
     }
 
     return res.status(400).json({ error: 'teamId required for non-operators' });
@@ -79,7 +90,7 @@ router.get('/my', authenticate, async (req, res) => {
 
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { teamId, playerName, message, requestType: rawType } = req.body;
+    const { teamId, playerName, message, phone, requestType: rawType } = req.body;
     const requestType = rawType === 'STAFF' ? 'STAFF' : 'PLAYER';
 
     if (!teamId || !playerName) {
@@ -115,6 +126,7 @@ router.post('/', authenticate, async (req, res) => {
         userId: req.user.id,
         teamId,
         playerName,
+        phone: phone ? String(phone).trim() : null,
         message,
         requestType,
       },
@@ -123,13 +135,18 @@ router.post('/', authenticate, async (req, res) => {
       }
     });
 
-    const teamStaff = await prisma.userTeam.findMany({
-      where: {
-        teamId,
-        role: { in: ['TEAM_MANAGER', 'COACH'] }
-      },
+    const teamManagers = await prisma.userTeam.findMany({
+      where: { teamId, role: 'TEAM_MANAGER', isActive: true },
       select: { userId: true }
     });
+    const hasTeamManager = teamManagers.length > 0;
+
+    const teamStaff = hasTeamManager
+      ? await prisma.userTeam.findMany({
+          where: { teamId, role: { in: ['TEAM_MANAGER', 'COACH'] }, isActive: true },
+          select: { userId: true }
+        })
+      : [];
 
     const operators = await prisma.userOrganization.findMany({
       where: {
@@ -143,12 +160,13 @@ router.post('/', authenticate, async (req, res) => {
       ...operators.map(o => o.userId)
     ]);
 
+    const noteSuffix = hasTeamManager ? '' : '（チーム管理者不在のためシステム管理者の承認が必要です）';
     for (const userId of notifyUserIds) {
       createNotification({
         userId,
         type: 'JOIN_REQUEST',
         title: '参加申請がありました',
-        message: `${playerName}さんが${request.team.name}への参加を申請しました`,
+        message: `${playerName}さんが${request.team.name}への参加を申請しました${noteSuffix}`,
         linkUrl: '/join-requests'
       });
     }
@@ -172,6 +190,17 @@ router.put('/:id/approve', authenticate, async (req, res) => {
     }
 
     const isOperator = isOperatorUser(req.user);
+    const teamMgrCount = await prisma.userTeam.count({
+      where: { teamId: request.teamId, role: 'TEAM_MANAGER', isActive: true }
+    });
+    const hasTeamManager = teamMgrCount > 0;
+
+    if (!hasTeamManager && !isOperator) {
+      return res.status(403).json({
+        error: 'このチームには管理者がいないため、システム管理者のみが承認できます'
+      });
+    }
+
     const requiredTeamRoles = request.requestType === 'STAFF'
       ? ['TEAM_MANAGER']
       : ['TEAM_MANAGER', 'COACH'];

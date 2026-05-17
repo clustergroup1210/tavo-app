@@ -137,6 +137,7 @@ model User {
   appealLinks          AppealLink[]
   joinRequests         TeamJoinRequest[]
   reviewedRequests     TeamJoinRequest[] @relation("JoinRequestReviewer")
+  reviewedTeamRegRequests TeamRegistrationRequest[] @relation("TeamRegRequestReviewer")
   notifications        Notification[]
   notificationSetting  NotificationSetting?
   headCoachTeams       Team[]             @relation("TeamHeadCoach")
@@ -643,6 +644,7 @@ model TeamJoinRequest {
   userId      String
   teamId      String
   playerName  String
+  phone       String?
   message     String?
   status      String   @default("pending")
   requestType String   @default("PLAYER")
@@ -666,7 +668,34 @@ enum NotificationType {
   CALENDAR
   ANNOUNCEMENT
   JOIN_REQUEST
+  TEAM_REGISTRATION_REQUEST
   BROADCAST
+}
+
+model TeamRegistrationRequest {
+  id                String   @id @default(uuid())
+  requesterName     String
+  requesterEmail    String
+  requesterPhone    String
+  passwordHash      String
+  desiredTeamName   String
+  league            String?
+  region            String?
+  description       String?
+  message           String?
+  status            String   @default("pending")
+  rejectionReason   String?
+  reviewedBy        String?
+  reviewedAt        DateTime?
+  createdUserId     String?
+  createdTeamId     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  reviewer  User? @relation("TeamRegRequestReviewer", fields: [reviewedBy], references: [id])
+
+  @@index([status])
+  @@index([createdAt])
 }
 
 model Notification {

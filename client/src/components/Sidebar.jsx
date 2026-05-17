@@ -55,6 +55,8 @@ export default function Sidebar({ isOpen, onClose }) {
         ],
         admin: [
           { path: '/users', label: 'ユーザー管理', icon: UserCog },
+          { path: '/admin/team-registration-requests', label: 'チーム登録申請', icon: Building2 },
+          { path: '/admin/join-requests', label: '参加申請（全チーム）', icon: UserPlus },
           { path: '/permissions', label: '権限管理', icon: UserCog },
           { path: '/evaluations/items', label: '評価項目管理', icon: ListChecks },
           { path: '/settings', label: 'システム設定', icon: Settings },
@@ -76,6 +78,8 @@ export default function Sidebar({ isOpen, onClose }) {
         ],
         admin: [
           { path: '/users', label: 'ユーザー管理', icon: UserCog },
+          { path: '/admin/team-registration-requests', label: 'チーム登録申請', icon: Building2 },
+          { path: '/admin/join-requests', label: '参加申請（全チーム）', icon: UserPlus },
           { path: '/permissions', label: '権限管理', icon: Shield },
           { path: '/evaluations/items', label: '評価項目管理', icon: ListChecks },
           { path: '/settings', label: 'システム設定', icon: Settings },

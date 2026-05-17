@@ -40,6 +40,8 @@ import AccountSettings from './pages/AccountSettings';
 import EvaluationMatrix from './pages/EvaluationMatrix';
 import AdminSystemSettings from './pages/AdminSystemSettings';
 import AdminNotificationManagement from './pages/AdminNotificationManagement';
+import AdminTeamRegistrationRequests from './pages/AdminTeamRegistrationRequests';
+import AdminJoinRequests from './pages/AdminJoinRequests';
 import TeamSettings from './pages/TeamSettings';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -134,6 +136,8 @@ export default function App() {
           <Route path="/admin/organizations" element={<Organizations />} />
           <Route path="/admin/notifications" element={<AdminNotificationManagement />} />
           <Route path="/admin/settings" element={<AdminSystemSettings />} />
+          <Route path="/admin/team-registration-requests" element={<AdminTeamRegistrationRequests />} />
+          <Route path="/admin/join-requests" element={<AdminJoinRequests />} />
         </Route>
       </Route>
       

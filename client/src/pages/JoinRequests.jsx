@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { UserPlus, Check, X, Clock, CheckCircle, XCircle, Mail } from 'lucide-react';
+import { UserPlus, Check, X, Clock, CheckCircle, XCircle, Mail, Phone, AlertTriangle } from 'lucide-react';
 
 export default function JoinRequests() {
   const { currentTeam, isTeamAdmin, isOperator } = useAuth();
-  const canHandleStaffRequests = isTeamAdmin || isOperator;
+  const operatorFlag = typeof isOperator === 'function' ? isOperator() : !!isOperator;
+  const teamAdminFlag = currentTeam?.id && typeof isTeamAdmin === 'function' ? isTeamAdmin(currentTeam.id) : !!isTeamAdmin;
+  const canHandleStaffRequests = teamAdminFlag || operatorFlag;
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('pending');
@@ -180,12 +182,22 @@ export default function JoinRequests() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span>{request.playerName}</span>
                           <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${request.requestType === 'STAFF' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                             {request.requestType === 'STAFF' ? 'スタッフ' : '選手'}
                           </span>
+                          {request.hasTeamManager === false && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded bg-orange-100 text-orange-700" title="チーム管理者不在 — システム管理者の承認が必要">
+                              <AlertTriangle className="w-3 h-3" />管理者なし
+                            </span>
+                          )}
                         </div>
+                        {request.phone && (
+                          <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                            <Phone className="w-3 h-3" />{request.phone}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
                         {request.message || '-'}
@@ -201,7 +213,11 @@ export default function JoinRequests() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         {request.status === 'pending' && (
-                          request.requestType === 'STAFF' && !canHandleStaffRequests ? (
+                          request.hasTeamManager === false && !operatorFlag ? (
+                            <span className="text-xs text-orange-700">
+                              システム管理者の承認待ち
+                            </span>
+                          ) : request.requestType === 'STAFF' && !canHandleStaffRequests ? (
                             <span className="text-xs text-gray-500">
                               チーム管理者の承認待ち
                             </span>
@@ -272,17 +288,27 @@ export default function JoinRequests() {
                     </span>
                   </div>
                   <div className="mt-2 pl-[52px] text-sm text-gray-600">
-                    <p className="flex items-center gap-2">
+                    <p className="flex items-center gap-2 flex-wrap">
                       <span>{request.requestType === 'STAFF' ? '氏名' : '選手名'}: {request.playerName}</span>
                       <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${request.requestType === 'STAFF' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                         {request.requestType === 'STAFF' ? 'スタッフ' : '選手'}
                       </span>
+                      {request.hasTeamManager === false && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded bg-orange-100 text-orange-700">
+                          <AlertTriangle className="w-3 h-3" />管理者なし
+                        </span>
+                      )}
                     </p>
+                    {request.phone && (
+                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1"><Phone className="w-3 h-3" />{request.phone}</p>
+                    )}
                     {request.message && <p className="text-xs text-gray-500 mt-1 truncate">{request.message}</p>}
                     <p className="text-xs text-gray-400 mt-1">{new Date(request.createdAt).toLocaleDateString('ja-JP')}</p>
                   </div>
                   {request.status === 'pending' && (
-                    request.requestType === 'STAFF' && !canHandleStaffRequests ? (
+                    request.hasTeamManager === false && !operatorFlag ? (
+                      <p className="mt-3 text-xs text-orange-700">システム管理者の承認待ち</p>
+                    ) : request.requestType === 'STAFF' && !canHandleStaffRequests ? (
                       <p className="mt-3 text-xs text-gray-500">チーム管理者の承認待ち</p>
                     ) : (
                       <div className="mt-3 flex items-center gap-2">

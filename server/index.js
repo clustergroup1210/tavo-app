@@ -76,6 +76,7 @@ app.use('/api/event-locations', eventLocationRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/team-categories', teamCategoryRoutes);
 app.use('/api/join-requests', joinRequestRoutes);
+app.use('/api/team-registration-requests', require('./routes/teamRegistrationRequests'));
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/player-dashboard', playerDashboardRoutes);
 app.use('/api/transfers', transferRoutes);
