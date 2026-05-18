@@ -122,6 +122,30 @@ export default function Ranking() {
     return groups;
   }, [activeTopCategories, activeCategories]);
 
+  // 表のカテゴリ列を「大項目 → 中項目 → 大項目 → 中項目…」の順で並べる
+  const orderedColumns = useMemo(() => {
+    const cols = [];
+    for (const group of sortOptionGroups) {
+      if (group.top.id !== '__orphans__') {
+        cols.push({
+          kind: 'top',
+          id: group.top.id,
+          name: group.top.name,
+          sortKey: `top:${group.top.id}`,
+        });
+      }
+      for (const mid of group.mids) {
+        cols.push({
+          kind: 'mid',
+          id: mid.id,
+          name: mid.name,
+          sortKey: mid.id,
+        });
+      }
+    }
+    return cols;
+  }, [sortOptionGroups]);
+
   const activeSortLabel = (() => {
     if (sortBy === 'total') return '総合';
     if (sortBy.startsWith('top:')) {
@@ -337,15 +361,25 @@ export default function Ranking() {
                     >
                       {sortBy === 'total' ? '総合達成率 ▼' : `${activeSortLabel} ▼`}
                     </th>
-                    {activeCategories.map((cat) => (
-                      <th
-                        key={cat.id}
-                        className={`text-center py-3 px-2 font-medium w-20 cursor-pointer hover:bg-gray-50 select-none ${sortBy === cat.id ? 'text-primary-600' : 'text-gray-600'}`}
-                        onClick={() => setSortBy(cat.id)}
-                      >
-                        {cat.name}{sortBy === cat.id ? ' ▼' : ''}
-                      </th>
-                    ))}
+                    {orderedColumns.map((col) => {
+                      const isActive = sortBy === col.sortKey;
+                      const isTop = col.kind === 'top';
+                      return (
+                        <th
+                          key={`${col.kind}:${col.id}`}
+                          className={`text-center py-3 px-2 font-medium align-bottom cursor-pointer hover:bg-gray-50 select-none whitespace-normal break-words leading-tight min-w-[5rem] max-w-[7rem] ${
+                            isActive ? 'text-primary-600' : isTop ? 'text-gray-800' : 'text-gray-600'
+                          } ${isTop ? 'bg-gray-50 border-l border-gray-200' : ''}`}
+                          onClick={() => setSortBy(col.sortKey)}
+                          title={col.name}
+                        >
+                          <span className={`block line-clamp-2 ${isTop ? 'font-semibold' : ''}`}>
+                            {col.name}
+                          </span>
+                          {isActive && <span className="block text-xs">▼</span>}
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
@@ -406,14 +440,23 @@ export default function Ranking() {
                             <span className="text-xs text-gray-400">期間未登録</span>
                           )}
                         </td>
-                        {activeCategories.map((cat) => {
-                          const catRate = item.categoryRates?.[cat.id];
-                          const isActive = sortBy === cat.id;
-                          const catHasRate = catRate?.rate !== null && catRate?.rate !== undefined;
+                        {orderedColumns.map((col) => {
+                          const isActive = sortBy === col.sortKey;
+                          const isTop = col.kind === 'top';
+                          const rateObj = isTop
+                            ? item.topCategoryRates?.[col.id]
+                            : item.categoryRates?.[col.id];
+                          const rateVal = rateObj?.rate;
+                          const hasVal = rateVal !== null && rateVal !== undefined;
                           return (
-                            <td key={cat.id} className={`py-3 px-2 text-center ${isActive ? 'bg-primary-50' : ''}`}>
-                              <span className={`text-sm font-medium ${catHasRate ? getRateColor(catRate.rate) : 'text-gray-400'}`}>
-                                {catHasRate ? `${catRate.rate}%` : '-'}
+                            <td
+                              key={`${col.kind}:${col.id}`}
+                              className={`py-3 px-2 text-center ${
+                                isActive ? 'bg-primary-50' : isTop ? 'bg-gray-50/60 border-l border-gray-200' : ''
+                              }`}
+                            >
+                              <span className={`text-sm ${isTop ? 'font-bold' : 'font-medium'} ${hasVal ? getRateColor(rateVal) : 'text-gray-400'}`}>
+                                {hasVal ? `${rateVal}%` : '-'}
                               </span>
                             </td>
                           );
