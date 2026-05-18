@@ -71,10 +71,15 @@ export default function Register() {
 
 function Shell({ children }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 py-12 px-4">
+      <Link to="/" className="mb-6 inline-flex items-baseline leading-none">
+        <span className="text-3xl font-bold tracking-tight text-gray-900">PDS</span>
+        <span className="text-3xl font-bold text-primary-600">.</span>
+      </Link>
       <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
         {children}
       </div>
+      <p className="mt-6 text-xs text-gray-400">©PDS</p>
     </div>
   );
 }
