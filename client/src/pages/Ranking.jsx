@@ -323,159 +323,90 @@ export default function Ranking() {
             <p className="mt-2 text-sm text-gray-500">読み込み中...</p>
           </div>
         ) : sortedRanking.length > 0 ? (
-          <>
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-2 font-medium text-gray-600 w-16">順位</th>
-                    <th className="text-left py-3 px-2 font-medium text-gray-600">選手</th>
-                    <th className="text-left py-3 px-2 font-medium text-gray-600 w-20">ポジション</th>
-                    <th
-                      className={`text-left py-3 px-2 font-medium w-56 cursor-pointer hover:bg-gray-50 select-none ${sortBy === 'total' ? 'text-primary-600' : 'text-primary-600'}`}
-                      onClick={() => setSortBy('total')}
-                    >
-                      {sortBy === 'total' ? '総合達成率 ▼' : `${activeSortLabel} ▼`}
-                    </th>
-                    {activeCategories.map((cat) => (
-                      <th
-                        key={cat.id}
-                        className={`text-center py-3 px-2 font-medium w-20 cursor-pointer hover:bg-gray-50 select-none ${sortBy === cat.id ? 'text-primary-600' : 'text-gray-600'}`}
-                        onClick={() => setSortBy(cat.id)}
-                      >
-                        {cat.name}{sortBy === cat.id ? ' ▼' : ''}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedRanking.map((item) => {
-                    const rawRate = getSortRate(item, sortBy);
-                    const displayRate = rawRate !== null && rawRate !== undefined ? rawRate : null;
-                    const hasRate = displayRate !== null;
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {sortedRanking.map((item) => {
+              const rawRate = getSortRate(item, sortBy);
+              const displayRate = rawRate !== null && rawRate !== undefined ? rawRate : null;
+              const hasRate = displayRate !== null;
 
-                    return (
-                      <tr key={item.player.id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/players/${item.player.id}`)}>
-                        <td className="py-3 px-2">
-                          {getRankBadge(item.rank)}
-                        </td>
-                        <td className="py-3 px-2">
-                          <div className="flex items-center gap-3">
-                            {item.player.photoUrl ? (
-                              <img
-                                src={item.player.photoUrl}
-                                alt={item.player.name}
-                                className="w-10 h-10 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
-                                <span className="text-primary-600 font-semibold text-sm">
-                                  {item.player.number || item.player.name?.charAt(0)}
-                                </span>
-                              </div>
-                            )}
-                            <div>
-                              <p className="font-medium text-gray-900">{item.player.name}</p>
-                              {item.player.number && (
-                                <p className="text-xs text-gray-500">#{item.player.number}</p>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-2">
-                          {item.player.position && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
-                              {item.player.position}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-2">
-                          {hasRate ? (
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full bg-gradient-to-r ${getRateBarColor(displayRate)} rounded-full transition-all duration-500`}
-                                  style={{ width: `${Math.min(displayRate, 100)}%` }}
-                                />
-                              </div>
-                              <span className={`text-sm font-bold w-16 text-right ${getRateColor(displayRate)}`}>
-                                {displayRate}%
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-400">期間未登録</span>
-                          )}
-                        </td>
-                        {activeCategories.map((cat) => {
-                          const catRate = item.categoryRates?.[cat.id];
-                          const isActive = sortBy === cat.id;
-                          const catHasRate = catRate?.rate !== null && catRate?.rate !== undefined;
-                          return (
-                            <td key={cat.id} className={`py-3 px-2 text-center ${isActive ? 'bg-primary-50' : ''}`}>
-                              <span className={`text-sm font-medium ${catHasRate ? getRateColor(catRate.rate) : 'text-gray-400'}`}>
-                                {catHasRate ? `${catRate.rate}%` : '-'}
-                              </span>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="md:hidden divide-y divide-gray-100">
-              {sortedRanking.map((item) => {
-                const rawRate = getSortRate(item, sortBy);
-                const displayRate = rawRate !== null && rawRate !== undefined ? rawRate : null;
-                const hasRate = displayRate !== null;
-
-                return (
-                  <div key={item.player.id} className="py-3 cursor-pointer active:bg-gray-50" onClick={() => navigate(`/players/${item.player.id}`)}>
-                    <div className="flex items-center gap-3">
-                      {getRankBadge(item.rank)}
-                      {item.player.photoUrl ? (
-                        <img src={item.player.photoUrl} alt={item.player.name} className="w-10 h-10 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
-                          <span className="text-primary-600 font-semibold text-sm">
-                            {item.player.number || item.player.name?.charAt(0)}
+              return (
+                <div
+                  key={item.player.id}
+                  className="p-3 sm:p-4 border border-gray-200 rounded-xl hover:border-primary-300 hover:bg-gray-50 cursor-pointer transition-colors"
+                  onClick={() => navigate(`/players/${item.player.id}`)}
+                >
+                  <div className="flex items-center gap-3">
+                    {getRankBadge(item.rank)}
+                    {item.player.photoUrl ? (
+                      <img src={item.player.photoUrl} alt={item.player.name} className="w-10 h-10 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
+                        <span className="text-primary-600 font-semibold text-sm">
+                          {item.player.number || item.player.name?.charAt(0)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium text-gray-900 truncate">{item.player.name}</p>
+                        {hasRate ? (
+                          <span className={`text-base font-bold whitespace-nowrap ${getRateColor(displayRate)}`}>
+                            {displayRate}%
                           </span>
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className="font-medium text-gray-900 truncate">{item.player.name}</p>
-                          {hasRate && (
-                            <span className={`text-sm font-bold ml-2 ${getRateColor(displayRate)}`}>
-                              {displayRate}%
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          {item.player.number && (
-                            <span className="text-xs text-gray-500">#{item.player.number}</span>
-                          )}
-                          {item.player.position && (
-                            <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-700">{item.player.position}</span>
-                          )}
-                        </div>
-                        {hasRate && (
-                          <div className="mt-1.5 h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full bg-gradient-to-r ${getRateBarColor(displayRate)} rounded-full`}
-                              style={{ width: `${Math.min(displayRate, 100)}%` }}
-                            />
-                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400 whitespace-nowrap">期間未登録</span>
                         )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {item.player.number && (
+                          <span className="text-xs text-gray-500">#{item.player.number}</span>
+                        )}
+                        {item.player.position && (
+                          <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-700">{item.player.position}</span>
+                        )}
+                        <span className="text-xs text-gray-400 truncate">{activeSortLabel}</span>
                       </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </>
+
+                  {hasRate && (
+                    <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full bg-gradient-to-r ${getRateBarColor(displayRate)} rounded-full transition-all duration-500`}
+                        style={{ width: `${Math.min(displayRate, 100)}%` }}
+                      />
+                    </div>
+                  )}
+
+                  {activeCategories.length > 0 && (
+                    <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5">
+                      {activeCategories.map((cat) => {
+                        const catRate = item.categoryRates?.[cat.id];
+                        const isActive = sortBy === cat.id;
+                        const catHasRate = catRate?.rate !== null && catRate?.rate !== undefined;
+                        return (
+                          <button
+                            type="button"
+                            key={cat.id}
+                            onClick={(e) => { e.stopPropagation(); setSortBy(cat.id); }}
+                            className={`flex items-center justify-between gap-2 px-2 py-1 rounded text-left transition-colors ${
+                              isActive ? 'bg-primary-50 ring-1 ring-primary-200' : 'hover:bg-gray-100'
+                            }`}
+                            title={`${cat.name} で並び替え`}
+                          >
+                            <span className="text-xs text-gray-600 truncate">{cat.name}</span>
+                            <span className={`text-xs font-semibold whitespace-nowrap ${catHasRate ? getRateColor(catRate.rate) : 'text-gray-400'}`}>
+                              {catHasRate ? `${catRate.rate}%` : '-'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         ) : (
           <div className="text-center py-12">
             <Trophy className="w-12 h-12 text-gray-300 mx-auto mb-3" />
