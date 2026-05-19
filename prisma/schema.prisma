@@ -339,6 +339,7 @@ model EvaluationRound {
   team        Team         @relation(fields: [teamId], references: [id])
   evaluations Evaluation[]
 
+  @@unique([teamId, name])
   @@index([teamId])
 }
 

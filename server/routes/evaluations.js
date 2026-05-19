@@ -499,6 +499,13 @@ router.post('/rounds', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    const existing = await prisma.evaluationRound.findUnique({
+      where: { teamId_name: { teamId, name } }
+    });
+    if (existing) {
+      return res.status(409).json({ error: '同じ名前の評価期間が既に存在します', round: existing });
+    }
+
     const round = await prisma.evaluationRound.create({
       data: {
         teamId,
@@ -510,6 +517,9 @@ router.post('/rounds', authenticate, async (req, res) => {
 
     res.json(round);
   } catch (error) {
+    if (error?.code === 'P2002') {
+      return res.status(409).json({ error: '同じ名前の評価期間が既に存在します' });
+    }
     res.status(500).json({ error: 'Failed to create evaluation round' });
   }
 });
@@ -561,16 +571,17 @@ router.get('/history/:playerId', authenticate, async (req, res) => {
       const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       const monthName = `${now.getFullYear()}年${now.getMonth() + 1}月`;
       const hasCurrent = rounds.some(r =>
-        r.teamId === player.teamId &&
-        r.startDate.getFullYear() === now.getFullYear() &&
-        r.startDate.getMonth() === now.getMonth()
+        r.teamId === player.teamId && r.name === monthName
       );
       if (!hasCurrent) {
         try {
-          const created = await prisma.evaluationRound.create({
-            data: { teamId: player.teamId, name: monthName, startDate: monthStart, endDate: monthEnd }
+          const created = await prisma.evaluationRound.upsert({
+            where: { teamId_name: { teamId: player.teamId, name: monthName } },
+            update: {},
+            create: { teamId: player.teamId, name: monthName, startDate: monthStart, endDate: monthEnd }
           });
-          rounds = [...rounds, created].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+          rounds = [...rounds.filter(r => r.id !== created.id), created]
+            .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
         } catch (createErr) {
           const refetched = await prisma.evaluationRound.findMany({
             where: { teamId: { in: teamIds } },
