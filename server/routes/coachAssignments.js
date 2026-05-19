@@ -59,8 +59,14 @@ router.get('/:teamId', authenticate, async (req, res) => {
 
     const players = await prisma.player.findMany({
       where: { teamId, deletedAt: null },
-      select: { id: true, name: true, number: true, position: true, photoUrl: true },
+      select: { id: true, name: true, number: true, position: true, photoUrl: true, teamCategoryId: true },
       orderBy: [{ number: 'asc' }, { name: 'asc' }]
+    });
+
+    const teamCategories = await prisma.teamCategory.findMany({
+      where: { teamId },
+      select: { id: true, name: true, sortOrder: true },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }]
     });
 
     res.json({
@@ -68,7 +74,8 @@ router.get('/:teamId', authenticate, async (req, res) => {
       headCoach: team.headCoach,
       assignments,
       coaches: coaches.map(c => ({ ...c.user, role: c.role })),
-      players
+      players,
+      teamCategories
     });
   } catch (error) {
     console.error('Coach assignments fetch error:', error);

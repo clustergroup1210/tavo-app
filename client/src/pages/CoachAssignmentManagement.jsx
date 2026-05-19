@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, UserCircle, Check, X, Shield, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Users, UserCircle, Check, X, Shield, ChevronDown, ChevronUp, Loader2, Filter } from 'lucide-react';
 
 export default function CoachAssignmentManagement() {
   const { currentTeam } = useAuth();
@@ -13,6 +13,7 @@ export default function CoachAssignmentManagement() {
   const [expandedCoach, setExpandedCoach] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [filterCategoryId, setFilterCategoryId] = useState('all');
 
   useEffect(() => {
     if (currentTeam) {
@@ -91,6 +92,26 @@ export default function CoachAssignmentManagement() {
     const assignments = data.assignments.filter(a => a.coachId === coach.id);
     setAssignedPlayerIds(new Set(assignments.map(a => a.playerId)));
     setExpandedCoach(coach.id);
+    setFilterCategoryId('all');
+  };
+
+  const filteredPlayers = useMemo(() => {
+    if (!data?.players) return [];
+    if (filterCategoryId === 'all') return data.players;
+    if (filterCategoryId === 'none') return data.players.filter(p => !p.teamCategoryId);
+    return data.players.filter(p => p.teamCategoryId === filterCategoryId);
+  }, [data?.players, filterCategoryId]);
+
+  const assignAllInFilter = () => {
+    const next = new Set(assignedPlayerIds);
+    filteredPlayers.forEach(p => next.add(p.id));
+    setAssignedPlayerIds(next);
+  };
+
+  const removeAllInFilter = () => {
+    const next = new Set(assignedPlayerIds);
+    filteredPlayers.forEach(p => next.delete(p.id));
+    setAssignedPlayerIds(next);
   };
 
   const handlePlayerToggle = (playerId) => {
@@ -309,40 +330,113 @@ export default function CoachAssignmentManagement() {
                         <p className="text-center py-4 text-gray-500">選手が登録されていません</p>
                       ) : (
                         <>
-                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-64 overflow-y-auto mb-4">
-                            {data.players.map((player) => {
-                              const isAssigned = assignedPlayerIds.has(player.id);
-                              return (
+                          {data.teamCategories?.length > 0 && (
+                            <div className="mb-3 flex flex-wrap items-center gap-2">
+                              <div className="flex items-center gap-1 text-xs text-gray-500">
+                                <Filter className="w-3.5 h-3.5" />
+                                カテゴリー：
+                              </div>
+                              <button
+                                onClick={() => setFilterCategoryId('all')}
+                                className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
+                                  filterCategoryId === 'all'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                              >
+                                全て（{data.players.length}）
+                              </button>
+                              {data.teamCategories.map(cat => {
+                                const count = data.players.filter(p => p.teamCategoryId === cat.id).length;
+                                return (
+                                  <button
+                                    key={cat.id}
+                                    onClick={() => setFilterCategoryId(cat.id)}
+                                    className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
+                                      filterCategoryId === cat.id
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    }`}
+                                  >
+                                    {cat.name}（{count}）
+                                  </button>
+                                );
+                              })}
+                              {data.players.some(p => !p.teamCategoryId) && (
                                 <button
-                                  key={player.id}
-                                  onClick={() => handlePlayerToggle(player.id)}
-                                  className={`p-2 rounded-lg border text-left transition-colors flex items-center gap-2 ${
-                                    isAssigned
-                                      ? 'border-green-500 bg-green-50 text-green-800'
-                                      : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                                  onClick={() => setFilterCategoryId('none')}
+                                  className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
+                                    filterCategoryId === 'none'
+                                      ? 'bg-blue-600 text-white'
+                                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                   }`}
                                 >
-                                  <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${
-                                    isAssigned ? 'bg-green-500 border-green-500' : 'border-gray-300'
-                                  }`}>
-                                    {isAssigned && <Check className="w-3 h-3 text-white" />}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="font-medium text-sm truncate">
-                                      {player.number && `#${player.number} `}{player.name}
-                                    </p>
-                                    {player.position && (
-                                      <p className="text-xs text-gray-500">{player.position}</p>
-                                    )}
-                                  </div>
+                                  未分類（{data.players.filter(p => !p.teamCategoryId).length}）
                                 </button>
-                              );
-                            })}
-                          </div>
-                          
+                              )}
+                              {filterCategoryId !== 'all' && (
+                                <div className="ml-auto flex gap-1.5">
+                                  <button
+                                    onClick={assignAllInFilter}
+                                    className="px-2.5 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-md transition-colors"
+                                  >
+                                    このカテゴリーを全て担当に追加
+                                  </button>
+                                  <button
+                                    onClick={removeAllInFilter}
+                                    className="px-2.5 py-1 text-xs font-medium text-gray-600 bg-white hover:bg-gray-50 border border-gray-300 rounded-md transition-colors"
+                                  >
+                                    このカテゴリーを担当から外す
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {filteredPlayers.length === 0 ? (
+                            <p className="text-center py-4 text-sm text-gray-400">該当する選手がいません</p>
+                          ) : (
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-64 overflow-y-auto mb-4">
+                              {filteredPlayers.map((player) => {
+                                const isAssigned = assignedPlayerIds.has(player.id);
+                                const cat = data.teamCategories?.find(c => c.id === player.teamCategoryId);
+                                return (
+                                  <button
+                                    key={player.id}
+                                    onClick={() => handlePlayerToggle(player.id)}
+                                    className={`p-2 rounded-lg border text-left transition-colors flex items-center gap-2 ${
+                                      isAssigned
+                                        ? 'border-green-500 bg-green-50 text-green-800'
+                                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                                    }`}
+                                  >
+                                    <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${
+                                      isAssigned ? 'bg-green-500 border-green-500' : 'border-gray-300'
+                                    }`}>
+                                      {isAssigned && <Check className="w-3 h-3 text-white" />}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="font-medium text-sm truncate">
+                                        {player.number && `#${player.number} `}{player.name}
+                                      </p>
+                                      <p className="text-xs text-gray-500 truncate">
+                                        {[player.position, cat?.name].filter(Boolean).join(' / ') || '\u00A0'}
+                                      </p>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+
                           <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                             <p className="text-sm text-gray-500">
                               {assignedPlayerIds.size}名を選択中
+                              {filterCategoryId !== 'all' && filteredPlayers.length > 0 && (
+                                <span className="ml-1 text-xs text-gray-400">
+                                  （表示中 {filteredPlayers.length}名）
+                                </span>
+                              )}
                             </p>
                             <div className="flex gap-2">
                               <button
