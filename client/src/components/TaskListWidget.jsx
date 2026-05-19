@@ -173,9 +173,15 @@ export default function TaskListWidget() {
     if (task.targetUrl) navigate(task.targetUrl);
   };
 
+  const isEmpty = !loading && openTasks.length === 0;
+
+  if (isEmpty && !canAssign) {
+    return null;
+  }
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-      <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-gray-100">
+      <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-gray-100" style={isEmpty ? { borderBottom: 0 } : undefined}>
         <div className="flex items-center gap-2 min-w-0">
           <div className="p-1.5 rounded-lg bg-orange-50 text-orange-600">
             <ClipboardList className="w-4 h-4" />
@@ -183,11 +189,13 @@ export default function TaskListWidget() {
           <h3 className="text-[14px] font-semibold text-gray-900 truncate">
             {playerMode ? 'マイタスク' : '担当タスク'}
           </h3>
-          {openTasks.length > 0 && (
+          {openTasks.length > 0 ? (
             <span className="text-[11px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">
               {openTasks.length}
             </span>
-          )}
+          ) : !loading && canAssign ? (
+            <span className="text-[11px] text-gray-400">担当タスクはありません</span>
+          ) : null}
         </div>
         {canAssign && (
           <button
@@ -205,17 +213,7 @@ export default function TaskListWidget() {
           <div className="px-5 py-8 text-center">
             <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-orange-500"></div>
           </div>
-        ) : openTasks.length === 0 ? (
-          <div className="px-5 py-10 text-center">
-            <div className="inline-flex w-12 h-12 rounded-full bg-gray-50 items-center justify-center mb-2">
-              <Check className="w-5 h-5 text-gray-300" />
-            </div>
-            <p className="text-[13px] text-gray-500">現在、担当タスクはありません</p>
-            {canAssign && (
-              <p className="text-[11px] text-gray-400 mt-1">右上の「+作成」から追加できます</p>
-            )}
-          </div>
-        ) : (
+        ) : openTasks.length === 0 ? null : (
           openTasks.slice(0, 8).map(task => {
             const due = formatDueDate(task.dueDate);
             const typeMeta = TARGET_TYPES.find(t => t.value === task.targetType);
