@@ -65,7 +65,7 @@ router.get('/', authenticate, async (req, res) => {
         },
         include: {
           teams: { where: { teamId }, include: { team: true } },
-          players: { where: { teamId }, select: { id: true, name: true, deletedAt: true } }
+          players: { where: { teamId }, select: { id: true, name: true, number: true, position: true, joinedAt: true, graduationDate: true, deletedAt: true } }
         }
       });
     } else {

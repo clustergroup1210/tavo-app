@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   UserCircle, UserPlus, Copy, X, Trash2, Link2, Plus,
-  User, Users, UserMinus, Undo2, Clock,
+  User, Users, UserMinus, Undo2, Clock, Calendar, Pencil,
 } from 'lucide-react';
 
 const ROLE_LABELS = {
@@ -119,6 +119,7 @@ export default function UserManagement() {
   };
 
   const [leaveTarget, setLeaveTarget] = useState(null);
+  const [membershipTarget, setMembershipTarget] = useState(null);
   const [showAddUser, setShowAddUser] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
 
@@ -220,6 +221,7 @@ export default function UserManagement() {
           onRoleChange={handleRoleChange}
           onLeave={setLeaveTarget}
           onRestore={handleRestore}
+          onEditMembership={setMembershipTarget}
         />
       )}
 
@@ -228,6 +230,15 @@ export default function UserManagement() {
           invitations={invitations}
           canManage={canManage}
           onChange={fetchAll}
+        />
+      )}
+
+      {membershipTarget && (
+        <MembershipModal
+          user={membershipTarget.user}
+          player={membershipTarget.player}
+          onClose={() => setMembershipTarget(null)}
+          onDone={() => { setMembershipTarget(null); fetchAll(); }}
         />
       )}
 
@@ -261,7 +272,106 @@ export default function UserManagement() {
   );
 }
 
-function UsersTable({ users, canManage, onRoleChange, onLeave, onRestore }) {
+function MembershipModal({ user, player, onClose, onDone }) {
+  const toInput = (d) => (d ? new Date(d).toISOString().slice(0, 10) : '');
+  const [joinedAt, setJoinedAt] = useState(toInput(player.joinedAt));
+  const [graduationDate, setGraduationDate] = useState(toInput(player.graduationDate));
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (joinedAt && graduationDate && joinedAt > graduationDate) {
+      setError('退団予定日は入団日より後に設定してください');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/players/${player.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          joinedAt: joinedAt || null,
+          graduationDate: graduationDate || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || '保存に失敗しました');
+        return;
+      }
+      onDone();
+    } catch (err) {
+      console.error(err);
+      setError('保存に失敗しました');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">在籍期間の設定</h2>
+          <button type="button" onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-900 mb-4">
+          <p className="font-medium">{user.name}（選手）の在籍期間を設定します。</p>
+          <p className="mt-1 text-xs text-blue-800">
+            設定すると、評価期間の表示が在籍期間内の月に絞られます。
+          </p>
+        </div>
+
+        <form onSubmit={submit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">入団日</label>
+            <input
+              type="date"
+              value={joinedAt}
+              onChange={(e) => setJoinedAt(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">退団予定日（卒業日）</label>
+            <input
+              type="date"
+              value={graduationDate}
+              onChange={(e) => setGraduationDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+            />
+            <p className="mt-1 text-xs text-gray-500">未設定の場合は無期限として扱います。</p>
+          </div>
+
+          {error && (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">
+              キャンセル
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60"
+            >
+              {submitting ? '保存中...' : '保存'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function UsersTable({ users, canManage, onRoleChange, onLeave, onRestore, onEditMembership }) {
   if (users.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 py-12 text-center">
@@ -280,6 +390,7 @@ function UsersTable({ users, canManage, onRoleChange, onLeave, onRestore }) {
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">メール</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">役割</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最終ログイン</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">在籍期間</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状態</th>
             {canManage && (
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
@@ -290,6 +401,7 @@ function UsersTable({ users, canManage, onRoleChange, onLeave, onRestore }) {
           {users.map((u) => {
             const ut = u.teams?.[0];
             const isLeft = ut && ut.isActive === false;
+            const player = u.players?.find(p => !p.deletedAt) || u.players?.[0] || null;
             return (
               <tr key={u.id} className={`hover:bg-gray-50 ${isLeft ? 'bg-gray-50/50' : ''}`}>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -330,6 +442,37 @@ function UsersTable({ users, canManage, onRoleChange, onLeave, onRestore }) {
                       {formatDateTime(u.lastLoginAt)}
                     </span>
                   </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {player ? (
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs text-gray-700 leading-tight">
+                        <div className="inline-flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-gray-400" />
+                          <span className="text-gray-500">入団</span>
+                          <span className="font-medium text-gray-800">{formatDate(player.joinedAt)}</span>
+                        </div>
+                        <div className="ml-4 inline-flex items-center gap-1">
+                          <span className="text-gray-400">〜</span>
+                          <span className="text-gray-500">退団予定</span>
+                          <span className="font-medium text-gray-800">{formatDate(player.graduationDate)}</span>
+                        </div>
+                      </div>
+                      {canManage && (
+                        <button
+                          type="button"
+                          onClick={() => onEditMembership({ user: u, player })}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded-md hover:bg-gray-100"
+                          title="在籍期間を編集"
+                        >
+                          <Pencil className="w-3 h-3" />
+                          編集
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">—</span>
+                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   {isLeft ? (

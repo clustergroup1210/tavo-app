@@ -43,6 +43,7 @@ Team-centric display, comprehensive RBAC, separation of internal IDs from displa
 
 #### Players
 - **Profiles**: personal info, JFA Passport photo, role model / play style fields, coach notes.
+- **在籍期間 (joinedAt / graduationDate)**: editable from both the player profile and the team `/users` page (在籍期間 column with 編集 modal posting `PUT /api/players/:id { joinedAt, graduationDate }`). `GET /api/users?teamId=` returns these fields on each user's `players[]`. `GET /api/evaluations/history/:playerId` filters returned `rounds` to those whose month overlaps `[joinedAt, graduationDate]` (inclusive at the month level) and only auto-creates the current month round when today falls inside that window — so the 評価期間 selector is automatically scoped to a player's tenure.
 - **Soft delete + restore**: `deletedAt` field with `DELETE /api/players/:id` and `POST /api/players/:id/restore` (TEAM_MANAGER/COACH/operator). List filters by membership status: 在籍中 (default) / 卒業済み (graduationDate ≤ today, hidden by default) / 削除済み (`?includeDeleted=true`).
 - **Category assignment**: `/team-categories` "選手の振り分け" modal lists all team players (sub-teams included) with inline category dropdowns. Pending diffs commit in batch via `PUT /api/players/:id { teamCategoryId }`. Filter chips, name/番号 search, and bulk-apply buttons let staff re-categorize an entire group quickly.
 - **Player transfer**: data ownership (evaluations, goals, videos) follows the player; transfer history is snapshot-tracked.

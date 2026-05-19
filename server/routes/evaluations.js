@@ -565,15 +565,35 @@ router.get('/history/:playerId', authenticate, async (req, res) => {
     ]);
 
     let rounds = roundsRaw;
+
+    // Membership window: a round is in-window if its month overlaps [joinedAt, graduationDate]
+    const joinedAt = player.joinedAt ? new Date(player.joinedAt) : null;
+    const graduationDate = player.graduationDate ? new Date(player.graduationDate) : null;
+    const roundInWindow = (r) => {
+      const rStart = new Date(r.startDate);
+      const rEnd = r.endDate
+        ? new Date(r.endDate)
+        : new Date(rStart.getFullYear(), rStart.getMonth() + 1, 0);
+      if (joinedAt && rEnd < new Date(joinedAt.getFullYear(), joinedAt.getMonth(), 1)) return false;
+      if (graduationDate) {
+        const gradMonthEnd = new Date(graduationDate.getFullYear(), graduationDate.getMonth() + 1, 0, 23, 59, 59, 999);
+        if (rStart > gradMonthEnd) return false;
+      }
+      return true;
+    };
+
     try {
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       const monthName = `${now.getFullYear()}年${now.getMonth() + 1}月`;
+      const nowWithinMembership =
+        (!joinedAt || joinedAt <= monthEnd) &&
+        (!graduationDate || new Date(graduationDate.getFullYear(), graduationDate.getMonth() + 1, 0) >= monthStart);
       const hasCurrent = rounds.some(r =>
         r.teamId === player.teamId && r.name === monthName
       );
-      if (!hasCurrent) {
+      if (!hasCurrent && nowWithinMembership) {
         try {
           const created = await prisma.evaluationRound.upsert({
             where: { teamId_name: { teamId: player.teamId, name: monthName } },
@@ -593,6 +613,8 @@ router.get('/history/:playerId', authenticate, async (req, res) => {
     } catch (e) {
       console.error('Auto-create monthly round failed:', e?.message);
     }
+
+    rounds = rounds.filter(roundInWindow);
 
     const scoreMap = {};
     evaluations.forEach(e => {
