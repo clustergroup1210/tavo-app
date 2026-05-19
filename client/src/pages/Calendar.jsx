@@ -124,13 +124,69 @@ function ViewModeDropdown({ viewMode, onChange }) {
   );
 }
 
-function EventDetailModal({ event, onClose, onEdit, onDelete, canEdit }) {
+function EventDetailModal({ event, onClose, onEdit, onDelete, canEdit, siblings = [], index = 0, onNavigate }) {
   if (!event) return null;
   const colors = eventTypeColors[event.eventType] || eventTypeColors.event;
+  const total = siblings.length;
+  const hasNav = total > 1 && typeof onNavigate === 'function';
+  const goPrev = () => hasNav && onNavigate((index - 1 + total) % total);
+  const goNext = () => hasNav && onNavigate((index + 1) % total);
+
+  const touchRef = React.useRef({ x: 0, y: 0, t: 0 });
+  const onTouchStart = (e) => {
+    const t = e.changedTouches[0];
+    touchRef.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+  };
+  const onTouchEnd = (e) => {
+    if (!hasNav) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchRef.current.x;
+    const dy = t.clientY - touchRef.current.y;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) goNext(); else goPrev();
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-start justify-center z-50 pt-[10vh]" onClick={onClose}>
-      <div className="bg-white rounded-xl w-full max-w-md mx-4 shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div
+        className="bg-white rounded-xl w-full max-w-md mx-4 shadow-2xl overflow-hidden"
+        onClick={e => e.stopPropagation()}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
+        {hasNav && (
+          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gray-50/70">
+            <button
+              type="button"
+              onClick={goPrev}
+              className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded-full transition-colors"
+              aria-label="前の予定"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-1.5">
+              {siblings.map((s, i) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => onNavigate(i)}
+                  className={`h-1.5 rounded-full transition-all ${i === index ? 'w-5 bg-primary-600' : 'w-1.5 bg-gray-300 hover:bg-gray-400'}`}
+                  aria-label={`予定 ${i + 1} / ${total}`}
+                />
+              ))}
+              <span className="ml-2 text-[11px] font-medium text-gray-500 tabular-nums">{index + 1} / {total}</span>
+            </div>
+            <button
+              type="button"
+              onClick={goNext}
+              className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded-full transition-colors"
+              aria-label="次の予定"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        )}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
           <h3 className="text-[15px] font-bold text-gray-900">予定の詳細</h3>
           <div className="flex items-center gap-2">
@@ -330,6 +386,8 @@ export default function Calendar() {
   const [editingEvent, setEditingEvent] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [detailEvent, setDetailEvent] = useState(null);
+  const [detailSiblings, setDetailSiblings] = useState([]);
+  const [detailIndex, setDetailIndex] = useState(0);
   const [savedLocations, setSavedLocations] = useState([]);
   const [selectedSavedLocationId, setSelectedSavedLocationId] = useState('');
   const [showLocationsModal, setShowLocationsModal] = useState(false);
@@ -648,6 +706,11 @@ export default function Calendar() {
   };
 
   const handleEventClick = (event) => {
+    const day = new Date(event.startDate);
+    const siblings = getEventsForDate(day);
+    const idx = Math.max(0, siblings.findIndex(e => e.id === event.id));
+    setDetailSiblings(siblings.length ? siblings : [event]);
+    setDetailIndex(idx);
     setDetailEvent(event);
   };
 
@@ -1080,15 +1143,24 @@ export default function Calendar() {
         </div>
       )}
 
-      {detailEvent && (
-        <EventDetailModal
-          event={detailEvent}
-          onClose={() => setDetailEvent(null)}
-          onEdit={openEditModal}
-          onDelete={handleDelete}
-          canEdit={canCreate || (detailEvent.isPersonal && detailEvent.createdBy === user?.id)}
-        />
-      )}
+      {detailEvent && (() => {
+        const current = detailSiblings[detailIndex] || detailEvent;
+        return (
+          <EventDetailModal
+            event={current}
+            siblings={detailSiblings}
+            index={detailIndex}
+            onNavigate={(i) => {
+              const next = detailSiblings[i];
+              if (next) { setDetailIndex(i); setDetailEvent(next); }
+            }}
+            onClose={() => setDetailEvent(null)}
+            onEdit={openEditModal}
+            onDelete={handleDelete}
+            canEdit={canCreate || (current.isPersonal && current.createdBy === user?.id)}
+          />
+        );
+      })()}
 
       {showModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4" onClick={() => setShowModal(false)}>
