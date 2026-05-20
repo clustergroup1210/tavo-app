@@ -175,10 +175,6 @@ export default function TaskListWidget() {
 
   const isEmpty = !loading && openTasks.length === 0;
 
-  if (isEmpty && !canAssign) {
-    return null;
-  }
-
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">
       <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-gray-100" style={isEmpty ? { borderBottom: 0 } : undefined}>
@@ -193,8 +189,10 @@ export default function TaskListWidget() {
             <span className="text-[11px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">
               {openTasks.length}
             </span>
-          ) : !loading && canAssign ? (
-            <span className="text-[11px] text-gray-400">担当タスクはありません</span>
+          ) : !loading ? (
+            <span className="text-[11px] text-gray-400">
+              {playerMode ? 'タスクはありません' : '担当タスクはありません'}
+            </span>
           ) : null}
         </div>
         {canAssign && (
