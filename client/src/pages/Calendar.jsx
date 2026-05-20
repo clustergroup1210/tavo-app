@@ -828,6 +828,9 @@ export default function Calendar() {
       
       setShowModal(false);
       fetchEvents();
+      if (currentTeamId && form.location?.trim()) {
+        fetchSavedLocations();
+      }
     } catch (error) {
       console.error('Failed to save event:', error);
       alert('予定の保存に失敗しました');

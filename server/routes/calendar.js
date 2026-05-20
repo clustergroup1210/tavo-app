@@ -16,6 +16,34 @@ function isOperator(user) {
   );
 }
 
+async function rememberEventLocation(teamId, location, locationAddress, userId) {
+  if (!teamId) return;
+  const name = typeof location === 'string' ? location.trim() : '';
+  if (!name) return;
+  const address = typeof locationAddress === 'string' ? locationAddress.trim() : '';
+  try {
+    const existing = await prisma.eventLocation.findUnique({
+      where: { teamId_name: { teamId, name } },
+    }).catch(() => null);
+    if (existing) {
+      if (address && address !== (existing.address || '')) {
+        await prisma.eventLocation.update({
+          where: { id: existing.id },
+          data: { address },
+        });
+      }
+      return;
+    }
+    await prisma.eventLocation.create({
+      data: { teamId, name, address: address || null, createdBy: userId },
+    });
+  } catch (err) {
+    if (err?.code !== 'P2002') {
+      console.warn('rememberEventLocation failed:', err?.message || err);
+    }
+  }
+}
+
 router.get('/', authenticate, async (req, res) => {
   try {
     const { teamId, month, year } = req.query;
@@ -298,6 +326,7 @@ router.post('/', authenticate, async (req, res) => {
 
     if (teamId) {
       sendCalendarNotifications(teamId, created[0], req.user, categoryIds, 'created');
+      rememberEventLocation(teamId, location, locationAddress, req.user.id);
     }
 
     res.status(201).json({ event: created[0], count: created.length, seriesId });
@@ -465,8 +494,9 @@ router.put('/:id', authenticate, async (req, res) => {
         }
       }
     });
-    
+
     if (event.teamId) {
+      rememberEventLocation(event.teamId, location, locationAddress, req.user.id);
       const targetCategoryIds = updated.categoryTargets?.map(ct => ct.teamCategoryId) || [];
       sendCalendarNotifications(event.teamId, updated, req.user, targetCategoryIds, 'updated');
     }
