@@ -28,6 +28,7 @@ export default function EvaluationItems() {
   const [csvUploading, setCsvUploading] = useState(false);
   const [csvResult, setCsvResult] = useState(null);
   const [csvError, setCsvError] = useState(null);
+  const [viewPosition, setViewPosition] = useState('all');
   const [newItem, setNewItem] = useState({
     name: '',
     description: '',
@@ -271,6 +272,13 @@ export default function EvaluationItems() {
     setShowModal(true);
   };
 
+  const VIEW_POSITION_PRESETS = {
+    all: [],
+    common: [],
+    fp: ['DF', 'MF', 'FW'],
+    gk: ['GK'],
+  };
+
   const handleAddTopLevel = () => {
     resetForm();
     setAddLevel(0);
@@ -278,9 +286,31 @@ export default function EvaluationItems() {
       ...prev,
       parentId: null,
       sortOrder: getNextSortOrder(null),
+      targetPositions: [...(VIEW_POSITION_PRESETS[viewPosition] || [])],
     }));
     setShowModal(true);
   };
+
+  const classifyTopPosition = (top) => {
+    const tp = top.targetPositions || [];
+    if (tp.length === 0) return 'common';
+    const hasGk = tp.includes('GK');
+    const hasField = tp.some(p => ['DF', 'MF', 'FW'].includes(p));
+    if (hasGk && !hasField) return 'gk';
+    if (!hasGk && hasField) return 'fp';
+    return 'mixed';
+  };
+
+  const filteredItems = viewPosition === 'all'
+    ? items
+    : items.filter(top => classifyTopPosition(top) === viewPosition);
+
+  const viewCounts = items.reduce((acc, top) => {
+    const k = classifyTopPosition(top);
+    acc[k] = (acc[k] || 0) + 1;
+    acc.all++;
+    return acc;
+  }, { all: 0, common: 0, fp: 0, gk: 0, mixed: 0 });
 
   const handleToggleActive = async (item) => {
     const newActive = !item.isActive;
@@ -489,7 +519,10 @@ export default function EvaluationItems() {
               className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
             >
               <Plus className="w-4 h-4" />
-              大項目を追加
+              {viewPosition === 'gk' ? 'GK用 大項目を追加'
+                : viewPosition === 'fp' ? 'FP用 大項目を追加'
+                : viewPosition === 'common' ? '共通 大項目を追加'
+                : '大項目を追加'}
             </button>
           </div>
         )}
@@ -666,9 +699,54 @@ export default function EvaluationItems() {
         </div>
       )}
 
+      {items.length > 0 && (
+        <div className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto">
+          {[
+            { v: 'all', label: '全て', count: viewCounts.all },
+            { v: 'common', label: '全選手共通', count: viewCounts.common },
+            { v: 'fp', label: 'FP (DF/MF/FW)', count: viewCounts.fp },
+            { v: 'gk', label: 'GK', count: viewCounts.gk },
+            ...(viewCounts.mixed > 0 ? [{ v: 'mixed', label: 'その他', count: viewCounts.mixed }] : []),
+          ].map(tab => (
+            <button
+              key={tab.v}
+              onClick={() => setViewPosition(tab.v)}
+              className={`px-3 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${
+                viewPosition === tab.v
+                  ? 'border-primary-600 text-primary-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+              <span className="ml-1.5 text-xs text-gray-400">{tab.count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        {items.length > 0 ? (
-          renderItems(items)
+        {filteredItems.length > 0 ? (
+          renderItems(filteredItems)
+        ) : items.length > 0 ? (
+          <div className="p-8 text-center text-sm text-gray-500">
+            {viewPosition === 'gk' && 'GK用の大項目はまだ登録されていません。'}
+            {viewPosition === 'fp' && 'FP用の大項目はまだ登録されていません。'}
+            {viewPosition === 'common' && '全選手共通の大項目はまだ登録されていません。'}
+            {viewPosition === 'mixed' && '該当する大項目はありません。'}
+            {viewPosition !== 'all' && canManage && (
+              <div className="mt-3">
+                <button
+                  onClick={handleAddTopLevel}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700"
+                >
+                  <Plus className="w-4 h-4" />
+                  {viewPosition === 'gk' ? 'GK用 大項目を追加'
+                    : viewPosition === 'fp' ? 'FP用 大項目を追加'
+                    : '大項目を追加'}
+                </button>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="p-8 text-center text-gray-500">
             {showInactive
