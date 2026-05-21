@@ -352,38 +352,91 @@ router.post('/items/import-csv', authenticate, csvUploadMiddleware, async (req, 
       return res.status(400).json({ error: '有効な行が1件もありません', rowErrors });
     }
 
+    // ポジションバケット判定: empty=common, ['GK']=gk, ['DF','MF','FW'](GKなし)=fp, それ以外=mixed
+    const bucketOfTargetPositions = (tp) => {
+      const arr = Array.isArray(tp) ? tp : [];
+      if (arr.length === 0) return 'common';
+      const hasGk = arr.includes('GK');
+      const hasField = arr.some(p => ['DF', 'MF', 'FW'].includes(p));
+      if (hasGk && !hasField) return 'gk';
+      if (!hasGk && hasField) return 'fp';
+      return 'mixed';
+    };
+    // import preset → 対象とするバケット
+    const targetBucket = positionPreset === 'gk' ? 'gk'
+      : positionPreset === 'fp' ? 'fp'
+      : 'common';
+
     const created = await prisma.$transaction(async (tx) => {
       // Long timeout: large CSVs loop many awaits inside the tx
 
+      // 既存のトップ一覧（バケット判定に必要）
+      const existingTops = await tx.evaluationItem.findMany({
+        where: { teamId, parentId: null },
+        select: { id: true, name: true, targetPositions: true }
+      });
+      const sameBucketTopIds = existingTops
+        .filter(t => bucketOfTargetPositions(t.targetPositions) === targetBucket)
+        .map(t => t.id);
+
       if (mode === 'replace') {
-        const existing = await tx.evaluationItem.findMany({
-          where: { teamId },
-          select: { id: true }
-        });
-        const ids = existing.map(e => e.id);
-        if (ids.length > 0) {
-          const inUse = await tx.evaluation.count({ where: { itemId: { in: ids } } });
+        // 同じポジションバケットに属する項目だけを対象に入れ替える
+        // (例: FP用インポートで replace 指定 → GK用や共通の項目は触らない)
+        if (sameBucketTopIds.length > 0) {
+          const midItems = await tx.evaluationItem.findMany({
+            where: { teamId, parentId: { in: sameBucketTopIds } },
+            select: { id: true },
+          });
+          const midIds = midItems.map(m => m.id);
+          const leafItemsForDelete = midIds.length > 0
+            ? await tx.evaluationItem.findMany({
+                where: { teamId, parentId: { in: midIds } },
+                select: { id: true },
+              })
+            : [];
+          const leafIds = leafItemsForDelete.map(l => l.id);
+          const allIds = [...leafIds, ...midIds, ...sameBucketTopIds];
+          const inUse = await tx.evaluation.count({ where: { itemId: { in: allIds } } });
           if (inUse > 0) {
-            throw Object.assign(new Error('既存の評価データがあるため全件入れ替えできません。append モードを使うか、既存評価を整理してください。'), { httpStatus: 409 });
+            throw Object.assign(new Error('対象ポジションの既存評価項目に評価データが残っているため入れ替えできません。append モードを使うか、既存評価を整理してください。'), { httpStatus: 409 });
           }
-          await tx.evaluationItem.deleteMany({ where: { teamId } });
+          // 子→親の順で削除（FK制約を回避）
+          if (leafIds.length > 0) await tx.evaluationItem.deleteMany({ where: { id: { in: leafIds } } });
+          if (midIds.length > 0) await tx.evaluationItem.deleteMany({ where: { id: { in: midIds } } });
+          await tx.evaluationItem.deleteMany({ where: { id: { in: sameBucketTopIds } } });
         }
       }
 
-      const existingItems = await tx.evaluationItem.findMany({
-        where: { teamId, isActive: true },
-        select: { id: true, name: true, parentId: true }
+      // 同バケットの既存項目だけを「再利用候補」とする
+      // (異なるバケットに同名の大項目があっても、それは別物として扱い新規作成)
+      const remainingTops = await tx.evaluationItem.findMany({
+        where: { teamId, parentId: null, isActive: true },
+        select: { id: true, name: true, targetPositions: true }
       });
+      const reusableTopIds = new Set(
+        remainingTops
+          .filter(t => bucketOfTargetPositions(t.targetPositions) === targetBucket)
+          .map(t => t.id)
+      );
+      const childrenOfReusable = reusableTopIds.size > 0
+        ? await tx.evaluationItem.findMany({
+            where: { teamId, isActive: true, parentId: { in: Array.from(reusableTopIds) } },
+            select: { id: true, name: true, parentId: true }
+          })
+        : [];
+
       const topByName = new Map();
       const subByParentName = new Map();
-      existingItems.forEach(it => {
-        if (!it.parentId) topByName.set(it.name, it.id);
-      });
-      existingItems.forEach(it => {
-        if (it.parentId) subByParentName.set(`${it.parentId}::${it.name}`, it.id);
+      remainingTops
+        .filter(t => reusableTopIds.has(t.id))
+        .forEach(it => { topByName.set(it.name, it.id); });
+      childrenOfReusable.forEach(it => {
+        subByParentName.set(`${it.parentId}::${it.name}`, it.id);
       });
 
-      let topOrder = topByName.size;
+      // sortOrder: 既存のトップ全体（バケットに関係なく）の数を超えるよう初期値を設定
+      const totalTopsAfter = await tx.evaluationItem.count({ where: { teamId, parentId: null } });
+      let topOrder = totalTopsAfter;
       const subOrderByParent = new Map();
       const leafOrderByParent = new Map();
 
