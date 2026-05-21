@@ -1544,24 +1544,13 @@ router.get('/ranking', authenticate, async (req, res) => {
       return leafItems.filter(item => isPositionAllowed(item, pos));
     };
 
-    // 総合ランキング用: 全選手を同じ項目数で比較するため、
-    // 出場ポジションすべてで評価可能な項目のみを共通項目とする。
-    // ポジション未設定(null)の選手は制約のない項目しか評価できないため、
-    // null ポジションが居る場合は targetPositions が空の項目だけが共通項目となる。
-    const cohortPositions = Array.from(new Set(players.map(p => p.position)));
+    // 総合ランキング用: GKとフィールドプレーヤーで「被っている」項目のみで比較する。
+    // 定義: GK / DF / MF / FW のすべてのポジションで評価可能な項目を共通項目とする
+    // （= targetPositions が空、または GK と少なくとも1つの field を含む実質的な共通項目）。
+    // チームの実際の在籍ポジションに依存しないため、ランキングの母数が安定する。
+    const ALL_POSITIONS = ['GK', 'DF', 'MF', 'FW'];
     const commonItems = leafItems.filter(item =>
-      cohortPositions.every(pos => {
-        if (pos == null) {
-          // 制約あり項目はポジション未設定選手には適用不可
-          const hasRestriction = (it) => {
-            if (it.targetPositions && it.targetPositions.length > 0) return true;
-            if (it.parentId && allItemsById[it.parentId]) return hasRestriction(allItemsById[it.parentId]);
-            return false;
-          };
-          return !hasRestriction(item);
-        }
-        return isPositionAllowed(item, pos);
-      })
+      ALL_POSITIONS.every(pos => isPositionAllowed(item, pos))
     );
 
     const buildCategoryInfo = (filteredItems) => {

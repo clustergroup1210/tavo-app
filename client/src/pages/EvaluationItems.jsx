@@ -787,8 +787,35 @@ export default function EvaluationItems() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   対象ポジション
-                  <span className="text-xs text-gray-400 ml-1">（未選択＝全ポジション共通）</span>
+                  <span className="text-xs text-gray-400 ml-1">（未選択＝全選手共通）</span>
                 </label>
+                {(() => {
+                  const tp = newItem.targetPositions || [];
+                  const FIELD = ['DF', 'MF', 'FW'];
+                  const isAll = tp.length === 0;
+                  const isGk = tp.length === 1 && tp[0] === 'GK';
+                  const isField = tp.length === FIELD.length && FIELD.every(p => tp.includes(p));
+                  const presetBtn = (active, label, onClick) => (
+                    <button
+                      type="button"
+                      onClick={onClick}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition ${
+                        active
+                          ? 'bg-primary-50 border-primary-400 text-primary-700'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                  return (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {presetBtn(isAll, '全選手共通', () => setNewItem({ ...newItem, targetPositions: [] }))}
+                      {presetBtn(isField, 'フィールド (DF/MF/FW)', () => setNewItem({ ...newItem, targetPositions: [...FIELD] }))}
+                      {presetBtn(isGk, 'GK専用', () => setNewItem({ ...newItem, targetPositions: ['GK'] }))}
+                    </div>
+                  );
+                })()}
                 <div className="flex gap-2">
                   {POSITIONS.map(pos => (
                     <button
@@ -811,6 +838,9 @@ export default function EvaluationItems() {
                     </button>
                   ))}
                 </div>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  GKとフィールドで別の項目を作る場合は、それぞれ「GK専用」「フィールド」を選択してください。両方で評価する共通項目は「全選手共通」にします。
+                </p>
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button
