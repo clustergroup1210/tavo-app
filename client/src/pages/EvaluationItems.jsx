@@ -312,6 +312,35 @@ export default function EvaluationItems() {
     return acc;
   }, { all: 0, common: 0, fp: 0, gk: 0, mixed: 0 });
 
+  // FPセットとGKセットで「同じパス（大>中>小の名前一致）」の小項目を共通項目として抽出
+  const fpGkOverlap = (() => {
+    const byPath = new Map(); // key: "top::sub::leaf" -> { topName, subName, leafName, fp:[], gk:[] }
+    const norm = (s) => (s || '').trim();
+    for (const top of items) {
+      const cls = classifyTopPosition(top);
+      if (cls !== 'fp' && cls !== 'gk') continue;
+      const topName = norm(top.name);
+      for (const sub of top.children || []) {
+        const subName = norm(sub.name);
+        for (const leaf of sub.children || []) {
+          if (!leaf.isActive) continue;
+          const leafName = norm(leaf.name);
+          if (!topName || !subName || !leafName) continue;
+          const key = `${topName}::${subName}::${leafName}`;
+          let entry = byPath.get(key);
+          if (!entry) {
+            entry = { topName, subName, leafName, fp: [], gk: [] };
+            byPath.set(key, entry);
+          }
+          entry[cls].push({ id: leaf.id, description: leaf.description, topId: top.id, subId: sub.id });
+        }
+      }
+    }
+    return Array.from(byPath.values()).filter(e => e.fp.length > 0 && e.gk.length > 0);
+  })();
+
+  const commonTabCount = viewCounts.common + fpGkOverlap.length;
+
   const handleToggleActive = async (item) => {
     const newActive = !item.isActive;
     const msg = newActive ? 'この項目を有効化しますか？' : 'この項目を無効化しますか？子項目も無効化されます。';
@@ -703,7 +732,7 @@ export default function EvaluationItems() {
         <div className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto">
           {[
             { v: 'all', label: '全て', count: viewCounts.all },
-            { v: 'common', label: '全選手共通', count: viewCounts.common },
+            { v: 'common', label: '全選手共通', count: commonTabCount },
             { v: 'fp', label: 'FP (DF/MF/FW)', count: viewCounts.fp },
             { v: 'gk', label: 'GK', count: viewCounts.gk },
             ...(viewCounts.mixed > 0 ? [{ v: 'mixed', label: 'その他', count: viewCounts.mixed }] : []),
@@ -731,7 +760,8 @@ export default function EvaluationItems() {
           <div className="p-8 text-center text-sm text-gray-500">
             {viewPosition === 'gk' && 'GK用の大項目はまだ登録されていません。'}
             {viewPosition === 'fp' && 'FP用の大項目はまだ登録されていません。'}
-            {viewPosition === 'common' && '全選手共通の大項目はまだ登録されていません。'}
+            {viewPosition === 'common' && fpGkOverlap.length === 0 && '全選手共通の大項目はまだ登録されていません。'}
+            {viewPosition === 'common' && fpGkOverlap.length > 0 && '専用の「全選手共通」大項目はありません。下の「FPとGKで共通している項目」をご確認ください。'}
             {viewPosition === 'mixed' && '該当する大項目はありません。'}
             {viewPosition !== 'all' && canManage && (
               <div className="mt-3">
@@ -755,6 +785,36 @@ export default function EvaluationItems() {
           </div>
         )}
       </div>
+
+      {viewPosition === 'common' && fpGkOverlap.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-amber-200 overflow-hidden">
+          <div className="px-4 py-3 bg-amber-50 border-b border-amber-200">
+            <h3 className="text-sm font-semibold text-amber-900">
+              FPとGKで共通している項目
+              <span className="ml-2 text-xs text-amber-700 font-normal">{fpGkOverlap.length}件</span>
+            </h3>
+            <p className="text-[11px] text-amber-700 mt-0.5">
+              FP一式とGK一式の両方に同じパス（大項目 &gt; 中項目 &gt; 小項目）で登録されている小項目です。実質的に全選手共通として扱えます。
+            </p>
+          </div>
+          <ul className="divide-y divide-gray-100">
+            {fpGkOverlap.map((entry, i) => (
+              <li key={i} className="px-4 py-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-gray-500">{entry.topName} &gt; {entry.subName} &gt;</span>
+                  <span className="text-sm font-medium text-gray-900">{entry.leafName}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">FP×{entry.fp.length}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">GK×{entry.gk.length}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700">共通</span>
+                </div>
+                {(entry.fp[0]?.description || entry.gk[0]?.description) && (
+                  <p className="text-xs text-gray-500 mt-1">{entry.fp[0]?.description || entry.gk[0]?.description}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {items.length > 0 && canManage && (
         <div className="text-right">
