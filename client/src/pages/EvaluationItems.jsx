@@ -24,6 +24,7 @@ export default function EvaluationItems() {
   const [showCsvModal, setShowCsvModal] = useState(false);
   const [csvFile, setCsvFile] = useState(null);
   const [csvMode, setCsvMode] = useState('append');
+  const [csvPosition, setCsvPosition] = useState('all');
   const [csvUploading, setCsvUploading] = useState(false);
   const [csvResult, setCsvResult] = useState(null);
   const [csvError, setCsvError] = useState(null);
@@ -104,7 +105,7 @@ export default function EvaluationItems() {
     try {
       const fd = new FormData();
       fd.append('file', csvFile);
-      const res = await fetch(`/api/evaluations/items/import-csv?teamId=${currentTeam.id}&mode=${csvMode}`, {
+      const res = await fetch(`/api/evaluations/items/import-csv?teamId=${currentTeam.id}&mode=${csvMode}&position=${csvPosition}`, {
         method: 'POST',
         credentials: 'include',
         body: fd
@@ -127,6 +128,7 @@ export default function EvaluationItems() {
     setShowCsvModal(false);
     setCsvFile(null);
     setCsvMode('append');
+    setCsvPosition('all');
     setCsvResult(null);
     setCsvError(null);
   };
@@ -551,6 +553,34 @@ export default function EvaluationItems() {
                     </span>
                   </label>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">対象ポジション（一式として登録）</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { v: 'all', label: '全選手共通', hint: 'ポジション制限なし' },
+                    { v: 'fp', label: 'FP一式', hint: 'DF / MF / FW' },
+                    { v: 'gk', label: 'GK一式', hint: 'GKのみ' },
+                  ].map(opt => (
+                    <button
+                      key={opt.v}
+                      type="button"
+                      onClick={() => setCsvPosition(opt.v)}
+                      className={`px-3 py-2 text-xs rounded-lg border transition text-left ${
+                        csvPosition === opt.v
+                          ? 'bg-primary-50 border-primary-400 text-primary-800'
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="font-medium">{opt.label}</div>
+                      <div className="text-[10px] text-gray-500">{opt.hint}</div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  新しく作る大項目に自動で対象ポジションを設定します。同名の既存の大項目は変更されません（中・小項目は親から継承）。
+                </p>
               </div>
 
               {csvError && (

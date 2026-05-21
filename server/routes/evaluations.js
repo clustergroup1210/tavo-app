@@ -270,12 +270,22 @@ router.post('/items/import-csv', authenticate, csvUploadMiddleware, async (req, 
   try {
     const { teamId } = req.query;
     const mode = (req.query.mode || 'append').toLowerCase();
+    const positionPreset = (req.query.position || 'all').toLowerCase();
 
     if (!teamId) return res.status(400).json({ error: 'teamId is required' });
     if (!req.file) return res.status(400).json({ error: 'CSVファイルを添付してください' });
     if (!['append', 'replace'].includes(mode)) {
       return res.status(400).json({ error: 'mode must be append or replace' });
     }
+    const POSITION_PRESETS = {
+      all: [],
+      gk: ['GK'],
+      fp: ['DF', 'MF', 'FW'],
+    };
+    if (!Object.prototype.hasOwnProperty.call(POSITION_PRESETS, positionPreset)) {
+      return res.status(400).json({ error: 'position must be all, gk, or fp' });
+    }
+    const presetTargetPositions = POSITION_PRESETS[positionPreset];
 
     if (!hasTeamAccess(req.user, teamId, ['TEAM_MANAGER', 'COACH']) && !isOperator(req.user)) {
       return res.status(403).json({ error: 'Access denied' });
@@ -383,7 +393,13 @@ router.post('/items/import-csv', authenticate, csvUploadMiddleware, async (req, 
         let topId = topByName.get(row.category);
         if (!topId) {
           const top = await tx.evaluationItem.create({
-            data: { teamId, parentId: null, name: row.category, sortOrder: topOrder++ }
+            data: {
+              teamId,
+              parentId: null,
+              name: row.category,
+              sortOrder: topOrder++,
+              targetPositions: presetTargetPositions,
+            }
           });
           topId = top.id;
           topByName.set(row.category, topId);
