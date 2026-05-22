@@ -74,6 +74,18 @@ router.get('/:teamId', authenticate, async (req, res) => {
     const categories = items.filter(i => i.parentId === null);
     const leafItems = items.filter(i => i.parentId !== null);
 
+    const itemsById = {};
+    items.forEach(it => { itemsById[it.id] = it; });
+    const isPositionAllowed = (item, pos) => {
+      if (item.targetPositions && item.targetPositions.length > 0) {
+        if (!item.targetPositions.includes(pos)) return false;
+      }
+      if (item.parentId && itemsById[item.parentId]) {
+        return isPositionAllowed(itemsById[item.parentId], pos);
+      }
+      return true;
+    };
+
     let monthLabels;
     let roundLabels;
 
@@ -112,9 +124,17 @@ router.get('/:teamId', authenticate, async (req, res) => {
         totalMonths = Math.max(1, (gradDate.getFullYear() - joinDate.getFullYear()) * 12 + (gradDate.getMonth() - joinDate.getMonth()) + 1);
       }
 
-      const rows = categories.length > 0
-        ? categories.map(cat => {
-            const catItems = categoryItemsMap[cat.id] || [];
+      // 選手のポジションで評価項目をフィルタ（ポジション未設定の選手は全項目表示）
+      const playerCategories = player.position
+        ? categories.filter(cat => isPositionAllowed(cat, player.position))
+        : categories;
+
+      const rows = playerCategories.length > 0
+        ? playerCategories.map(cat => {
+            const baseItems = categoryItemsMap[cat.id] || [];
+            const catItems = player.position
+              ? baseItems.filter(it => isPositionAllowed(it, player.position))
+              : baseItems;
             const maxPerRound = catItems.reduce((sum, item) => sum + (item.maxScore || 5), 0);
             const fullMax = totalMonths !== null ? totalMonths * maxPerRound : null;
 
@@ -184,7 +204,7 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
 
     const player = await prisma.player.findFirst({
       where: { id: playerId, deletedAt: null },
-      select: { id: true, teamId: true, name: true, joinedAt: true, graduationDate: true }
+      select: { id: true, teamId: true, name: true, position: true, joinedAt: true, graduationDate: true }
     });
     if (!player) return res.status(404).json({ error: 'Player not found' });
 
@@ -215,8 +235,28 @@ router.get('/player/:playerId', authenticate, async (req, res) => {
       })
     ]);
 
-    const categories = items.filter(i => i.parentId === null);
-    const leafItems = items.filter(i => i.parentId !== null);
+    const allCategories = items.filter(i => i.parentId === null);
+    const allLeafItems = items.filter(i => i.parentId !== null);
+
+    const itemsById = {};
+    items.forEach(it => { itemsById[it.id] = it; });
+    const isPositionAllowed = (item, pos) => {
+      if (item.targetPositions && item.targetPositions.length > 0) {
+        if (!item.targetPositions.includes(pos)) return false;
+      }
+      if (item.parentId && itemsById[item.parentId]) {
+        return isPositionAllowed(itemsById[item.parentId], pos);
+      }
+      return true;
+    };
+
+    // 選手のポジションで評価項目をフィルタ（未設定なら全項目）
+    const categories = player.position
+      ? allCategories.filter(cat => isPositionAllowed(cat, player.position))
+      : allCategories;
+    const leafItems = player.position
+      ? allLeafItems.filter(it => isPositionAllowed(it, player.position))
+      : allLeafItems;
 
     const roundLabels = rounds.map(r => {
       const d = new Date(r.startDate);
