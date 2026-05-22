@@ -7,6 +7,7 @@ export default function AdminJoinRequests() {
   const [filter, setFilter] = useState('pending');
   const [onlyNoManager, setOnlyNoManager] = useState(false);
   const [processing, setProcessing] = useState(null);
+  const [rejectTarget, setRejectTarget] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -33,8 +34,9 @@ export default function AdminJoinRequests() {
     } finally { setProcessing(null); }
   };
 
-  const reject = async (id) => {
-    if (!confirm('この申請を却下しますか？')) return;
+  const confirmReject = async () => {
+    if (!rejectTarget) return;
+    const id = rejectTarget.id;
     setProcessing(id);
     try {
       const res = await fetch(`/api/join-requests/${id}/reject`, { method: 'PUT', credentials: 'include' });
@@ -43,7 +45,10 @@ export default function AdminJoinRequests() {
         alert(d.error || '却下に失敗しました');
       }
       load();
-    } finally { setProcessing(null); }
+    } finally {
+      setProcessing(null);
+      setRejectTarget(null);
+    }
   };
 
   const visible = onlyNoManager ? rows.filter(r => r.hasTeamManager === false) : rows;
@@ -127,7 +132,7 @@ export default function AdminJoinRequests() {
                           className="flex items-center gap-1 px-3 py-1.5 text-sm text-green-700 bg-green-50 hover:bg-green-100 rounded-lg disabled:opacity-50">
                           <Check className="w-4 h-4" />承認
                         </button>
-                        <button onClick={() => reject(r.id)} disabled={processing === r.id}
+                        <button onClick={() => setRejectTarget(r)} disabled={processing === r.id}
                           className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-700 bg-red-50 hover:bg-red-100 rounded-lg disabled:opacity-50">
                           <X className="w-4 h-4" />却下
                         </button>
@@ -140,6 +145,52 @@ export default function AdminJoinRequests() {
           </ul>
         )}
       </div>
+
+      {rejectTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => processing !== rejectTarget.id && setRejectTarget(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl max-w-md w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <XCircle className="w-5 h-5 text-red-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-lg font-semibold text-gray-900">この申請を却下しますか？</h3>
+                <p className="mt-1 text-sm text-gray-600">
+                  <span className="font-medium text-gray-900">{rejectTarget.playerName}</span>
+                  （{rejectTarget.requestType === 'STAFF' ? 'スタッフ' : '選手'}） — 参加先: <span className="font-medium">{rejectTarget.team?.name}</span> の申請を却下します。この操作は元に戻せません。
+                </p>
+                {rejectTarget.user?.email && (
+                  <p className="mt-2 text-xs text-gray-500 flex items-center gap-1">
+                    <Mail className="w-3 h-3" />{rejectTarget.user.email}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="mt-6 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setRejectTarget(null)}
+                disabled={processing === rejectTarget.id}
+                className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-50"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={confirmReject}
+                disabled={processing === rejectTarget.id}
+                className="px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50"
+              >
+                {processing === rejectTarget.id ? '却下中...' : '却下する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
