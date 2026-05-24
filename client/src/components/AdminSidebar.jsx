@@ -61,9 +61,8 @@ export default function AdminSidebar({ isOpen, onClose }) {
     >
       <div className="px-4 pt-4 pb-3 border-b border-white/[0.06]">
         <div className="flex items-center justify-between mb-3">
-          <Link to="/admin" className="flex items-baseline gap-0.5 group">
-            <span className="text-[20px] font-bold text-white tracking-tight leading-none group-hover:text-blue-300 transition-colors">PDS</span>
-            <span className="text-[20px] font-bold text-blue-400 leading-none">.</span>
+          <Link to="/admin" className="flex items-center group" aria-label="ホームへ">
+            <img src="/tavo-logo-white.png" alt="TAVO" className="h-6 w-auto group-hover:opacity-80 transition-opacity" />
           </Link>
           <button onClick={onClose} className="p-1 text-slate-400 hover:text-white rounded lg:hidden">
             <X className="w-4 h-4" />
