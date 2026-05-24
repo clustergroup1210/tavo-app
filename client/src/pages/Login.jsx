@@ -35,11 +35,11 @@ export default function Login() {
     <div className="min-h-screen flex flex-col bg-slate-50">
       <main className="flex-1 px-6 py-8 lg:py-16">
         <div className="max-w-md mx-auto lg:max-w-5xl lg:grid lg:grid-cols-2 lg:gap-16 lg:items-center">
-          <div className="hidden lg:block">
+          <div className="hidden lg:block lg:pl-12">
             <img
               src="/tavo-logo.png"
               alt="TAVO 才能を、加速させる。"
-              className="w-full max-w-xs h-auto"
+              className="w-full max-w-[200px] h-auto"
             />
             <p className="mt-5 text-base text-gray-600 leading-relaxed">
               評価・目標・コミュニケーションを集約し、<br />
