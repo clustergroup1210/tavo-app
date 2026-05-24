@@ -177,20 +177,13 @@ export default function Sidebar({ isOpen, onClose }) {
 
   return (
     <aside
-      className={clsx(
-        'fixed top-0 h-screen w-60 bg-sidebar flex flex-col z-[60] transition-transform duration-300',
-        'left-0 lg:translate-x-0',
-        isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-      )}
+      className="fixed top-0 h-screen w-60 bg-sidebar flex flex-col z-[60] left-0"
     >
       <div className="px-4 pt-4 pb-3 border-b border-white/[0.06]">
         <div className="flex items-center justify-between mb-3">
           <Link to={isOperator() ? '/admin' : (isPlayer() || isParent()) ? '/player-dashboard' : '/dashboard'} className="flex items-center group" aria-label="ホームへ">
             <img src="/tavo-logo-white.png" alt="TAVO" className="h-9 w-auto group-hover:opacity-80 transition-opacity" />
           </Link>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white rounded lg:hidden">
-            <X className="w-4 h-4" />
-          </button>
         </div>
 
         {isOperator() && (
