@@ -181,11 +181,14 @@ router.post('/forgot-password', async (req, res) => {
         data: { resetToken, resetExpiresAt }
       });
 
-      const baseUrl = process.env.REPLIT_DEV_DOMAIN
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-        : process.env.REPL_SLUG
-          ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
-          : 'http://localhost:5000';
+      const baseUrl = process.env.APP_URL
+        || (process.env.NODE_ENV === 'production'
+          ? 'https://ta-vo.jp'
+          : process.env.REPLIT_DEV_DOMAIN
+            ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+            : process.env.REPL_SLUG
+              ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+              : 'http://localhost:5000');
       const resetUrl = `${baseUrl}/reset-password/${resetToken}`;
       
       console.log(`[PASSWORD RESET] To: ${user.email}`);
