@@ -39,7 +39,7 @@ export default function Login() {
             <img
               src="/tavo-logo.png"
               alt="TAVO 才能を、加速させる。"
-              className="w-full max-w-md h-auto"
+              className="w-full max-w-xs h-auto"
             />
             <p className="mt-5 text-base text-gray-600 leading-relaxed">
               評価・目標・コミュニケーションを集約し、<br />
