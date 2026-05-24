@@ -33,15 +33,6 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      <header className="bg-sidebar border-b border-sidebar-dark">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10 py-4">
-          <div className="flex items-baseline gap-0.5">
-            <span className="text-2xl font-bold tracking-tight text-white leading-none">PDS</span>
-            <span className="text-2xl font-bold text-blue-400 leading-none">.</span>
-          </div>
-        </div>
-      </header>
-
       <main className="flex-1 px-6 py-8 lg:py-16">
         <div className="max-w-md mx-auto lg:max-w-5xl lg:grid lg:grid-cols-2 lg:gap-16 lg:items-center">
           <div className="hidden lg:block">
