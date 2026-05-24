@@ -4,12 +4,11 @@ const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
 const { JWT_SECRET } = require('../middleware/auth');
 const { resolveUserCode } = require('../services/userCode');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const {
   GOOGLE_CLIENT_ID,

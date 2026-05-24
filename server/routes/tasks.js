@@ -1,10 +1,9 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { authenticate, hasTeamAccess, canEvaluatePlayer } = require('../middleware/auth');
 const { createNotification } = require('../services/notificationService');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const ALLOWED_TYPES = ['EVALUATION', 'VIDEO', 'MEETING', 'GOAL', 'MENTORING', 'OTHER'];
 const STAFF_ROLES = ['TEAM_MANAGER', 'COACH', 'GUEST_COACH'];

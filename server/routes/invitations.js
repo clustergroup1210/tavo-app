@@ -1,10 +1,9 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { PrismaClient } = require('@prisma/client');
 const { authenticate, hasTeamAccess } = require('../middleware/auth');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 function isOperatorUser(user) {
   return user.organizations?.some(o => 

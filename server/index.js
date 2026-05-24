@@ -120,10 +120,40 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 const logger = require('./lib/logger');
+const prisma = require('./lib/prisma');
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, '0.0.0.0', () => {
-  logger.info('server.started', { port: Number(PORT), env: process.env.NODE_ENV || 'development' });
-});
+
+async function start() {
+  try {
+    await prisma.$connect();
+    console.log('✅ PostgreSQL connected');
+    logger.info('database.connected', { provider: 'postgresql' });
+  } catch (error) {
+    console.error('❌ PostgreSQL connection failed', error);
+    logger.error('database.connection_failed', { message: error?.message });
+    // 本番では起動失敗とする。開発では警告のみ（RDS/ローカルDB未到達でもUI開発を継続できるように）
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    } else {
+      console.warn('⚠️  Continuing without DB (NODE_ENV != production). API calls touching the DB will error.');
+    }
+  }
+
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    logger.info('server.started', { port: Number(PORT), env: process.env.NODE_ENV || 'development' });
+  });
+
+  const shutdown = async (signal) => {
+    logger.info('server.shutdown', { signal });
+    server.close(() => {});
+    try { await prisma.$disconnect(); } catch (_) {}
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+}
+
+start();
 
 process.on('unhandledRejection', (reason) => {
   logger.error('unhandledRejection', { reason: reason && reason.message ? reason.message : String(reason) });

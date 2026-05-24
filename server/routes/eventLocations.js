@@ -1,9 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
 const { authenticate } = require('../middleware/auth');
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 function hasTeamAccess(user, teamId, roles) {
   return user.teams?.some(ut => ut.teamId === teamId && (!roles || roles.includes(ut.role)));

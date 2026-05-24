@@ -1,12 +1,11 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { PrismaClient } = require('@prisma/client');
 const { authenticate } = require('../middleware/auth');
 const { createNotification } = require('../services/notificationService');
 const { resolveUserCode } = require('../services/userCode');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 function isOperatorUser(user) {
   return user?.organizations?.some(o =>

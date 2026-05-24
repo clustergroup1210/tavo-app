@@ -1,5 +1,4 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const multer = require('multer');
 const Papa = require('papaparse');
 const { authenticate, hasTeamAccess, canEvaluatePlayer } = require('../middleware/auth');
@@ -7,7 +6,7 @@ const { createNotification } = require('../services/notificationService');
 const { filterDataByVisibility } = require('../services/dataVisibilityService');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const csvUpload = multer({
   storage: multer.memoryStorage(),
