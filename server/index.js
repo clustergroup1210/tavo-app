@@ -112,11 +112,20 @@ app.get('/healthz', (req, res) => {
   res.json({ ok: true, ts: new Date().toISOString() });
 });
 
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../client/dist')));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+// クライアントビルドが存在すれば配信（本番EC2想定）。
+// Vite dev サーバーを別に動かす開発時は client/dist が無いのでスキップされる。
+const fs = require('fs');
+const clientDistPath = path.join(__dirname, '../client/dist');
+const clientIndexPath = path.join(clientDistPath, 'index.html');
+if (fs.existsSync(clientIndexPath)) {
+  app.use(express.static(clientDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) return next();
+    res.sendFile(clientIndexPath);
   });
+  console.log(`📦 Serving client build from ${clientDistPath}`);
+} else {
+  console.log(`ℹ️  No client build found at ${clientDistPath} (skipping static serving)`);
 }
 
 const logger = require('./lib/logger');
