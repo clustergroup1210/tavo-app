@@ -89,6 +89,10 @@ app.use('/api/mentoring', mentoringRoutes);
 app.use('/api/team-invitations', teamInvitationRoutes);
 app.use('/api/push', pushRoutes);
 
+app.get('/healthz', (req, res) => {
+  res.json({ ok: true, ts: new Date().toISOString() });
+});
+
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));
   app.get('*', (req, res) => {
@@ -96,7 +100,15 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
+const logger = require('./lib/logger');
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+  logger.info('server.started', { port: Number(PORT), env: process.env.NODE_ENV || 'development' });
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error('unhandledRejection', { reason: reason && reason.message ? reason.message : String(reason) });
+});
+process.on('uncaughtException', (err) => {
+  logger.error('uncaughtException', { message: err.message, stack: err.stack });
 });

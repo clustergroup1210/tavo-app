@@ -1,0 +1,27 @@
+[Unit]
+Description=TAVO Player Development System
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/var/www/tavo
+EnvironmentFile=/var/www/tavo/.env
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tavo-app
+Environment=NODE_ENV=production
+Environment=LOG_FORMAT=json
+Environment=PORT=5000
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target
