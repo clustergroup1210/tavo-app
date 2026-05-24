@@ -35,7 +35,7 @@ export default function Login() {
     <div className="min-h-screen flex flex-col bg-slate-50">
       <main className="flex-1 px-6 py-8 lg:py-16">
         <div className="max-w-md mx-auto lg:max-w-5xl lg:grid lg:grid-cols-2 lg:gap-16 lg:items-center">
-          <div className="hidden lg:block lg:pl-12">
+          <div className="hidden lg:flex lg:flex-col lg:items-center lg:text-center">
             <img
               src="/tavo-logo.png"
               alt="TAVO 才能を、加速させる。"
@@ -46,7 +46,7 @@ export default function Login() {
               チーム運営と選手育成をシンプルにします。
             </p>
 
-            <ul className="mt-8 space-y-3 text-sm text-gray-700">
+            <ul className="mt-8 space-y-3 text-sm text-gray-700 text-left">
               <li className="flex items-start gap-3">
                 <span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-primary-600 flex-shrink-0" />
                 チーム単位で選手データを一元管理
