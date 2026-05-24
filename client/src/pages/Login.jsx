@@ -33,8 +33,8 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      <main className="flex-1 px-6 py-8 lg:py-16">
-        <div className="max-w-md mx-auto lg:max-w-5xl lg:grid lg:grid-cols-2 lg:gap-16 lg:items-center">
+      <main className="flex-1 flex items-center justify-center px-6 py-8 lg:py-16">
+        <div className="w-full max-w-md mx-auto lg:max-w-5xl lg:grid lg:grid-cols-2 lg:gap-16 lg:items-center">
           <div className="hidden lg:flex lg:flex-col lg:items-center lg:text-center">
             <img
               src="/tavo-logo.png"
