@@ -28,7 +28,7 @@ export default function AdminLayout({ children }) {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <Link to="/admin" className="text-sm font-bold text-gray-800 truncate hover:text-primary-600 transition-colors" aria-label="ホームへ">PDS<span className="text-primary-600">.</span></Link>
+            <Link to="/admin" className="flex items-center hover:opacity-80 transition-opacity" aria-label="ホームへ"><img src="/tavo-logo-black.png" alt="TAVO" className="h-5 w-auto" /></Link>
             <span className="text-gray-300 flex-shrink-0">|</span>
             <span className="text-xs text-gray-600 truncate">システム管理</span>
           </div>
