@@ -131,10 +131,6 @@ export default function Login() {
           </div>
         </div>
       </main>
-
-      <footer className="py-6 text-center text-xs text-gray-500">
-        ©PDS
-      </footer>
     </div>
   );
 }
