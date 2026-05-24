@@ -2,10 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
+const session = require('express-session');
+const passport = require('passport');
 const path = require('path');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
+const authGoogleRoutes = require('./routes/authGoogle');
 const teamRoutes = require('./routes/teams');
 const playerRoutes = require('./routes/players');
 const evaluationRoutes = require('./routes/evaluations');
@@ -57,10 +61,25 @@ app.use(helmet({
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex'),
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    maxAge: 10 * 60 * 1000,
+  },
+}));
+app.use(passport.initialize());
+app.use(passport.session());
 app.use('/uploads/logos', express.static(path.join(__dirname, '../uploads')));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use('/api/auth', authRoutes);
+app.use('/api/auth', authGoogleRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/players', playerRoutes);
 app.use('/api/evaluations', evaluationRoutes);
