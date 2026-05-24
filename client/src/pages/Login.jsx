@@ -62,10 +62,16 @@ export default function Login() {
             </ul>
           </div>
 
-          <div className="bg-white rounded-sm lg:rounded-lg p-6 sm:p-8 lg:p-10 lg:shadow-sm lg:border lg:border-gray-200/80">
-            <h2 className="hidden lg:block text-xl font-semibold text-gray-900 mb-6">
-              ログイン
-            </h2>
+          <div>
+            <img
+              src="/tavo-logo.png"
+              alt="TAVO 才能を、加速させる。"
+              className="lg:hidden mx-auto mb-6 w-full max-w-[180px] h-auto"
+            />
+            <div className="bg-white rounded-sm lg:rounded-lg p-6 sm:p-8 lg:p-10 lg:shadow-sm lg:border lg:border-gray-200/80">
+              <h2 className="hidden lg:block text-xl font-semibold text-gray-900 mb-6">
+                ログイン
+              </h2>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {error && (
@@ -128,6 +134,7 @@ export default function Login() {
                 </Link>
               </div>
             </form>
+            </div>
           </div>
         </div>
       </main>
