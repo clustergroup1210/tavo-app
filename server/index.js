@@ -80,7 +80,7 @@ app.get(/^\/uploads\/(.+)$/, async (req, res) => {
   try {
     const rest = req.params[0];
     if (!rest || rest.includes('..')) return res.status(400).end();
-    await streamUpload(res, rest, { cacheControl: 'public, max-age=3600' });
+    await streamUpload(res, rest, { cacheControl: 'public, max-age=3600', range: req.headers.range });
   } catch (e) {
     console.error('uploads stream error:', e);
     if (!res.headersSent) res.status(500).end();

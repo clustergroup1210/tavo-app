@@ -46,9 +46,9 @@ function getBucket() {
   return process.env.AWS_S3_BUCKET || process.env.S3_BUCKET || process.env.R2_BUCKET_NAME || null;
 }
 
-async function getDownloadStreamSafe(key) {
+async function getDownloadStreamSafe(key, opts = {}) {
   try {
-    return await getDownloadStream(key);
+    return await getDownloadStream(key, opts);
   } catch (e) {
     if (e?.$metadata?.httpStatusCode === 404 || e?.Code === 'NoSuchKey' || e?.name === 'NoSuchKey') {
       return null;
@@ -90,12 +90,13 @@ async function uploadBuffer(key, buffer, contentType, { cacheControl } = {}) {
   return { key, url: publicUrlFor(key) };
 }
 
-async function getDownloadStream(key) {
+async function getDownloadStream(key, { range } = {}) {
   const client = getClient();
   if (!client) throw new Error('Object storage is not configured');
   const res = await client.send(new GetObjectCommand({
     Bucket: getBucket(),
     Key: key,
+    Range: range || undefined,
   }));
   return res;
 }

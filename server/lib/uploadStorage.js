@@ -26,12 +26,12 @@ async function deleteUpload(relativeKey) {
   fs.promises.unlink(absPath).catch(() => {});
 }
 
-async function streamUpload(res, relativeKey, { cacheControl } = {}) {
+async function streamUpload(res, relativeKey, { cacheControl, range } = {}) {
   const cleaned = relativeKey.replace(/^\/+/, '');
   const key = cleaned.startsWith('uploads/') ? cleaned : `uploads/${cleaned}`;
 
   if (storage.isConfigured()) {
-    const obj = await storage.getDownloadStreamSafe(key);
+    const obj = await storage.getDownloadStreamSafe(key, { range });
     if (!obj || !obj.Body) {
       const absPath = path.join(LOCAL_UPLOADS_DIR, key.replace(/^uploads\//, ''));
       if (fs.existsSync(absPath)) {
@@ -41,8 +41,11 @@ async function streamUpload(res, relativeKey, { cacheControl } = {}) {
       return res.status(404).end();
     }
     if (obj.ContentType) res.set('Content-Type', obj.ContentType);
-    if (obj.ContentLength) res.set('Content-Length', obj.ContentLength);
+    if (obj.ContentLength != null) res.set('Content-Length', obj.ContentLength);
+    if (obj.ContentRange) res.set('Content-Range', obj.ContentRange);
+    res.set('Accept-Ranges', 'bytes');
     if (cacheControl) res.set('Cache-Control', cacheControl);
+    if (range && obj.ContentRange) res.status(206);
     return obj.Body.pipe(res);
   }
 

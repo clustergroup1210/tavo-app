@@ -347,12 +347,7 @@ router.get('/:id/stream', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Video not found' });
     }
 
-    if (video.r2Key && isR2Configured()) {
-      const downloadUrl = await getDownloadPresignedUrl(video.r2Key);
-      return res.redirect(downloadUrl);
-    }
-
-    if (!video.storageKey) {
+    if (!video.r2Key && !video.storageKey) {
       return res.status(404).json({ error: 'Video file not found' });
     }
 
@@ -361,25 +356,27 @@ router.get('/:id/stream', authenticate, async (req, res) => {
     const isParent = req.user.parentPlayers?.some(pp => pp.playerId === video.playerId);
     const isOp = isOperator(req.user);
 
-    if (isUploader || isSelf || isParent || isOp) {
-      return streamUpload(res, video.storageKey);
-    }
-
-    const hasAccess = (video.player && hasTeamAccess(req.user, video.player.teamId)) ||
-                      (video.teamId && hasTeamAccess(req.user, video.teamId));
-
-    if (!hasAccess) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    if (video.player) {
-      const filteredVideos = await filterDataByVisibility(req.user, video.playerId, [video], 'createdAt');
-      if (filteredVideos.length === 0) {
-        return res.status(403).json({ error: 'この動画は閲覧期間外のため表示できません' });
+    let authorized = isUploader || isSelf || isParent || isOp;
+    if (!authorized) {
+      const hasAccess = (video.player && hasTeamAccess(req.user, video.player.teamId)) ||
+                        (video.teamId && hasTeamAccess(req.user, video.teamId));
+      if (!hasAccess) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      if (video.player) {
+        const filteredVideos = await filterDataByVisibility(req.user, video.playerId, [video], 'createdAt');
+        if (filteredVideos.length === 0) {
+          return res.status(403).json({ error: 'この動画は閲覧期間外のため表示できません' });
+        }
       }
     }
 
-    return streamUpload(res, video.storageKey);
+    if (video.r2Key && isR2Configured()) {
+      const downloadUrl = await getDownloadPresignedUrl(video.r2Key);
+      return res.redirect(downloadUrl);
+    }
+
+    return streamUpload(res, video.storageKey, { range: req.headers.range });
   } catch (error) {
     res.status(500).json({ error: 'Failed to stream video' });
   }
