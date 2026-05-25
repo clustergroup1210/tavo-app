@@ -8,7 +8,7 @@ SaaS for sports teams: player development, evaluation, scheduling, video sharing
 - Views are organized around teams.
 - Database/API paths are generic; display names are team/player specific.
 - Menus are role-driven.
-- Clevio-style left-fixed sidebar; on mobile it slides in from the **left** via a top-left hamburger.
+- Clevio-style left-fixed sidebar on desktop; on mobile it slides in from the **right** via a top-right hamburger (with backdrop overlay and in-drawer X close).
 
 ## Tech Stack
 React 19 + Vite + Tailwind • Express (Node) • PostgreSQL via Prisma • JWT in cookies • Recharts • Helmet.

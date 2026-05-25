@@ -176,14 +176,36 @@ export default function Sidebar({ isOpen, onClose }) {
   };
 
   return (
+    <>
+      {isOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/50 z-[55]"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
     <aside
-      className="fixed top-0 h-screen w-60 bg-sidebar flex flex-col z-[60] left-0"
+      className={clsx(
+        'fixed top-0 h-screen w-60 bg-sidebar flex flex-col z-[60] transition-transform duration-200',
+        'lg:left-0 lg:translate-x-0',
+        'right-0 lg:right-auto',
+        isOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
+      )}
     >
       <div className="px-4 pt-4 pb-3 border-b border-white/[0.06]">
         <div className="flex items-center justify-between mb-3">
           <Link to={isOperator() ? '/admin' : (isPlayer() || isParent()) ? '/player-dashboard' : '/dashboard'} className="flex items-center group" aria-label="ホームへ">
             <img src="/tavo-logo-white.png" alt="TAVO" className="h-9 w-auto group-hover:opacity-80 transition-opacity" />
           </Link>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="lg:hidden p-1.5 text-white/70 hover:text-white hover:bg-white/[0.08] rounded transition-colors"
+              aria-label="閉じる"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         {isOperator() && (
@@ -330,5 +352,6 @@ export default function Sidebar({ isOpen, onClose }) {
         </div>
       </div>
     </aside>
+    </>
   );
 }
