@@ -35,7 +35,7 @@ export default function Login() {
     <div className="min-h-screen flex flex-col bg-slate-50">
       <main className="flex-1 flex items-center justify-center px-6 py-8 lg:py-16">
         <div className="w-full max-w-md mx-auto lg:max-w-5xl lg:grid lg:grid-cols-2 lg:gap-16 lg:items-center">
-          <div className="hidden lg:flex lg:flex-col lg:items-center lg:text-center lg:-ml-8 xl:-ml-16">
+          <div className="hidden lg:flex lg:flex-col lg:items-center lg:text-center lg:-ml-24 xl:-ml-40">
             <img
               src="/tavo-logo.png"
               alt="TAVO 才能を、加速させる。"
