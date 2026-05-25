@@ -4,15 +4,12 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { authenticate, hasTeamAccess } = require('../middleware/auth');
 const { findCandidateParents } = require('../services/teamNameMatcher');
+const { saveUpload } = require('../lib/uploadStorage');
 
 const router = express.Router();
 const prisma = require('../lib/prisma');
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`)
-});
-const upload = multer({ storage });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 router.get('/public', async (req, res) => {
   try {
@@ -291,7 +288,13 @@ router.post('/:id/logo', authenticate, upload.single('logo'), async (req, res) =
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    const logoUrl = `/uploads/logos/${req.file.filename}`;
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ error: 'ファイルが必要です' });
+    }
+    const ext = path.extname(req.file.originalname) || '';
+    const filename = `${uuidv4()}${ext}`;
+    await saveUpload(`logos/${filename}`, req.file.buffer, req.file.mimetype);
+    const logoUrl = `/uploads/logos/${filename}`;
     const team = await prisma.team.update({
       where: { id: req.params.id },
       data: { logoUrl }
@@ -299,6 +302,7 @@ router.post('/:id/logo', authenticate, upload.single('logo'), async (req, res) =
 
     res.json(team);
   } catch (error) {
+    console.error('Upload logo error:', error);
     res.status(500).json({ error: 'Failed to upload logo' });
   }
 });

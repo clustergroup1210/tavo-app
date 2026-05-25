@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const { authenticate, hasTeamAccess } = require('../middleware/auth');
 const { filterDataByVisibility, getVisibleDataWhereClause } = require('../services/dataVisibilityService');
 const { isR2Configured, getUploadPresignedUrl, getDownloadPresignedUrl, deleteR2Object } = require('../lib/r2');
+const { saveUpload, deleteUpload, streamUpload } = require('../lib/uploadStorage');
 
 const router = express.Router();
 const prisma = require('../lib/prisma');
@@ -21,11 +22,7 @@ const videoInclude = {
   categoryTags: { include: { teamCategory: { select: { id: true, name: true } } } }
 };
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => cb(null, `video_${uuidv4()}${path.extname(file.originalname)}`)
-});
-const upload = multer({ storage, limits: { fileSize: 100 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 
 const fs = require('fs');
 const thumbUpload = multer({
@@ -187,13 +184,20 @@ router.post('/', authenticate, upload.single('video'), async (req, res) => {
       }
     }
 
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ error: 'video file is required' });
+    }
+    const ext = path.extname(req.file.originalname) || '';
+    const storageKey = `video_${uuidv4()}${ext}`;
+    await saveUpload(storageKey, req.file.buffer, req.file.mimetype);
+
     const video = await prisma.video.create({
       data: {
         title,
         description,
         playerId,
         teamId,
-        storageKey: req.file.filename,
+        storageKey,
         uploadedBy: req.user.id,
         playerTags: parsedPlayerTags.length ? {
           create: parsedPlayerTags.map(pid => ({ playerId: pid }))
@@ -236,11 +240,10 @@ router.post('/:id/thumbnail', authenticate, (req, res) => {
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      // ここで初めてディスクに書き込む
+      // 認可OK後にストレージへ保存
       const filename = `thumb_${video.id}_${Date.now()}.jpg`;
-      const filePath = path.join(__dirname, '../../uploads', filename);
       try {
-        await fs.promises.writeFile(filePath, req.file.buffer);
+        await saveUpload(filename, req.file.buffer, req.file.mimetype || 'image/jpeg');
       } catch (writeErr) {
         console.error('Thumbnail write error:', writeErr);
         return res.status(500).json({ error: 'Failed to save thumbnail' });
@@ -248,8 +251,7 @@ router.post('/:id/thumbnail', authenticate, (req, res) => {
 
       // 旧サムネがあればクリーンアップ
       if (video.thumbnailKey) {
-        const oldPath = path.join(__dirname, '../../uploads', video.thumbnailKey);
-        fs.promises.unlink(oldPath).catch(() => {});
+        deleteUpload(video.thumbnailKey).catch(() => {});
       }
 
       const thumbnailUrl = `/api/videos/${video.id}/thumbnail?v=${Date.now()}`;
@@ -290,8 +292,7 @@ router.get('/:id/thumbnail', authenticate, async (req, res) => {
       }
     }
 
-    res.set('Cache-Control', 'private, max-age=3600');
-    res.sendFile(path.join(__dirname, '../../uploads', video.thumbnailKey));
+    return streamUpload(res, video.thumbnailKey, { cacheControl: 'private, max-age=3600' });
   } catch (error) {
     console.error('Thumbnail serve error:', error);
     res.status(500).end();
@@ -361,8 +362,7 @@ router.get('/:id/stream', authenticate, async (req, res) => {
     const isOp = isOperator(req.user);
 
     if (isUploader || isSelf || isParent || isOp) {
-      const filePath = path.join(__dirname, '../../uploads', video.storageKey);
-      return res.sendFile(filePath);
+      return streamUpload(res, video.storageKey);
     }
 
     const hasAccess = (video.player && hasTeamAccess(req.user, video.player.teamId)) ||
@@ -379,8 +379,7 @@ router.get('/:id/stream', authenticate, async (req, res) => {
       }
     }
 
-    const filePath = path.join(__dirname, '../../uploads', video.storageKey);
-    res.sendFile(filePath);
+    return streamUpload(res, video.storageKey);
   } catch (error) {
     res.status(500).json({ error: 'Failed to stream video' });
   }
@@ -491,6 +490,12 @@ router.delete('/:id', authenticate, async (req, res) => {
       } catch (err) {
         console.error('R2 delete error (continuing with DB delete):', err);
       }
+    }
+    if (video.storageKey) {
+      deleteUpload(video.storageKey).catch(() => {});
+    }
+    if (video.thumbnailKey) {
+      deleteUpload(video.thumbnailKey).catch(() => {});
     }
 
     await prisma.video.delete({ where: { id: req.params.id } });

@@ -6,14 +6,11 @@ const prisma = require('../lib/prisma');
 const { authenticate, hasTeamAccess, getHeadCoachVisibleTeamIds, getTeamSubtreeIds } = require('../middleware/auth');
 const { transferPlayer } = require('../services/transferService');
 const { filterDataByVisibility } = require('../services/dataVisibilityService');
+const { saveUpload } = require('../lib/uploadStorage');
 
 const router = express.Router();
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`)
-});
-const upload = multer({ storage });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -561,7 +558,13 @@ router.post('/:id/photo', authenticate, upload.single('photo'), async (req, res)
       return res.status(403).json({ error: '写真の更新権限がありません。担当選手のみ更新できます。' });
     }
 
-    const photoUrl = `/uploads/logos/${req.file.filename}`;
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ error: 'ファイルが必要です' });
+    }
+    const ext = path.extname(req.file.originalname) || '';
+    const filename = `${uuidv4()}${ext}`;
+    await saveUpload(`logos/${filename}`, req.file.buffer, req.file.mimetype);
+    const photoUrl = `/uploads/logos/${filename}`;
     const updated = await prisma.player.update({
       where: { id: req.params.id },
       data: { photoUrl }
@@ -569,6 +572,7 @@ router.post('/:id/photo', authenticate, upload.single('photo'), async (req, res)
 
     res.json(updated);
   } catch (error) {
+    console.error('Upload photo error:', error);
     res.status(500).json({ error: 'Failed to upload photo' });
   }
 });
@@ -620,7 +624,13 @@ router.post('/:id/passport', authenticate, upload.single('passport'), async (req
       return res.status(403).json({ error: '選手証写真の更新権限がありません。担当選手のみ更新できます。' });
     }
 
-    const passportUrl = `/uploads/${req.file.filename}`;
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ error: 'ファイルが必要です' });
+    }
+    const ext = path.extname(req.file.originalname) || '';
+    const filename = `${uuidv4()}${ext}`;
+    await saveUpload(filename, req.file.buffer, req.file.mimetype);
+    const passportUrl = `/uploads/${filename}`;
     const updated = await prisma.player.update({
       where: { id: req.params.id },
       data: { passportUrl }

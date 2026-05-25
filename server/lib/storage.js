@@ -5,7 +5,8 @@ let cachedClient = null;
 let cachedProvider = null;
 
 function detectProvider() {
-  if (process.env.S3_BUCKET && process.env.AWS_REGION) return 'aws';
+  const awsBucket = process.env.AWS_S3_BUCKET || process.env.S3_BUCKET;
+  if (awsBucket && process.env.AWS_REGION) return 'aws';
   if (process.env.R2_BUCKET_NAME && process.env.R2_ACCOUNT_ID) return 'r2';
   return null;
 }
@@ -42,7 +43,18 @@ function getClient() {
 }
 
 function getBucket() {
-  return process.env.S3_BUCKET || process.env.R2_BUCKET_NAME || null;
+  return process.env.AWS_S3_BUCKET || process.env.S3_BUCKET || process.env.R2_BUCKET_NAME || null;
+}
+
+async function getDownloadStreamSafe(key) {
+  try {
+    return await getDownloadStream(key);
+  } catch (e) {
+    if (e?.$metadata?.httpStatusCode === 404 || e?.Code === 'NoSuchKey' || e?.name === 'NoSuchKey') {
+      return null;
+    }
+    throw e;
+  }
 }
 
 function isConfigured() {
@@ -123,6 +135,7 @@ module.exports = {
   publicUrlFor,
   uploadBuffer,
   getDownloadStream,
+  getDownloadStreamSafe,
   getUploadPresignedUrl,
   getDownloadPresignedUrl,
   deleteObject,

@@ -75,8 +75,17 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
-app.use('/uploads/logos', express.static(path.join(__dirname, '../uploads')));
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+const { streamUpload } = require('./lib/uploadStorage');
+app.get(/^\/uploads\/(.+)$/, async (req, res) => {
+  try {
+    const rest = req.params[0];
+    if (!rest || rest.includes('..')) return res.status(400).end();
+    await streamUpload(res, rest, { cacheControl: 'public, max-age=3600' });
+  } catch (e) {
+    console.error('uploads stream error:', e);
+    if (!res.headersSent) res.status(500).end();
+  }
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/auth', authGoogleRoutes);
