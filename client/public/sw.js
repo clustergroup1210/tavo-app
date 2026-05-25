@@ -19,8 +19,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'お知らせ';
   const options = {
     body: data.body || '',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
     data: { url: data.url || '/', type: data.type || 'GENERIC' },
     tag: data.type || 'notification',
     renotify: true

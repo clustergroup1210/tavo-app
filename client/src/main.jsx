@@ -20,9 +20,9 @@ window.fetch = function(url, options = {}) {
   return originalFetch.call(this, url, options);
 };
 
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
+    navigator.serviceWorker.register('/service-worker.js').catch((err) => {
       console.warn('Service worker registration failed:', err);
     });
   });

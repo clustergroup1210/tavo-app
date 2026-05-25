@@ -23,7 +23,7 @@ export async function ensureServiceWorker() {
   try {
     const reg =
       (await navigator.serviceWorker.getRegistration('/')) ||
-      (await navigator.serviceWorker.register('/sw.js'));
+      (await navigator.serviceWorker.register('/service-worker.js'));
     await navigator.serviceWorker.ready;
     return reg;
   } catch (e) {
