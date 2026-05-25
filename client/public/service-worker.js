@@ -1,6 +1,6 @@
 /* TAVO PWA Service Worker: caching + web push */
 
-const CACHE_VERSION = 'tavo-cache-v1';
+const CACHE_VERSION = 'tavo-cache-v2';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
