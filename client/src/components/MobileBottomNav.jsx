@@ -17,7 +17,6 @@ export default function MobileBottomNav() {
         { path: '/player-dashboard', label: 'ホーム', icon: LayoutDashboard },
         { path: '/mypage', label: 'マイページ', icon: UserCircle },
         { path: '/evaluations/entry', label: '評価', icon: ClipboardList },
-        { path: '/videos', label: '動画', icon: Video },
         { path: '/calendar', label: 'カレンダー', icon: Calendar },
       ];
     }
@@ -28,17 +27,6 @@ export default function MobileBottomNav() {
         { path: '/mypage', label: 'マイページ', icon: UserCircle },
         { path: '/videos', label: '動画', icon: Video },
         { path: '/calendar', label: 'カレンダー', icon: Calendar },
-        { path: '/announcements', label: 'お知らせ', icon: Megaphone },
-      ];
-    }
-
-    if (currentTeam && (isTeamAdmin(currentTeam.id) || isCoach(currentTeam.id))) {
-      return [
-        { path: '/dashboard', label: 'ホーム', icon: LayoutDashboard },
-        { path: '/players', label: '選手', icon: Users },
-        { path: '/evaluations/entry', label: '評価', icon: ClipboardList },
-        { path: '/videos', label: '動画', icon: Video },
-        { path: '/calendar', label: 'カレンダー', icon: Calendar },
       ];
     }
 
@@ -46,24 +34,15 @@ export default function MobileBottomNav() {
       return [
         { path: '/dashboard', label: 'ホーム', icon: LayoutDashboard },
         { path: '/teams', label: 'チーム', icon: Building2 },
-        { path: '/players', label: '選手', icon: Users },
-        { path: '/videos', label: '動画', icon: Video },
-        { path: '/calendar', label: 'カレンダー', icon: Calendar },
-      ];
-    }
-
-    if (isOperator() && currentTeam) {
-      return [
-        { path: '/dashboard', label: 'ホーム', icon: LayoutDashboard },
-        { path: '/players', label: '選手', icon: Users },
-        { path: '/evaluations/entry', label: '評価', icon: ClipboardList },
-        { path: '/videos', label: '動画', icon: Video },
+        { path: '/players', label: '選手一覧', icon: Users },
         { path: '/calendar', label: 'カレンダー', icon: Calendar },
       ];
     }
 
     return [
       { path: '/dashboard', label: 'ホーム', icon: LayoutDashboard },
+      { path: '/players', label: '選手一覧', icon: Users },
+      { path: '/evaluations/entry', label: '評価入力', icon: ClipboardList },
       { path: '/calendar', label: 'カレンダー', icon: Calendar },
     ];
   };

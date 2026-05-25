@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Menu } from 'lucide-react';
 import Sidebar from './Sidebar';
+import MobileBottomNav from './MobileBottomNav';
 import PostLoginPushPrompt from './PostLoginPushPrompt';
 import NotificationBell from './NotificationBell';
 import { useAuth } from '../contexts/AuthContext';
@@ -37,11 +38,12 @@ export default function Layout({ children }) {
             </div>
           </div>
         </header>
-        <main className="flex-1 p-4 lg:p-5 min-w-0 mt-14 lg:mt-12">
+        <main className="flex-1 p-4 lg:p-5 min-w-0 mt-14 lg:mt-12 pb-20 lg:pb-5">
           {children}
         </main>
       </div>
 
+      <MobileBottomNav />
       <PostLoginPushPrompt />
     </div>
   );
