@@ -14,17 +14,17 @@ export default function Layout({ children }) {
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="flex-1 lg:ml-60 flex flex-col min-w-0">
-        <header className="h-12 bg-white border-b border-gray-200/80 flex items-center px-3 lg:px-5 fixed top-0 left-0 lg:left-60 right-0 z-[45] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        <header className="h-14 lg:h-12 bg-white border-b border-gray-200/80 flex items-center px-3 lg:px-5 fixed top-0 left-0 lg:left-60 right-0 z-[45] shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
           <button
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden p-1.5 -ml-1 text-gray-700 hover:bg-gray-100 rounded transition-colors"
             aria-label="メニューを開く"
           >
-            <Menu className="w-5 h-5" />
+            <Menu className="w-6 h-6" />
           </button>
 
           <div className="lg:hidden absolute left-1/2 -translate-x-1/2 flex items-center pointer-events-none">
-            <img src="/tavo-logo-black.png" alt="TAVO" className="h-6 w-auto" />
+            <img src="/tavo-logo-black.png" alt="TAVO" className="h-7 w-auto" />
           </div>
 
           <div className="flex items-center gap-2 ml-auto flex-shrink-0">
@@ -37,7 +37,7 @@ export default function Layout({ children }) {
             </div>
           </div>
         </header>
-        <main className="flex-1 p-4 lg:p-5 min-w-0 mt-12">
+        <main className="flex-1 p-4 lg:p-5 min-w-0 mt-14 lg:mt-12">
           {children}
         </main>
       </div>
