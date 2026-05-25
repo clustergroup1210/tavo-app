@@ -39,14 +39,14 @@ export default function Login() {
             <img
               src="/tavo-logo.png"
               alt="TAVO 才能を、加速させる。"
-              className="w-full max-w-[200px] h-auto"
+              className="w-full max-w-[260px] h-auto"
             />
-            <p className="mt-5 text-base text-gray-600 leading-relaxed">
+            <p className="mt-6 text-lg text-gray-600 leading-relaxed">
               評価・目標・コミュニケーションを集約し、<br />
               チーム運営と選手育成をシンプルにします。
             </p>
 
-            <ul className="mt-8 space-y-3 text-sm text-gray-700 text-left">
+            <ul className="mt-8 space-y-3 text-base text-gray-700 text-left">
               <li className="flex items-start gap-3">
                 <span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-primary-600 flex-shrink-0" />
                 チーム単位で選手データを一元管理
