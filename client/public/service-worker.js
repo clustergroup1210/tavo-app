@@ -1,10 +1,9 @@
 /* TAVO PWA Service Worker: caching + web push */
 
-const CACHE_VERSION = 'tavo-cache-v2';
+const CACHE_VERSION = 'tavo-cache-v3-20260525';
 const PRECACHE_URLS = [
-  '/',
-  '/index.html',
   '/manifest.webmanifest',
+  '/favicon.ico',
   '/favicon.png',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
